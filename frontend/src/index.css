@@ -1,0 +1,157 @@
+/* ============================================================
+   src/index.css — Estilos globales de Conexión Legal
+   ============================================================ */
+
+/* Fuentes de Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Variables CSS globales ──────────────────────────────── */
+:root {
+  --color-primary:     #1a2e5a;
+  --color-primary-light: #2d4a8a;
+  --color-gold:        #c9a227;
+  --color-surface:     #f8fafc;
+  --color-border:      #e2e8f0;
+  --transition-fast:   150ms ease;
+  --transition-base:   250ms ease;
+  --transition-slow:   400ms ease;
+}
+
+/* ─── Reset y base ───────────────────────────────────────── */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply font-body text-slate-800 bg-slate-50;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display;
+  }
+
+  /* Scrollbar personalizada */
+  ::-webkit-scrollbar        { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track  { background: transparent; }
+  ::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+}
+
+/* ─── Componentes reutilizables ──────────────────────────── */
+@layer components {
+
+  /* Botón principal */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2
+           px-6 py-3 rounded-xl font-body font-medium text-sm text-white
+           bg-navy-900 hover:bg-navy-800
+           shadow-button hover:shadow-card-hover
+           transition-all duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Botón secundario (outline) */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2
+           px-6 py-3 rounded-xl font-body font-medium text-sm
+           text-navy-900 bg-white border border-navy-200
+           hover:bg-navy-50 hover:border-navy-300
+           transition-all duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Botón dorado (premium) */
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2
+           px-6 py-3 rounded-xl font-body font-medium text-sm text-white
+           bg-gradient-to-r from-gold-500 to-gold-600
+           hover:from-gold-600 hover:to-gold-500
+           shadow-button hover:shadow-card-hover
+           transition-all duration-200;
+  }
+
+  /* Tarjeta base */
+  .card {
+    @apply bg-white rounded-2xl shadow-card border border-slate-100
+           transition-shadow duration-200;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-card-hover cursor-pointer;
+  }
+
+  /* Input de formulario */
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl border border-slate-200
+           bg-white text-slate-800 placeholder-slate-400
+           font-body text-sm
+           focus:outline-none focus:ring-2 focus:ring-navy-900/20 focus:border-navy-900
+           transition-all duration-200
+           disabled:bg-slate-50 disabled:text-slate-500;
+  }
+
+  .input-label {
+    @apply block text-sm font-medium text-slate-700 mb-1.5 font-body;
+  }
+
+  .input-error {
+    @apply text-xs text-red-500 mt-1;
+  }
+
+  /* Badge de plan */
+  .badge-plan-gratuito { @apply text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600; }
+  .badge-plan-basico   { @apply text-xs font-medium px-2.5 py-1 rounded-full bg-navy-50 text-navy-700; }
+  .badge-plan-premium  { @apply text-xs font-medium px-2.5 py-1 rounded-full bg-gradient-to-r from-gold-400 to-gold-500 text-white; }
+
+  /* Badge de estado de consulta */
+  .badge-pendiente   { @apply text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200; }
+  .badge-confirmada  { @apply text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200; }
+  .badge-completada  { @apply text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200; }
+  .badge-cancelada   { @apply text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-700 border border-red-200; }
+
+  /* Sección de página */
+  .page-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-title {
+    @apply font-display text-3xl font-bold text-navy-900;
+  }
+
+  .section-subtitle {
+    @apply font-body text-slate-500 mt-2;
+  }
+
+  /* Estrellas de calificación */
+  .star-filled  { @apply text-gold-500; }
+  .star-empty   { @apply text-slate-200; }
+
+  /* Separador decorativo */
+  .divider {
+    @apply border-t border-slate-100 my-6;
+  }
+}
+
+/* ─── Utilidades extra ────────────────────────────────────── */
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-navy-900 to-navy-700 bg-clip-text text-transparent;
+  }
+
+  .text-gradient-gold {
+    @apply bg-gradient-to-r from-gold-500 to-gold-400 bg-clip-text text-transparent;
+  }
+
+  /* Glassmorphism para overlays */
+  .glass {
+    backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.85);
+  }
+}

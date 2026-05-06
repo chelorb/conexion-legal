@@ -1,0 +1,343 @@
+// ============================================================
+// src/controllers/abogados.controller.js
+// Endpoints públicos y privados para abogados
+// - Búsqueda y listado (público)
+// - Gestión de perfil (privado, solo el propio abogado)
+// ============================================================
+
+const { query } = require('../config/database');
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/abogados
+// Listado público de abogados con filtros y paginación
+// ─────────────────────────────────────────────────────────────
+const listarAbogados = async (req, res, next) => {
+  try {
+    const {
+      especialidad,
+      ciudad,
+      provincia,
+      online,          // 'true' o 'false'
+      plan,            // 'gratuito', 'basico', 'premium'
+      orden = 'calificacion', // 'calificacion' | 'experiencia' | 'nombre'
+      pagina = 1,
+      limite = 12,
+    } = req.query;
+
+    // Construir la query dinámicamente según los filtros recibidos
+    const condiciones = ['pa.visible_en_grilla = true', 'u.activo = true'];
+    const parametros  = [];
+    let paramIndex    = 1;
+
+    if (especialidad) {
+      // Busca en el array de especialidades del perfil
+      condiciones.push(`$${paramIndex} = ANY(pa.especialidades)`);
+      parametros.push(especialidad);
+      paramIndex++;
+    }
+
+    if (ciudad) {
+      condiciones.push(`LOWER(pa.ciudad) LIKE LOWER($${paramIndex})`);
+      parametros.push(`%${ciudad}%`);
+      paramIndex++;
+    }
+
+    if (provincia) {
+      condiciones.push(`LOWER(pa.provincia) LIKE LOWER($${paramIndex})`);
+      parametros.push(`%${provincia}%`);
+      paramIndex++;
+    }
+
+    if (online === 'true') {
+      condiciones.push('pa.atiende_online = true');
+    }
+
+    if (plan) {
+      condiciones.push(`ps.slug = $${paramIndex}`);
+      parametros.push(plan);
+      paramIndex++;
+    }
+
+    // Mapear opciones de ordenamiento
+    const ordenMap = {
+      calificacion: 'pa.calificacion_promedio DESC, pa.total_calificaciones DESC',
+      experiencia:  'pa.anos_experiencia DESC NULLS LAST',
+      nombre:       'u.apellido ASC, u.nombre ASC',
+    };
+    const ordenSQL = ordenMap[orden] || ordenMap.calificacion;
+
+    // Paginación
+    const offset = (parseInt(pagina) - 1) * parseInt(limite);
+    const limiteParsed = Math.min(parseInt(limite), 50); // Máximo 50 por página
+
+    const whereClause = condiciones.join(' AND ');
+
+    // Query principal con todos los datos necesarios para la tarjeta del abogado
+    const sql = `
+      SELECT
+        u.id,
+        u.nombre,
+        u.apellido,
+        u.avatar_url,
+        pa.especialidades,
+        pa.descripcion,
+        pa.anos_experiencia,
+        pa.ciudad,
+        pa.provincia,
+        pa.atiende_online,
+        pa.atiende_presencial,
+        pa.calificacion_promedio,
+        pa.total_calificaciones,
+        pa.consultas_completadas,
+        pa.matricula_verificada,
+        pa.credencial_activa,
+        ps.nombre  AS plan_nombre,
+        ps.slug    AS plan_slug,
+        ps.difusion_profesional
+      FROM usuarios u
+      JOIN perfiles_abogado pa ON u.id = pa.usuario_id
+      JOIN planes_suscripcion ps ON pa.plan_id = ps.id
+      WHERE ${whereClause}
+      ORDER BY
+        ps.difusion_profesional DESC, -- Los premium aparecen primero
+        ${ordenSQL}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    parametros.push(limiteParsed, offset);
+
+    const { rows: abogados } = await query(sql, parametros);
+
+    // Contar el total para la paginación del frontend
+    const { rows: conteo } = await query(
+      `SELECT COUNT(*) AS total
+       FROM usuarios u
+       JOIN perfiles_abogado pa ON u.id = pa.usuario_id
+       JOIN planes_suscripcion ps ON pa.plan_id = ps.id
+       WHERE ${whereClause}`,
+      parametros.slice(0, -2) // Sin el LIMIT y OFFSET
+    );
+
+    const total = parseInt(conteo[0].total);
+
+    res.json({
+      abogados,
+      paginacion: {
+        total,
+        pagina:      parseInt(pagina),
+        limite:      limiteParsed,
+        total_paginas: Math.ceil(total / limiteParsed),
+      }
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/abogados/:id
+// Perfil público completo de un abogado
+// ─────────────────────────────────────────────────────────────
+const obtenerAbogado = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const { rows } = await query(
+      `SELECT
+         u.id, u.nombre, u.apellido, u.avatar_url,
+         pa.especialidades, pa.descripcion, pa.anos_experiencia,
+         pa.ciudad, pa.provincia, pa.direccion_consultorio,
+         pa.atiende_online, pa.atiende_presencial,
+         pa.calificacion_promedio, pa.total_calificaciones,
+         pa.consultas_completadas, pa.matricula_verificada,
+         pa.credencial_activa,
+         ps.nombre AS plan_nombre
+       FROM usuarios u
+       JOIN perfiles_abogado pa ON u.id = pa.usuario_id
+       JOIN planes_suscripcion ps ON pa.plan_id = ps.id
+       WHERE u.id = $1 AND pa.visible_en_grilla = true AND u.activo = true`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Abogado no encontrado.' });
+    }
+
+    // Obtener las últimas calificaciones públicas
+    const { rows: calificaciones } = await query(
+      `SELECT c.puntaje, c.comentario, c.creado_en,
+              u.nombre AS cliente_nombre
+       FROM calificaciones c
+       JOIN usuarios u ON c.cliente_id = u.id
+       WHERE c.abogado_id = $1 AND c.publica = true
+       ORDER BY c.creado_en DESC
+       LIMIT 10`,
+      [id]
+    );
+
+    res.json({
+      abogado: rows[0],
+      calificaciones,
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// PUT /api/abogados/perfil
+// Actualizar el perfil del abogado autenticado
+// ─────────────────────────────────────────────────────────────
+const actualizarPerfil = async (req, res, next) => {
+  try {
+    const usuarioId = req.usuario.id;
+    const {
+      matricula, especialidades, descripcion, anos_experiencia,
+      provincia, ciudad, direccion_consultorio,
+      atiende_online, atiende_presencial,
+    } = req.body;
+
+    // También actualizar nombre y teléfono en la tabla usuarios si vienen
+    if (req.body.nombre || req.body.apellido || req.body.telefono) {
+      const campos = [];
+      const vals   = [];
+      let idx = 1;
+
+      if (req.body.nombre)   { campos.push(`nombre = $${idx++}`);   vals.push(req.body.nombre); }
+      if (req.body.apellido) { campos.push(`apellido = $${idx++}`); vals.push(req.body.apellido); }
+      if (req.body.telefono) { campos.push(`telefono = $${idx++}`); vals.push(req.body.telefono); }
+
+      vals.push(usuarioId);
+      await query(
+        `UPDATE usuarios SET ${campos.join(', ')} WHERE id = $${idx}`,
+        vals
+      );
+    }
+
+    // Actualizar perfil del abogado
+    const { rows } = await query(
+      `UPDATE perfiles_abogado SET
+         matricula             = COALESCE($1, matricula),
+         especialidades        = COALESCE($2, especialidades),
+         descripcion           = COALESCE($3, descripcion),
+         anos_experiencia      = COALESCE($4, anos_experiencia),
+         provincia             = COALESCE($5, provincia),
+         ciudad                = COALESCE($6, ciudad),
+         direccion_consultorio = COALESCE($7, direccion_consultorio),
+         atiende_online        = COALESCE($8, atiende_online),
+         atiende_presencial    = COALESCE($9, atiende_presencial),
+         perfil_completo       = true
+       WHERE usuario_id = $10
+       RETURNING *`,
+      [
+        matricula, especialidades, descripcion, anos_experiencia,
+        provincia, ciudad, direccion_consultorio,
+        atiende_online, atiende_presencial,
+        usuarioId,
+      ]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Perfil no encontrado.' });
+    }
+
+    res.json({
+      mensaje: 'Perfil actualizado correctamente.',
+      perfil: rows[0],
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/abogados/dashboard
+// Panel principal del abogado autenticado con estadísticas
+// ─────────────────────────────────────────────────────────────
+const obtenerDashboard = async (req, res, next) => {
+  try {
+    const usuarioId = req.usuario.id;
+
+    // Estadísticas del mes actual
+    const { rows: stats } = await query(
+      `SELECT
+         COUNT(*) FILTER (WHERE estado = 'pendiente')   AS consultas_pendientes,
+         COUNT(*) FILTER (WHERE estado = 'confirmada')  AS consultas_confirmadas,
+         COUNT(*) FILTER (WHERE estado = 'completada'
+           AND DATE_TRUNC('month', fecha_hora) = DATE_TRUNC('month', NOW())) AS completadas_este_mes,
+         COUNT(*) FILTER (WHERE estado = 'cancelada')   AS canceladas_total
+       FROM consultas
+       WHERE abogado_id = $1`,
+      [usuarioId]
+    );
+
+    // Próximas consultas
+    const { rows: proximas } = await query(
+      `SELECT c.id, c.tipo, c.fecha_hora, c.estado, c.especialidad,
+              u.nombre AS cliente_nombre, u.apellido AS cliente_apellido,
+              u.telefono AS cliente_telefono
+       FROM consultas c
+       JOIN usuarios u ON c.cliente_id = u.id
+       WHERE c.abogado_id = $1
+         AND c.estado IN ('pendiente', 'confirmada')
+         AND c.fecha_hora >= NOW()
+       ORDER BY c.fecha_hora ASC
+       LIMIT 5`,
+      [usuarioId]
+    );
+
+    // Datos del perfil y plan
+    const { rows: perfil } = await query(
+      `SELECT pa.calificacion_promedio, pa.total_calificaciones,
+              pa.suscripcion_activa, pa.suscripcion_fin,
+              pa.visible_en_grilla, pa.perfil_completo,
+              ps.nombre AS plan_nombre, ps.slug AS plan_slug
+       FROM perfiles_abogado pa
+       JOIN planes_suscripcion ps ON pa.plan_id = ps.id
+       WHERE pa.usuario_id = $1`,
+      [usuarioId]
+    );
+
+    // Notificaciones no leídas
+    const { rows: notifs } = await query(
+      'SELECT COUNT(*) AS no_leidas FROM notificaciones WHERE usuario_id = $1 AND leida = false',
+      [usuarioId]
+    );
+
+    res.json({
+      estadisticas:    stats[0],
+      proximas_consultas: proximas,
+      perfil:          perfil[0],
+      notificaciones_no_leidas: parseInt(notifs[0].no_leidas),
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/abogados/especialidades
+// Lista de especialidades disponibles para filtros
+// ─────────────────────────────────────────────────────────────
+const listarEspecialidades = async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'SELECT id, nombre, icono FROM especialidades_catalogo WHERE activa = true ORDER BY nombre'
+    );
+    res.json({ especialidades: rows });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = {
+  listarAbogados,
+  obtenerAbogado,
+  actualizarPerfil,
+  obtenerDashboard,
+  listarEspecialidades,
+};
