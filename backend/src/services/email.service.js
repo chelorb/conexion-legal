@@ -245,3 +245,81 @@ module.exports = {
   enviarResetPassword,
   enviarConfirmacionSuscripcion,
 };
+
+
+// ─────────────────────────────────────────────────────────────
+// Email al admin: nuevo abogado esperando aprobación
+// ─────────────────────────────────────────────────────────────
+const notificarAdminNuevoAbogado = async ({ adminNombre, adminEmail, abogadoNombre, abogadoApellido, abogadoEmail }) => {
+  const contenido = `
+    <h2>Nuevo abogado pendiente de aprobación 📋</h2>
+    <p>Hola <strong>${adminNombre}</strong>, un nuevo profesional se registró y está esperando tu revisión.</p>
+    <div class="info-box">
+      <strong>👤 Nombre:</strong> ${abogadoNombre} ${abogadoApellido}<br>
+      <strong>📧 Email:</strong> ${abogadoEmail}
+    </div>
+    <div style="text-align:center;">
+      <a href="${process.env.FRONTEND_URL}/admin/abogados" class="btn">
+        Revisar perfil en el panel admin
+      </a>
+    </div>
+  `;
+  return enviarEmail({
+    to:      adminEmail,
+    subject: '🔔 Nuevo abogado pendiente de aprobación — Conexión Legal',
+    html:    templateBase('Nuevo abogado pendiente', contenido),
+  });
+};
+
+// ─────────────────────────────────────────────────────────────
+// Email al abogado: perfil aprobado
+// ─────────────────────────────────────────────────────────────
+const notificarAbogadoAprobado = async ({ nombre, email }) => {
+  const contenido = `
+    <h2>¡Tu perfil fue aprobado! ✅</h2>
+    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, nuestro equipo revisó tu perfil y fue aprobado.</p>
+    <p>A partir de ahora aparecés en la grilla de búsqueda de Conexión Legal y los clientes pueden contactarte.</p>
+    <div style="text-align:center;">
+      <a href="${process.env.FRONTEND_URL}/abogado/dashboard" class="btn">
+        Ir a mi panel
+      </a>
+    </div>
+  `;
+  return enviarEmail({
+    to:      email,
+    subject: '✅ ¡Tu perfil fue aprobado! — Conexión Legal',
+    html:    templateBase('Perfil aprobado', contenido),
+  });
+};
+
+// ─────────────────────────────────────────────────────────────
+// Email al abogado: perfil rechazado con motivo
+// ─────────────────────────────────────────────────────────────
+const notificarAbogadoRechazado = async ({ nombre, email, motivo }) => {
+  const contenido = `
+    <h2>Tu perfil necesita correcciones</h2>
+    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, revisamos tu perfil y encontramos algunos puntos a mejorar antes de poder aprobarlo.</p>
+    <div class="info-box">
+      <strong>📋 Motivo:</strong><br>
+      ${motivo || 'Por favor completá todos los campos requeridos y asegurate de que la matrícula sea válida.'}
+    </div>
+    <p>Podés actualizar tu perfil desde tu panel y volver a solicitar la revisión.</p>
+    <div style="text-align:center;">
+      <a href="${process.env.FRONTEND_URL}/abogado/perfil" class="btn">
+        Actualizar mi perfil
+      </a>
+    </div>
+  `;
+  return enviarEmail({
+    to:      email,
+    subject: 'ℹ️ Tu perfil necesita correcciones — Conexión Legal',
+    html:    templateBase('Perfil pendiente de correcciones', contenido),
+  });
+};
+
+// Exportar las nuevas funciones junto con las existentes
+module.exports = Object.assign(module.exports, {
+  notificarAdminNuevoAbogado,
+  notificarAbogadoAprobado,
+  notificarAbogadoRechazado,
+});
