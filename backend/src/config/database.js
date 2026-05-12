@@ -11,14 +11,12 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 
   // Configuración del pool
-  max: 20,              // Máximo de conexiones simultáneas
-  idleTimeoutMillis: 30000,   // Cierra conexiones inactivas a los 30 segundos
+  max: 20, // Máximo de conexiones simultáneas
+  idleTimeoutMillis: 30000, // Cierra conexiones inactivas a los 30 segundos
   connectionTimeoutMillis: 2000, // Error si no se puede conectar en 2 segundos
 
   // En producción con Railway/Heroku usar SSL
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : false,
+  ssl: process.env.DATABASE_URL?.includes('supabase') ? { rejectUnauthorized: false } : false,
 });
 
 // Verificar conexión al iniciar la aplicación
