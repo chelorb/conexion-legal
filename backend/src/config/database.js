@@ -1,60 +1,48 @@
 // ============================================================
-// src/config/database.js — Configuración del pool de conexiones PostgreSQL
+// src/config/database.js — Configuración del pool de conexiones
 // Usa un pool para reutilizar conexiones y mejorar el rendimiento
+// Compatible con conexiones locales y Supabase (IPv4 + SSL)
 // ============================================================
 
 const { Pool } = require('pg');
 
-// Pool de conexiones: mantiene múltiples conexiones abiertas
-// y las reutiliza en lugar de abrir una nueva por cada consulta
+// Detectar si estamos conectando a Supabase para activar SSL
+const usarSSL = process.env.DATABASE_URL?.includes('supabase');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 
-  // Configuración del pool
-  max: 20, // Máximo de conexiones simultáneas
-  idleTimeoutMillis: 30000, // Cierra conexiones inactivas a los 30 segundos
-  connectionTimeoutMillis: 2000, // Error si no se puede conectar en 2 segundos
+  // SSL: activado para Supabase, desactivado para PostgreSQL local
+  ssl: usarSSL ? { rejectUnauthorized: false } : false,
 
-  // En producción con Railway/Heroku usar SSL
-  ssl: process.env.DATABASE_URL?.includes('supabase') ? { rejectUnauthorized: false } : false,
+  // Configuración del pool de conexiones
+  max:                    10,    // Máximo de conexiones simultáneas
+  idleTimeoutMillis:      30000, // Cerrar conexiones inactivas a los 30 segundos
+  connectionTimeoutMillis: 5000, // Timeout de 5 segundos para obtener conexión
 });
 
-// Verificar conexión al iniciar la aplicación
+// Verificar conexión al iniciar — sin detener el servidor si falla
+// En producción puede tardar unos segundos en conectarse
 pool.connect((err, client, release) => {
   if (err) {
-    console.error('❌ Error al conectar con PostgreSQL:', err.message);
-    process.exit(1); // Detiene la app si no hay DB
+    // Solo loguear el error, no detener el servidor
+    console.error('⚠️  Advertencia: No se pudo conectar con PostgreSQL al iniciar:', err.message);
+    console.error('   El servidor seguirá corriendo e intentará conectarse en cada query.');
   } else {
     console.log('✅ Conexión con PostgreSQL establecida correctamente');
-    release(); // Libera el cliente de vuelta al pool
+    release(); // Liberar el cliente de vuelta al pool
   }
 });
 
 /**
- * Función auxiliar para ejecutar queries con manejo de errores
- * @param {string} text - Query SQL
- * @param {Array} params - Parámetros de la query (evita SQL injection)
- * @returns {Promise<QueryResult>}
+ * Ejecuta una query SQL con parámetros
+ * Los parámetros previenen SQL injection automáticamente
  */
-const query = (text, params) => {
-  return pool.query(text, params);
-};
+const query = (text, params) => pool.query(text, params);
 
 /**
- * Función para transacciones — útil cuando hay múltiples operaciones
- * que deben ejecutarse juntas o fallar juntas
- * @example
- * const client = await getClient();
- * try {
- *   await client.query('BEGIN');
- *   await client.query('INSERT...');
- *   await client.query('UPDATE...');
- *   await client.query('COMMIT');
- * } catch (e) {
- *   await client.query('ROLLBACK');
- * } finally {
- *   client.release();
- * }
+ * Obtiene un cliente del pool para transacciones
+ * Recordá siempre hacer client.release() al terminar
  */
 const getClient = () => pool.connect();
 
