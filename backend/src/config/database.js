@@ -1,49 +1,55 @@
 // ============================================================
-// src/config/database.js — Configuración del pool de conexiones
-// Usa un pool para reutilizar conexiones y mejorar el rendimiento
-// Compatible con conexiones locales y Supabase (IPv4 + SSL)
+// src/config/database.js
+// Conexión a PostgreSQL — soporta variables separadas o URL
+// Compatible con Supabase (pooler) y PostgreSQL local
 // ============================================================
 
 const { Pool } = require('pg');
 
-// Detectar si estamos conectando a Supabase para activar SSL
-const usarSSL = process.env.DATABASE_URL?.includes('supabase');
+// Construir config según disponibilidad de variables
+// Prioridad: variables separadas > DATABASE_URL
+let config;
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+if (process.env.DB_HOST) {
+  // Variables separadas — más confiable con Supabase en Render
+  config = {
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT) || 5432,
+    database: process.env.DB_NAME || 'postgres',
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    ssl: { rejectUnauthorized: false },
+    max: 3,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  };
+  console.log(`🔌 Conectando a: ${process.env.DB_HOST}:${process.env.DB_PORT}`);
+} else {
+  // Fallback a DATABASE_URL (para desarrollo local)
+  config = {
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL?.includes('supabase') ? { rejectUnauthorized: false } : false,
+    max: 3,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  };
+  console.log(`🔌 Conectando via URL`);
+}
 
-  // SSL: activado para Supabase, desactivado para PostgreSQL local
-  ssl: usarSSL ? { rejectUnauthorized: false } : false,
+const pool = new Pool(config);
 
-  // Configuración del pool de conexiones
-  max:                    10,    // Máximo de conexiones simultáneas
-  idleTimeoutMillis:      30000, // Cerrar conexiones inactivas a los 30 segundos
-  connectionTimeoutMillis: 5000, // Timeout de 5 segundos para obtener conexión
-});
-
-// Verificar conexión al iniciar — sin detener el servidor si falla
-// En producción puede tardar unos segundos en conectarse
-pool.connect((err, client, release) => {
-  if (err) {
-    // Solo loguear el error, no detener el servidor
-    console.error('⚠️  Advertencia: No se pudo conectar con PostgreSQL al iniciar:', err.message);
-    console.error('   El servidor seguirá corriendo e intentará conectarse en cada query.');
-  } else {
+// Verificar conexión al iniciar
+pool
+  .connect()
+  .then((client) => {
     console.log('✅ Conexión con PostgreSQL establecida correctamente');
-    release(); // Liberar el cliente de vuelta al pool
-  }
-});
+    client.release();
+  })
+  .catch((err) => {
+    console.error('⚠️  Error de conexión inicial:', err.message);
+  });
 
-/**
- * Ejecuta una query SQL con parámetros
- * Los parámetros previenen SQL injection automáticamente
- */
 const query = (text, params) => pool.query(text, params);
-
-/**
- * Obtiene un cliente del pool para transacciones
- * Recordá siempre hacer client.release() al terminar
- */
 const getClient = () => pool.connect();
 
 module.exports = { query, getClient, pool };
