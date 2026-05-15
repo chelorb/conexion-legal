@@ -81,14 +81,14 @@ const listarAbogados = async (req, res, next) => {
         u.avatar_url,
         pa.especialidades,
         pa.descripcion,
-        pa.anos_experiencia,
+        CAST(pa.anos_experiencia AS INT) AS anos_experiencia,
         pa.ciudad,
         pa.provincia,
         pa.atiende_online,
         pa.atiende_presencial,
-        pa.calificacion_promedio,
-        pa.total_calificaciones,
-        pa.consultas_completadas,
+        CAST(pa.calificacion_promedio AS FLOAT) AS calificacion_promedio,
+        CAST(pa.total_calificaciones AS INT) AS total_calificaciones,
+        CAST(pa.consultas_completadas AS INT) AS consultas_completadas,
         pa.matricula_verificada,
         pa.credencial_activa,
         ps.nombre  AS plan_nombre,
@@ -146,11 +146,11 @@ const obtenerAbogado = async (req, res, next) => {
     const { rows } = await query(
       `SELECT
          u.id, u.nombre, u.apellido, u.avatar_url,
-         pa.especialidades, pa.descripcion, pa.anos_experiencia,
+         pa.especialidades, pa.descripcion, CAST(pa.anos_experiencia AS INT) AS anos_experiencia,
          pa.ciudad, pa.provincia, pa.direccion_consultorio,
          pa.atiende_online, pa.atiende_presencial,
-         pa.calificacion_promedio, pa.total_calificaciones,
-         pa.consultas_completadas, pa.matricula_verificada,
+         CAST(pa.calificacion_promedio AS FLOAT) AS calificacion_promedio, CAST(pa.total_calificaciones AS INT) AS total_calificaciones,
+         CAST(pa.consultas_completadas AS INT) AS consultas_completadas, pa.matricula_verificada,
          pa.credencial_activa,
          ps.nombre AS plan_nombre
        FROM usuarios u
@@ -291,7 +291,7 @@ const obtenerDashboard = async (req, res, next) => {
 
     // Datos del perfil y plan
     const { rows: perfil } = await query(
-      `SELECT pa.calificacion_promedio, pa.total_calificaciones,
+      `SELECT CAST(pa.calificacion_promedio AS FLOAT) AS calificacion_promedio, CAST(pa.total_calificaciones AS INT) AS total_calificaciones,
               pa.suscripcion_activa, pa.suscripcion_fin,
               pa.visible_en_grilla, pa.perfil_completo,
               ps.nombre AS plan_nombre, ps.slug AS plan_slug
@@ -340,4 +340,25 @@ module.exports = {
   actualizarPerfil,
   obtenerDashboard,
   listarEspecialidades,
+};
+
+// ─────────────────────────────────────────────────────────────
+// Helper: convierte campos numéricos que Neon devuelve como strings
+// Neon (y algunos drivers de pg) retornan DECIMAL como string
+// ─────────────────────────────────────────────────────────────
+const parsearAbogado = (a) => ({
+  ...a,
+  calificacion_promedio:  parseFloat(a.calificacion_promedio  || 0),
+  total_calificaciones:   parseInt(a.total_calificaciones     || 0),
+  consultas_completadas:  parseInt(a.consultas_completadas    || 0),
+  anos_experiencia:       parseInt(a.anos_experiencia         || 0),
+});
+
+module.exports = {
+  listarAbogados,
+  obtenerAbogado,
+  actualizarPerfil,
+  obtenerDashboard,
+  listarEspecialidades,
+  parsearAbogado,
 };
