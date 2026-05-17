@@ -233,3 +233,139 @@ router.patch('/usuarios/:id/estado', async (req, res, next) => {
 });
 
 module.exports = router;
+
+// ─────────────────────────────────────────────────────────────
+// PUT /api/admin/abogados/:id/perfil
+// Editar el perfil completo de un abogado desde el admin
+// ─────────────────────────────────────────────────────────────
+router.put('/abogados/:id/perfil', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const {
+      descripcion, anos_experiencia, ciudad, provincia,
+      matricula, especialidades,
+    } = req.body;
+
+    await query(
+      `UPDATE perfiles_abogado SET
+         descripcion      = COALESCE($1, descripcion),
+         anos_experiencia = COALESCE($2, anos_experiencia),
+         ciudad           = COALESCE($3, ciudad),
+         provincia        = COALESCE($4, provincia),
+         matricula        = COALESCE($5, matricula),
+         especialidades   = COALESCE($6, especialidades),
+         perfil_completo  = true
+       WHERE usuario_id = $7`,
+      [
+        descripcion || null,
+        anos_experiencia ? parseInt(anos_experiencia) : null,
+        ciudad || null,
+        provincia || null,
+        matricula || null,
+        especialidades?.length ? especialidades : null,
+        id,
+      ]
+    );
+
+    res.json({ mensaje: 'Perfil actualizado correctamente.' });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/admin/campus — Listar todo el contenido del campus
+// ─────────────────────────────────────────────────────────────
+router.get('/campus', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, tipo, titulo, descripcion, autor, especialidad,
+              duracion_min, plan_requerido, contenido_url,
+              es_evento, activo, creado_en
+       FROM contenido_campus
+       WHERE es_evento = false
+       ORDER BY creado_en DESC`
+    );
+    res.json({ contenido: rows });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/admin/campus — Crear nuevo contenido
+// ─────────────────────────────────────────────────────────────
+router.post('/campus', async (req, res, next) => {
+  try {
+    const {
+      tipo, titulo, descripcion, autor, especialidad,
+      duracion_min, plan_requerido, contenido_url,
+    } = req.body;
+
+    if (!titulo) {
+      return res.status(400).json({ error: 'El título es obligatorio.' });
+    }
+
+    const { rows: [item] } = await query(
+      `INSERT INTO contenido_campus
+         (tipo, titulo, descripcion, autor, especialidad,
+          duracion_min, plan_requerido, contenido_url, es_evento, activo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, false, true)
+       RETURNING *`,
+      [
+        tipo || 'curso', titulo, descripcion || null,
+        autor || null, especialidad || null,
+        duracion_min || null, plan_requerido || 'comunidad',
+        contenido_url || null,
+      ]
+    );
+
+    res.status(201).json({ mensaje: 'Contenido creado.', item });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PUT /api/admin/campus/:id — Editar contenido existente
+// ─────────────────────────────────────────────────────────────
+router.put('/campus/:id', async (req, res, next) => {
+  try {
+    const {
+      tipo, titulo, descripcion, autor, especialidad,
+      duracion_min, plan_requerido, contenido_url, activo,
+    } = req.body;
+
+    const { rows: [item] } = await query(
+      `UPDATE contenido_campus SET
+         tipo           = COALESCE($1, tipo),
+         titulo         = COALESCE($2, titulo),
+         descripcion    = COALESCE($3, descripcion),
+         autor          = COALESCE($4, autor),
+         especialidad   = COALESCE($5, especialidad),
+         duracion_min   = COALESCE($6, duracion_min),
+         plan_requerido = COALESCE($7, plan_requerido),
+         contenido_url  = COALESCE($8, contenido_url),
+         activo         = COALESCE($9, activo)
+       WHERE id = $10 AND es_evento = false
+       RETURNING *`,
+      [
+        tipo || null, titulo || null, descripcion || null,
+        autor || null, especialidad || null,
+        duracion_min || null, plan_requerido || null,
+        contenido_url || null, activo ?? null,
+        req.params.id,
+      ]
+    );
+
+    if (!item) return res.status(404).json({ error: 'Contenido no encontrado.' });
+    res.json({ mensaje: 'Contenido actualizado.', item });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// DELETE /api/admin/campus/:id — Desactivar contenido
+// ─────────────────────────────────────────────────────────────
+router.delete('/campus/:id', async (req, res, next) => {
+  try {
+    await query(
+      'UPDATE contenido_campus SET activo = false WHERE id = $1',
+      [req.params.id]
+    );
+    res.json({ mensaje: 'Contenido desactivado.' });
+  } catch (error) { next(error); }
+});

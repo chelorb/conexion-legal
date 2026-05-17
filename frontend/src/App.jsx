@@ -42,7 +42,8 @@ import NuevaConsulta    from './pages/cliente/NuevaConsulta';
 import AdminDashboard   from './pages/admin/Dashboard';
 import AdminAbogados    from './pages/admin/Abogados';
 import AdminUsuarios    from './pages/admin/Usuarios';
-import AdminEventos     from './pages/admin/Eventos';         // ← NUEVA
+import AdminEventos     from './pages/admin/Eventos';
+import AdminCampus     from './pages/admin/Campus';
 
 // ─────────────────────────────────────────────────────────────
 // Protección de rutas por autenticación y rol
@@ -123,6 +124,7 @@ function AppRoutes() {
           <Route path="/admin/abogados"  element={<RutaProtegida rolesPermitidos={['admin']}><AdminAbogados /></RutaProtegida>} />
           <Route path="/admin/usuarios"  element={<RutaProtegida rolesPermitidos={['admin']}><AdminUsuarios /></RutaProtegida>} />
           <Route path="/admin/eventos"   element={<RutaProtegida rolesPermitidos={['admin']}><AdminEventos /></RutaProtegida>} />
+          <Route path="/admin/campus"    element={<RutaProtegida rolesPermitidos={['admin']}><AdminCampus /></RutaProtegida>} />
 
           {/* ── 404 ───────────────────────────────────────── */}
           <Route path="*" element={

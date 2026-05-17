@@ -18,16 +18,16 @@ conexion-legal/
 
 ## 🚀 Stack Tecnológico
 
-| Capa          | Tecnología              | Por qué                                      |
-| ------------- | ----------------------- | -------------------------------------------- |
-| Frontend      | React 18 + Vite         | Rápido, amplio ecosistema                    |
-| Estilos       | TailwindCSS             | Diseño profesional sin CSS manual            |
-| Backend       | Node.js + Express       | JavaScript full-stack, simple y escalable    |
-| Base de datos | PostgreSQL              | Relacional, robusto, gratis en Railway       |
-| Auth          | JWT + bcrypt            | Estándar seguro para APIs REST               |
-| Pagos         | MercadoPago             | Líder en Argentina                           |
-| Deploy        | Railway                 | Gratis para comenzar, escala automáticamente |
-| Email         | Nodemailer + Gmail SMTP | Envío de notificaciones                      |
+| Capa | Tecnología | Por qué |
+|------|------------|---------|
+| Frontend | React 18 + Vite | Rápido, amplio ecosistema |
+| Estilos | TailwindCSS | Diseño profesional sin CSS manual |
+| Backend | Node.js + Express | JavaScript full-stack, simple y escalable |
+| Base de datos | PostgreSQL | Relacional, robusto, gratis en Railway |
+| Auth | JWT + bcrypt | Estándar seguro para APIs REST |
+| Pagos | MercadoPago | Líder en Argentina |
+| Deploy | Railway | Gratis para comenzar, escala automáticamente |
+| Email | Nodemailer + Gmail SMTP | Envío de notificaciones |
 
 ---
 
@@ -41,24 +41,22 @@ conexion-legal/
 
 ## 💼 Planes de Suscripción (Abogados)
 
-| Plan         | Precio | Funcionalidades                                             |
-| ------------ | ------ | ----------------------------------------------------------- |
-| **Gratuito** | $0/mes | Perfil básico, aparece en grilla                            |
-| **Básico**   | $X/mes | + Gestión de turnos, campus básico                          |
-| **Premium**  | $X/mes | + Todo el campus, credencial virtual, beneficios exclusivos |
+| Plan | Precio | Funcionalidades |
+|------|--------|-----------------|
+| **Gratuito** | $0/mes | Perfil básico, aparece en grilla |
+| **Básico** | $X/mes | + Gestión de turnos, campus básico |
+| **Premium** | $X/mes | + Todo el campus, credencial virtual, beneficios exclusivos |
 
 ---
 
 ## 📦 Instalación Local
 
 ### Requisitos
-
 - Node.js 18+
 - PostgreSQL 14+
 - npm o yarn
 
 ### Backend
-
 ```bash
 cd backend
 npm install
@@ -69,7 +67,6 @@ npm run dev            # Servidor en http://localhost:3001
 ```
 
 ### Frontend
-
 ```bash
 cd frontend
 npm install

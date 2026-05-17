@@ -81,12 +81,13 @@ const registro = async (req, res, next) => {
         [usuario.id, planId]
       );
 
-      // Notificar al administrador que hay un nuevo abogado esperando revisión
-      await notificarAdminNuevoAbogado({
+      // Notificar al administrador — sin await para no bloquear el registro
+      // Si falla el email, el registro igual se completa correctamente
+      notificarAdminNuevoAbogado({
         abogadoNombre:   nombre,
         abogadoApellido: apellido,
         abogadoEmail:    email,
-      });
+      }).catch(err => console.warn('⚠️  No se pudo notificar al admin:', err.message));
     }
 
     await client.query('COMMIT');
