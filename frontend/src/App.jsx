@@ -28,7 +28,10 @@ import DashboardAbogado from './pages/abogado/Dashboard';
 import PerfilEditar     from './pages/abogado/PerfilEditar';
 import ConsultasAbogado from './pages/abogado/Consultas';
 import Campus           from './pages/abogado/Campus';
-import Agenda           from './pages/abogado/Agenda';       // ← NUEVA
+import Agenda           from './pages/abogado/Agenda';
+import Foro             from './pages/abogado/Foro';
+import ForoCategoria    from './pages/abogado/ForoCategoria';
+import ForoHilo         from './pages/abogado/ForoHilo';
 import Beneficios       from './pages/abogado/Beneficios';
 import Credencial       from './pages/abogado/Credencial';
 import Suscripcion      from './pages/abogado/Suscripcion';
@@ -110,6 +113,9 @@ function AppRoutes() {
           <Route path="/abogado/consultas"   element={<RutaProtegida rolesPermitidos={['abogado']}><ConsultasAbogado /></RutaProtegida>} />
           <Route path="/abogado/campus"      element={<RutaProtegida rolesPermitidos={['abogado']}><Campus /></RutaProtegida>} />
           <Route path="/abogado/agenda"      element={<RutaProtegida rolesPermitidos={['abogado']}><Agenda /></RutaProtegida>} />
+          <Route path="/abogado/foro"        element={<RutaProtegida rolesPermitidos={['abogado']}><Foro /></RutaProtegida>} />
+          <Route path="/abogado/foro/:categoriaId" element={<RutaProtegida rolesPermitidos={['abogado']}><ForoCategoria /></RutaProtegida>} />
+          <Route path="/abogado/foro/:categoriaId/:hiloId" element={<RutaProtegida rolesPermitidos={['abogado']}><ForoHilo /></RutaProtegida>} />
           <Route path="/abogado/beneficios"  element={<RutaProtegida rolesPermitidos={['abogado']}><Beneficios /></RutaProtegida>} />
           <Route path="/abogado/credencial"  element={<RutaProtegida rolesPermitidos={['abogado']}><Credencial /></RutaProtegida>} />
           <Route path="/abogado/suscripcion" element={<RutaProtegida rolesPermitidos={['abogado']}><Suscripcion /></RutaProtegida>} />

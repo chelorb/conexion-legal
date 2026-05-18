@@ -21,7 +21,8 @@ export default function Navbar() {
     { href: '/abogado/dashboard',   label: 'Panel' },
     { href: '/abogado/consultas',   label: 'Consultas' },
     { href: '/abogado/campus',      label: 'Campus' },
-    { href: '/abogado/agenda',      label: 'Agenda' },      // ← NUEVO
+    { href: '/abogado/agenda',      label: 'Agenda' },
+    { href: '/abogado/foro',        label: 'Foro' },
     { href: '/abogado/beneficios',  label: 'Beneficios' },
   ];
 

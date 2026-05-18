@@ -23,6 +23,7 @@ const consultasRoutes      = require('./routes/consultas.routes');
 const calificacionesRoutes = require('./routes/calificaciones.routes');
 const campusRoutes         = require('./routes/campus.routes');
 const agendaRoutes         = require('./routes/agenda.routes');
+const foroRoutes           = require('./routes/foro.routes');       // ← FORO
 const pagosRoutes          = require('./routes/pagos.routes');
 const beneficiosRoutes     = require('./routes/beneficios.routes');
 const adminRoutes          = require('./routes/admin.routes');
@@ -89,6 +90,7 @@ app.use('/api/consultas',      consultasRoutes);
 app.use('/api/calificaciones', calificacionesRoutes);
 app.use('/api/campus',         campusRoutes);
 app.use('/api/agenda',         agendaRoutes);
+app.use('/api/foro',           foroRoutes);          // ← FORO
 app.use('/api/pagos',          pagosRoutes);
 app.use('/api/beneficios',     beneficiosRoutes);
 app.use('/api/admin',          adminRoutes);
