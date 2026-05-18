@@ -94,6 +94,9 @@ app.use('/api/foro',           foroRoutes);          // ← FORO
 app.use('/api/pagos',          pagosRoutes);
 app.use('/api/beneficios',     beneficiosRoutes);
 app.use('/api/admin',          adminRoutes);
+// Ruta pública para links de interés (sin auth, visible en el dashboard)
+const { linksPublicos } = require('./routes/admin.routes');
+app.get('/api/links', linksPublicos);
 app.use('/api/notificaciones', notificacionesRoutes);
 
 // ── 404 ───────────────────────────────────────────────────────

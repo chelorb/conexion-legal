@@ -37,6 +37,7 @@ export default function Navbar() {
     { href: '/admin/usuarios',  label: 'Usuarios' },
     { href: '/admin/campus',    label: 'Campus' },
     { href: '/admin/eventos',   label: 'Eventos' },
+    { href: '/admin/links',     label: 'Links' },
   ];
 
   const linksPublicos = [

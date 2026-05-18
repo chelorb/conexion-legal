@@ -369,3 +369,71 @@ router.delete('/campus/:id', async (req, res, next) => {
     res.json({ mensaje: 'Contenido desactivado.' });
   } catch (error) { next(error); }
 });
+
+// ─────────────────────────────────────────────────────────────
+// LINKS DE INTERÉS
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/links — Listar todos (admin)
+router.get('/links', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'SELECT * FROM links_interes ORDER BY orden ASC, creado_en ASC'
+    );
+    res.json({ links: rows });
+  } catch (error) { next(error); }
+});
+
+// GET pública (sin auth) — para mostrar en el dashboard del abogado
+// La registramos también en app.js como ruta pública
+module.exports.linksPublicos = async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'SELECT id, titulo, url, descripcion FROM links_interes WHERE activo = true ORDER BY orden ASC'
+    );
+    res.json({ links: rows });
+  } catch (error) { next(error); }
+};
+
+// POST /api/admin/links — Crear link
+router.post('/links', async (req, res, next) => {
+  try {
+    const { titulo, url, descripcion, orden } = req.body;
+    if (!titulo || !url) {
+      return res.status(400).json({ error: 'Título y URL son obligatorios.' });
+    }
+    const { rows: [link] } = await query(
+      `INSERT INTO links_interes (titulo, url, descripcion, orden)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [titulo, url, descripcion || null, orden || 0]
+    );
+    res.status(201).json({ link });
+  } catch (error) { next(error); }
+});
+
+// PUT /api/admin/links/:id — Editar link
+router.put('/links/:id', async (req, res, next) => {
+  try {
+    const { titulo, url, descripcion, orden, activo } = req.body;
+    const { rows: [link] } = await query(
+      `UPDATE links_interes SET
+         titulo      = COALESCE($1, titulo),
+         url         = COALESCE($2, url),
+         descripcion = COALESCE($3, descripcion),
+         orden       = COALESCE($4, orden),
+         activo      = COALESCE($5, activo)
+       WHERE id = $6 RETURNING *`,
+      [titulo, url, descripcion, orden, activo ?? null, req.params.id]
+    );
+    if (!link) return res.status(404).json({ error: 'Link no encontrado.' });
+    res.json({ link });
+  } catch (error) { next(error); }
+});
+
+// DELETE /api/admin/links/:id — Eliminar link
+router.delete('/links/:id', async (req, res, next) => {
+  try {
+    await query('DELETE FROM links_interes WHERE id = $1', [req.params.id]);
+    res.json({ mensaje: 'Link eliminado.' });
+  } catch (error) { next(error); }
+});
