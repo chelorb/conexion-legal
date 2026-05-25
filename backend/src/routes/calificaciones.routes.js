@@ -62,3 +62,20 @@ routerC.post('/:consulta_id', verificarToken, requireRol('cliente'), validarCali
 module.exports = routerC;
 
 
+
+// GET /api/calificaciones/abogado/:id — Calificaciones públicas de un abogado
+routerC.get('/abogado/:id', async (req, res, next) => {
+  try {
+    const { rows } = await dbQuery(
+      `SELECT c.puntaje AS calificacion, c.comentario, c.creado_en,
+              u.nombre AS cliente_nombre
+       FROM calificaciones c
+       JOIN usuarios u ON c.cliente_id = u.id
+       WHERE c.abogado_id = $1
+       ORDER BY c.creado_en DESC
+       LIMIT 20`,
+      [req.params.id]
+    );
+    res.json({ calificaciones: rows });
+  } catch (error) { next(error); }
+});

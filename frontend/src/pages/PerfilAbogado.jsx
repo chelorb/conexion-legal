@@ -57,7 +57,7 @@ function TarjetaResena({ resena }) {
             </p>
           </div>
         </div>
-        <Estrellas valor={resena.calificacion} size={13} />
+        <Estrellas valor={resena.puntaje} size={13} />
       </div>
       {resena.comentario && (
         <p className="font-body text-sm leading-relaxed" style={{ color: '#56534A' }}>
@@ -83,13 +83,20 @@ export default function PerfilAbogado() {
   useEffect(() => {
     const cargar = async () => {
       try {
-        const [abogadoRes, resenasRes] = await Promise.all([
-          api.get(`/abogados/${id}`),
-          api.get(`/calificaciones/abogado/${id}`),
-        ]);
+        // Cargar el perfil del abogado (obligatorio)
+        const abogadoRes = await api.get(`/abogados/${id}`);
         setAbogado(abogadoRes.data.abogado);
-        setResenas(resenasRes.data.calificaciones || []);
+
+        // Cargar calificaciones (opcional — no redirigir si falla)
+        try {
+          const resenasRes = await api.get(`/calificaciones/abogado/${id}`);
+          setResenas(resenasRes.data.calificaciones || []);
+        } catch {
+          setResenas([]);
+        }
+
       } catch {
+        // Solo redirigir si el abogado no existe (404)
         navigate('/clientes');
       } finally {
         setCargando(false);
@@ -377,7 +384,7 @@ export default function PerfilAbogado() {
                         {/* Distribución por estrella */}
                         <div className="flex-1 space-y-2">
                           {[5,4,3,2,1].map(n => {
-                            const count = resenas.filter(r => r.calificacion === n).length;
+                            const count = resenas.filter(r => r.puntaje === n).length;
                             const pct   = resenas.length > 0 ? (count / resenas.length) * 100 : 0;
                             return (
                               <div key={n} className="flex items-center gap-3">
