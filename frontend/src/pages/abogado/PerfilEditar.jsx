@@ -1,387 +1,301 @@
 // ============================================================
-// src/pages/abogado/PerfilEditar.jsx
-// Formulario para que el abogado edite su perfil profesional
-// Incluye foto, especialidades, descripción y modalidades
+// src/pages/abogado/PerfilEditar.jsx — Paleta C: Gris carbón + Cobre
 // ============================================================
 
 import { useState, useEffect, useRef } from 'react';
+import { Camera, Save, Check, AlertCircle, User } from 'lucide-react';
 import { useForm } from 'react-hook-form';
-import { Camera, Save, Shield, AlertCircle, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
-// Especialidades disponibles (se cargan desde la API)
+const ESPECIALIDADES = [
+  'Derecho Civil', 'Derecho Penal', 'Derecho Laboral', 'Derecho de Familia',
+  'Derecho Comercial', 'Derecho Administrativo', 'Derecho Tributario',
+  'Derecho Inmobiliario', 'Derecho de Daños', 'Derecho del Consumidor',
+  'Propiedad Intelectual', 'Derecho Migratorio', 'Derecho Societario',
+  'Derecho Ambiental', 'Mediación',
+];
+
 export default function PerfilEditar() {
   const { usuario, actualizarUsuario } = useAuth();
+  const perfil = usuario?.perfil_abogado;
+  const [guardando,     setGuardando]     = useState(false);
+  const [espSel,        setEspSel]        = useState(perfil?.especialidades || []);
+  const [modalidades,   setModalidades]   = useState({
+    online:     perfil?.atiende_online     ?? true,
+    presencial: perfil?.atiende_presencial ?? true,
+  });
+  const [avatarPreview, setAvatarPreview] = useState(usuario?.avatar_url || null);
+  const [avatarFile,    setAvatarFile]    = useState(null);
+  const [cambiosSin,    setCambiosSin]    = useState(false);
+  const fileInputRef = useRef(null);
 
-  const [perfil,          setPerfil]          = useState(null);
-  const [especialidades,  setEspecialidades]  = useState([]);   // catálogo completo
-  const [espSeleccionadas, setEspSeleccionadas] = useState([]); // las del abogado
-  const [cargando,        setCargando]        = useState(true);
-  const [guardando,       setGuardando]       = useState(false);
-  const [subiendoFoto,    setSubiendoFoto]    = useState(false);
-  const [avatarPreview,   setAvatarPreview]   = useState(null); // preview local
+  const { register, handleSubmit, formState: { errors, isDirty } } = useForm({
+    defaultValues: {
+      nombre:          usuario?.nombre          || '',
+      apellido:        usuario?.apellido        || '',
+      telefono:        usuario?.telefono        || '',
+      descripcion:     perfil?.descripcion      || '',
+      anos_experiencia:perfil?.anos_experiencia || '',
+      ciudad:          perfil?.ciudad           || '',
+      provincia:       perfil?.provincia        || '',
+      matricula:       perfil?.matricula        || '',
+    }
+  });
 
-  const inputFotoRef = useRef(null); // Referencia al input file oculto
-
-  const { register, handleSubmit, reset, formState: { errors, isDirty } } = useForm();
-
-  // ── Cargar perfil y catálogo al montar ──────────────────────
   useEffect(() => {
-    const cargar = async () => {
-      try {
-        const [perfilRes, espRes] = await Promise.all([
-          api.get('/auth/me'),
-          api.get('/abogados/especialidades'),
-        ]);
+    setCambiosSin(isDirty || espSel !== (perfil?.especialidades || []) || avatarFile !== null);
+  }, [isDirty, espSel, avatarFile]);
 
-        const p = perfilRes.data.usuario.perfil_abogado;
-        setPerfil(p);
-        setEspecialidades(espRes.data.especialidades);
-        setEspSeleccionadas(p?.especialidades || []);
-        setAvatarPreview(perfilRes.data.usuario.avatar_url);
-
-        // Pre-cargar el formulario con los datos actuales
-        reset({
-          nombre:               perfilRes.data.usuario.nombre,
-          apellido:             perfilRes.data.usuario.apellido,
-          telefono:             perfilRes.data.usuario.telefono || '',
-          matricula:            p?.matricula || '',
-          anos_experiencia:     p?.anos_experiencia || '',
-          descripcion:          p?.descripcion || '',
-          ciudad:               p?.ciudad || '',
-          provincia:            p?.provincia || '',
-          direccion_consultorio: p?.direccion_consultorio || '',
-          atiende_online:       p?.atiende_online ?? true,
-          atiende_presencial:   p?.atiende_presencial ?? true,
-        });
-      } catch {
-        toast.error('No se pudo cargar el perfil.');
-      } finally {
-        setCargando(false);
-      }
-    };
-    cargar();
-  }, [reset]);
-
-  // ── Toggle de especialidad seleccionada ────────────────────
-  const toggleEspecialidad = (nombre) => {
-    setEspSeleccionadas(prev =>
-      prev.includes(nombre)
-        ? prev.filter(e => e !== nombre)        // Quitar si ya estaba
-        : prev.length < 10                      // Máximo 10 especialidades
-          ? [...prev, nombre]
-          : prev
+  const toggleEsp = (esp) => {
+    setEspSel(prev =>
+      prev.includes(esp) ? prev.filter(e => e !== esp) : [...prev, esp]
     );
   };
 
-  // ── Guardar cambios del perfil ─────────────────────────────
-  const onSubmit = async (datos) => {
-    if (espSeleccionadas.length === 0) {
-      toast.error('Seleccioná al menos una especialidad.');
-      return;
-    }
+  const handleAvatar = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error('El archivo no puede superar 5MB.'); return; }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setCambiosSin(true);
+  };
 
+  const onSubmit = async (datos) => {
     setGuardando(true);
     try {
-      // Enviar todos los datos juntos al backend
-      await api.put('/abogados/me/perfil', {
-        ...datos,
-        especialidades: espSeleccionadas,
+      const formData = new FormData();
+      Object.entries(datos).forEach(([k, v]) => { if (v) formData.append(k, v); });
+      formData.append('especialidades', JSON.stringify(espSel));
+      formData.append('atiende_online',      modalidades.online);
+      formData.append('atiende_presencial',  modalidades.presencial);
+      if (avatarFile) formData.append('avatar', avatarFile);
+
+      const { data } = await api.put('/abogados/me/perfil', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      // Actualizar el nombre en el contexto global si cambió
-      actualizarUsuario({ nombre: datos.nombre, apellido: datos.apellido });
-
+      if (actualizarUsuario) actualizarUsuario(data.usuario);
       toast.success('Perfil actualizado correctamente.');
+      setAvatarFile(null);
+      setCambiosSin(false);
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al guardar el perfil.');
+      toast.error(err.response?.data?.error || 'Error al guardar los cambios.');
     } finally {
       setGuardando(false);
     }
   };
 
-  // ── Subir foto de perfil ───────────────────────────────────
-  const handleFoto = async (e) => {
-    const archivo = e.target.files?.[0];
-    if (!archivo) return;
-
-    // Validar tamaño y tipo antes de subir
-    if (archivo.size > 5 * 1024 * 1024) {
-      toast.error('La imagen no puede superar 5MB.');
-      return;
-    }
-
-    // Mostrar preview inmediato (mejor UX)
-    const reader = new FileReader();
-    reader.onload = (ev) => setAvatarPreview(ev.target.result);
-    reader.readAsDataURL(archivo);
-
-    // Subir al servidor
-    setSubiendoFoto(true);
-    try {
-      const formData = new FormData();
-      formData.append('avatar', archivo);
-
-      const { data } = await api.post('/usuarios/avatar', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      actualizarUsuario({ avatar_url: data.avatar_url });
-      toast.success('Foto actualizada.');
-    } catch {
-      toast.error('Error al subir la foto.');
-      setAvatarPreview(usuario?.avatar_url); // Revertir preview
-    } finally {
-      setSubiendoFoto(false);
-    }
-  };
-
-  // ── Estado de carga ────────────────────────────────────────
-  if (cargando) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-navy-900 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="page-container py-8 max-w-4xl">
+    <div className="min-h-screen" style={{ background: '#F0EFED' }}>
+      <div className="page-container py-8 max-w-3xl">
 
-        {/* ── Encabezado ──────────────────────────────────── */}
         <div className="mb-8">
           <h1 className="section-title">Editar perfil</h1>
-          <p className="section-subtitle">
-            Un perfil completo mejora tu visibilidad y genera más confianza en los clientes.
-          </p>
+          <p className="section-subtitle">Tu información visible para los clientes.</p>
         </div>
 
-        {/* Alerta: perfil incompleto */}
-        {!perfil?.perfil_completo && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 flex items-start gap-3">
-            <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-            <p className="font-body text-sm text-amber-700">
-              Tu perfil está incompleto. Completá todos los campos para aparecer en la búsqueda de clientes.
+        {/* Alerta cambios sin guardar */}
+        {cambiosSin && (
+          <div className="rounded-2xl p-4 mb-6 flex items-center gap-3 animate-slide-down"
+            style={{ background: 'rgba(184,96,48,0.08)', border: '1px solid rgba(184,96,48,0.2)' }}>
+            <AlertCircle size={18} style={{ color: '#B86030' }} className="shrink-0" />
+            <p className="font-body text-sm" style={{ color: '#56534A' }}>
+              Tenés cambios sin guardar.
             </p>
           </div>
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
 
-          {/* ── Sección: Foto de perfil ─────────────────── */}
+          {/* Avatar */}
           <div className="card p-6">
-            <h2 className="font-display font-semibold text-navy-900 text-lg mb-5">Foto de perfil</h2>
-
+            <h2 className="font-display font-semibold text-lg mb-5" style={{ color: '#1C1B18' }}>
+              Foto de perfil
+            </h2>
             <div className="flex items-center gap-6">
-              {/* Avatar con botón de cambio */}
-              <div className="relative shrink-0">
-                <div className="w-24 h-24 rounded-2xl bg-navy-100 overflow-hidden">
+              <div className="relative">
+                <div className="w-24 h-24 rounded-2xl overflow-hidden"
+                  style={{ background: '#2C2B27' }}>
                   {avatarPreview
                     ? <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                    : (
-                      <div className="w-full h-full flex items-center justify-center bg-navy-900">
+                    : <div className="w-full h-full flex items-center justify-center">
                         <span className="font-display font-bold text-white text-3xl">
                           {usuario?.nombre?.[0]}{usuario?.apellido?.[0]}
                         </span>
                       </div>
-                    )
                   }
                 </div>
-                {/* Botón superpuesto para cambiar foto */}
-                <button
-                  type="button"
-                  onClick={() => inputFotoRef.current?.click()}
-                  disabled={subiendoFoto}
-                  className="absolute -bottom-2 -right-2 w-8 h-8 bg-navy-900 hover:bg-navy-800 rounded-full flex items-center justify-center transition-colors shadow-button"
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center text-white transition-colors"
+                  style={{ background: '#B86030' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#8B4A1E'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#B86030'; }}
                 >
-                  {subiendoFoto
-                    ? <div className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />
-                    : <Camera size={14} className="text-white" />
-                  }
+                  <Camera size={14} />
                 </button>
-                {/* Input file oculto */}
-                <input
-                  ref={inputFotoRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleFoto}
-                  className="hidden"
-                />
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                  onChange={handleAvatar} />
               </div>
-
               <div>
-                <p className="font-body font-medium text-navy-900 text-sm mb-1">
-                  Subir nueva foto
+                <p className="font-body font-medium text-sm mb-1" style={{ color: '#1C1B18' }}>
+                  Foto profesional
                 </p>
-                <p className="font-body text-xs text-slate-400 leading-relaxed">
-                  JPG, PNG o WebP · Máximo 5MB<br />
-                  Recomendado: foto profesional, fondo claro
+                <p className="font-body text-xs leading-relaxed" style={{ color: '#8A8780' }}>
+                  JPG, PNG o WEBP. Máximo 5MB.<br />Recomendamos una foto clara y profesional.
                 </p>
               </div>
             </div>
           </div>
 
-          {/* ── Sección: Datos personales ───────────────── */}
-          <div className="card p-6">
-            <h2 className="font-display font-semibold text-navy-900 text-lg mb-5">Datos personales</h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Datos personales */}
+          <div className="card p-6 space-y-4">
+            <h2 className="font-display font-semibold text-lg" style={{ color: '#1C1B18' }}>
+              Datos personales
+            </h2>
+            <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="input-label">Nombre</label>
                 <input type="text" className={`input-field ${errors.nombre ? 'border-red-300' : ''}`}
-                  {...register('nombre', { required: 'El nombre es obligatorio' })} />
+                  {...register('nombre', { required: 'Obligatorio' })} />
                 {errors.nombre && <p className="input-error">{errors.nombre.message}</p>}
               </div>
-
               <div>
                 <label className="input-label">Apellido</label>
                 <input type="text" className={`input-field ${errors.apellido ? 'border-red-300' : ''}`}
-                  {...register('apellido', { required: 'El apellido es obligatorio' })} />
+                  {...register('apellido', { required: 'Obligatorio' })} />
                 {errors.apellido && <p className="input-error">{errors.apellido.message}</p>}
               </div>
+            </div>
+            <div>
+              <label className="input-label">
+                Teléfono <span className="font-normal" style={{ color: '#8A8780' }}>(opcional)</span>
+              </label>
+              <input type="tel" placeholder="+54 11 1234-5678" className="input-field"
+                {...register('telefono')} />
+            </div>
+          </div>
 
+          {/* Datos profesionales */}
+          <div className="card p-6 space-y-4">
+            <h2 className="font-display font-semibold text-lg" style={{ color: '#1C1B18' }}>
+              Datos profesionales
+            </h2>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="input-label">Teléfono de contacto</label>
-                <input type="tel" placeholder="+54 11 1234-5678" className="input-field"
-                  {...register('telefono')} />
-              </div>
-
-              <div>
-                <label className="input-label">
-                  Matrícula profesional
-                  {perfil?.matricula_verificada && (
-                    <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 font-normal">
-                      <Shield size={11} /> Verificada
-                    </span>
-                  )}
-                </label>
+                <label className="input-label">Matrícula</label>
                 <input type="text" placeholder="Ej: T-12345" className="input-field"
                   {...register('matricula')} />
               </div>
-
               <div>
                 <label className="input-label">Años de experiencia</label>
-                <input type="number" min="0" max="70" placeholder="Ej: 8" className="input-field"
-                  {...register('anos_experiencia', {
-                    min: { value: 0, message: 'Mínimo 0' },
-                    max: { value: 70, message: 'Máximo 70' },
-                  })} />
-                {errors.anos_experiencia && <p className="input-error">{errors.anos_experiencia.message}</p>}
+                <input type="number" min="0" max="70" placeholder="Ej: 10" className="input-field"
+                  {...register('anos_experiencia')} />
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="input-label">Ciudad</label>
+                <input type="text" placeholder="Ej: Buenos Aires" className="input-field"
+                  {...register('ciudad')} />
+              </div>
+              <div>
+                <label className="input-label">Provincia</label>
+                <input type="text" placeholder="Ej: Buenos Aires" className="input-field"
+                  {...register('provincia')} />
+              </div>
+            </div>
+            <div>
+              <label className="input-label">Descripción profesional</label>
+              <textarea rows={5} placeholder="Contá tu experiencia y especialización..."
+                className={`input-field resize-none ${errors.descripcion ? 'border-red-300' : ''}`}
+                {...register('descripcion', {
+                  maxLength: { value: 2000, message: 'Máximo 2000 caracteres' }
+                })} />
+              {errors.descripcion && <p className="input-error">{errors.descripcion.message}</p>}
+            </div>
           </div>
 
-          {/* ── Sección: Descripción profesional ────────── */}
+          {/* Modalidades */}
           <div className="card p-6">
-            <h2 className="font-display font-semibold text-navy-900 text-lg mb-2">Bio profesional</h2>
-            <p className="font-body text-sm text-slate-500 mb-5">
-              Esta descripción aparece en tu perfil público. Contá tu trayectoria, enfoque y qué te diferencia.
-            </p>
-
-            <textarea
-              rows={5}
-              placeholder="Ej: Abogada especializada en derecho de familia con 10 años de experiencia en el fuero civil. Atiendo casos de divorcio, alimentos, régimen de visitas y sucesiones..."
-              className={`input-field resize-none ${errors.descripcion ? 'border-red-300' : ''}`}
-              {...register('descripcion', {
-                maxLength: { value: 2000, message: 'Máximo 2000 caracteres' },
-              })}
-            />
-            {errors.descripcion && <p className="input-error">{errors.descripcion.message}</p>}
+            <h2 className="font-display font-semibold text-lg mb-5" style={{ color: '#1C1B18' }}>
+              Modalidad de atención
+            </h2>
+            <div className="grid grid-cols-2 gap-4">
+              {[
+                { key: 'online',     label: 'Online',     desc: 'Videollamada o chat', icono: '💻' },
+                { key: 'presencial', label: 'Presencial', desc: 'En tu consultorio',   icono: '🏢' },
+              ].map(({ key, label, desc, icono }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setModalidades(m => ({ ...m, [key]: !m[key] }))}
+                  className="p-4 rounded-xl border-2 text-left transition-all"
+                  style={{
+                    borderColor: modalidades[key] ? '#2C2B27' : '#E8E6E3',
+                    background: modalidades[key] ? '#F7F6F4' : '#fff',
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl">{icono}</span>
+                    {modalidades[key] && (
+                      <div className="w-5 h-5 rounded-full flex items-center justify-center"
+                        style={{ background: '#2C2B27' }}>
+                        <Check size={12} className="text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="font-body font-medium text-sm" style={{ color: '#1C1B18' }}>{label}</p>
+                  <p className="font-body text-xs mt-0.5" style={{ color: '#8A8780' }}>{desc}</p>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* ── Sección: Especialidades ─────────────────── */}
+          {/* Especialidades */}
           <div className="card p-6">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="font-display font-semibold text-navy-900 text-lg">Especialidades</h2>
-              <span className="font-body text-xs text-slate-400">
-                {espSeleccionadas.length}/10 seleccionadas
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="font-display font-semibold text-lg" style={{ color: '#1C1B18' }}>
+                Especialidades
+              </h2>
+              <span className="font-body text-sm" style={{ color: '#8A8780' }}>
+                {espSel.length} seleccionada{espSel.length !== 1 ? 's' : ''}
               </span>
             </div>
-            <p className="font-body text-sm text-slate-500 mb-5">
-              Seleccioná las áreas del derecho en las que ejercés.
-            </p>
-
             <div className="flex flex-wrap gap-2">
-              {especialidades.map(esp => {
-                const seleccionada = espSeleccionadas.includes(esp.nombre);
+              {ESPECIALIDADES.map(esp => {
+                const sel = espSel.includes(esp);
                 return (
                   <button
-                    key={esp.id}
+                    key={esp}
                     type="button"
-                    onClick={() => toggleEspecialidad(esp.nombre)}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-body font-medium transition-all ${
-                      seleccionada
-                        ? 'border-navy-900 bg-navy-900 text-white'
-                        : 'border-slate-200 text-slate-600 hover:border-navy-300 bg-white'
-                    }`}
+                    onClick={() => toggleEsp(esp)}
+                    className="px-3 py-2 rounded-xl text-sm font-body font-medium border-2 transition-all"
+                    style={sel
+                      ? { borderColor: '#2C2B27', background: '#2C2B27', color: '#fff' }
+                      : { borderColor: '#E8E6E3', background: '#fff', color: '#56534A' }
+                    }
                   >
-                    <span>{esp.icono}</span>
-                    {esp.nombre}
-                    {seleccionada && <Check size={13} />}
+                    {sel && <Check size={11} className="inline mr-1" />}
+                    {esp}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* ── Sección: Ubicación y modalidad ──────────── */}
-          <div className="card p-6">
-            <h2 className="font-display font-semibold text-navy-900 text-lg mb-5">Ubicación y modalidad</h2>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="input-label">Provincia</label>
-                <input type="text" placeholder="Ej: Buenos Aires" className="input-field"
-                  {...register('provincia')} />
-              </div>
-
-              <div>
-                <label className="input-label">Ciudad</label>
-                <input type="text" placeholder="Ej: CABA" className="input-field"
-                  {...register('ciudad')} />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className="input-label">
-                  Dirección del consultorio
-                  <span className="text-slate-400 font-normal ml-1">(opcional, solo para atención presencial)</span>
-                </label>
-                <input type="text" placeholder="Ej: Av. Corrientes 1234, Piso 3, Of. B" className="input-field"
-                  {...register('direccion_consultorio')} />
-              </div>
-            </div>
-
-            {/* Modalidades de atención */}
-            <div>
-              <label className="input-label mb-3">Modalidades de atención</label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { campo: 'atiende_online',     label: 'Online',     desc: 'Videollamada',   icono: '💻' },
-                  { campo: 'atiende_presencial', label: 'Presencial', desc: 'En consultorio', icono: '🏢' },
-                ].map(({ campo, label, desc, icono }) => (
-                  <label key={campo} className="flex items-center gap-3 p-4 rounded-xl border-2 border-slate-200 cursor-pointer hover:border-navy-300 transition-colors">
-                    <input type="checkbox" className="rounded border-slate-300 text-navy-900 focus:ring-navy-900 w-4 h-4"
-                      {...register(campo)} />
-                    <span className="text-xl">{icono}</span>
-                    <div>
-                      <p className="font-body font-medium text-navy-900 text-sm">{label}</p>
-                      <p className="font-body text-xs text-slate-400">{desc}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* ── Botón guardar ───────────────────────────── */}
-          <div className="flex items-center justify-between">
-            <p className="font-body text-xs text-slate-400">
-              {isDirty ? '● Hay cambios sin guardar' : '✓ Todo guardado'}
-            </p>
-            <button type="submit" disabled={guardando} className="btn-primary px-8 py-3.5">
+          {/* Botón guardar */}
+          <div className="flex justify-end gap-3">
+            <button
+              type="submit"
+              disabled={guardando}
+              className="flex items-center gap-2 px-8 py-3.5 rounded-xl font-body font-medium text-sm text-white transition-colors disabled:opacity-50"
+              style={{ background: '#2C2B27' }}
+              onMouseEnter={e => { if (!guardando) e.currentTarget.style.background = '#1C1B18'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}
+            >
               {guardando
                 ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Guardando...</>
                 : <><Save size={16} /> Guardar cambios</>

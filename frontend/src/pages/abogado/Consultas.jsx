@@ -1,404 +1,388 @@
 // ============================================================
-// src/pages/abogado/Consultas.jsx
-// Gestión completa de consultas desde el lado del abogado
-// Confirmar, completar, cancelar y ver detalles de cada turno
+// src/pages/abogado/Consultas.jsx — Paleta C: Gris carbón + Cobre
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Calendar, Video, Building2, ChevronDown,
-  Check, X, Clock, Phone, MessageSquare, Search
+  Calendar, Search, Filter, Video, Building2,
+  Check, X, Clock, RefreshCw, Link as LinkIcon,
+  ChevronDown, Star
 } from 'lucide-react';
-import { format, isPast } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 
-// ─────────────────────────────────────────────────────────────
-// Componente: Badge de estado
-// ─────────────────────────────────────────────────────────────
+const ESTADOS = {
+  pendiente:   { label: 'Pendiente',   bg: 'bg-amber-50',  text: 'text-amber-700',  border: 'border-amber-200' },
+  confirmada:  { label: 'Confirmada',  bg: 'bg-blue-50',   text: 'text-blue-700',   border: 'border-blue-200'  },
+  completada:  { label: 'Completada',  bg: 'bg-green-50',  text: 'text-green-700',  border: 'border-green-200' },
+  cancelada:   { label: 'Cancelada',   bg: 'bg-red-50',    text: 'text-red-600',    border: 'border-red-200'   },
+  no_asistio:  { label: 'No asistió',  bg: 'bg-slate-100', text: 'text-slate-600',  border: 'border-slate-200' },
+};
+
 function BadgeEstado({ estado }) {
-  const mapa = {
-    pendiente:  { clase: 'badge-pendiente',  label: 'Pendiente' },
-    confirmada: { clase: 'badge-confirmada', label: 'Confirmada' },
-    completada: { clase: 'badge-completada', label: 'Completada' },
-    cancelada:  { clase: 'badge-cancelada',  label: 'Cancelada' },
-    no_asistio: { clase: 'badge-cancelada',  label: 'No asistió' },
-  };
-  const { clase, label } = mapa[estado] || { clase: 'badge-pendiente', label: estado };
-  return <span className={clase}>{label}</span>;
+  const cfg = ESTADOS[estado] || ESTADOS.pendiente;
+  return (
+    <span className={`text-xs font-body font-medium px-2.5 py-1 rounded-full border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+      {cfg.label}
+    </span>
+  );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Componente: Tarjeta de consulta con acciones
-// ─────────────────────────────────────────────────────────────
 function TarjetaConsulta({ consulta, onAccion }) {
   const [expandida,    setExpandida]    = useState(false);
-  const [linkReunion,  setLinkReunion]  = useState(consulta.link_reunion || '');
-  const [procesando,   setProcesando]   = useState(false);
+  const [linkVideo,    setLinkVideo]    = useState(consulta.link_videollamada || '');
+  const [guardandoLink, setGuardandoLink] = useState(false);
+  const fecha = new Date(consulta.fecha_hora);
 
-  const fecha   = new Date(consulta.fecha_hora);
-  const pasada  = isPast(fecha);
-
-  // Ejecutar una acción de cambio de estado
-  const ejecutarAccion = async (estado, extras = {}) => {
-    setProcesando(true);
+  const guardarLink = async () => {
+    setGuardandoLink(true);
     try {
-      await onAccion(consulta.id, estado, { link_reunion: linkReunion, ...extras });
-    } finally {
-      setProcesando(false);
-    }
+      await api.patch(`/consultas/${consulta.id}/link`, { link_videollamada: linkVideo });
+      toast.success('Link actualizado.');
+    } catch { toast.error('Error al guardar el link.'); }
+    finally { setGuardandoLink(false); }
   };
 
   return (
     <div className="card overflow-hidden">
-      {/* ── Cabecera siempre visible ────────────────────── */}
-      <div className="p-5">
-        <div className="flex items-start gap-4 flex-wrap">
+      {/* Cabecera */}
+      <div
+        className="p-5 flex items-start gap-4 cursor-pointer transition-colors"
+        onClick={() => setExpandida(!expandida)}
+        onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+      >
+        {/* Fecha */}
+        <div
+          className="shrink-0 text-center rounded-xl px-3 py-2 min-w-[52px]"
+          style={{ background: '#F0EFED' }}
+        >
+          <p className="font-body text-xs uppercase tracking-wider" style={{ color: '#8A8780' }}>
+            {format(fecha, 'MMM', { locale: es })}
+          </p>
+          <p className="font-display font-bold text-xl leading-none" style={{ color: '#1C1B18' }}>
+            {format(fecha, 'd')}
+          </p>
+        </div>
 
-          {/* Bloque de fecha */}
-          <div className={`shrink-0 text-center rounded-xl px-3 py-2 min-w-[56px] ${
-            pasada && consulta.estado === 'confirmada' ? 'bg-amber-50' : 'bg-navy-50'
-          }`}>
-            <p className="font-body text-xs text-slate-500 uppercase tracking-wider">
-              {format(fecha, 'MMM', { locale: es })}
-            </p>
-            <p className="font-display font-bold text-navy-900 text-xl leading-none">
-              {format(fecha, 'd')}
-            </p>
-            <p className="font-body text-xs text-slate-400 mt-0.5">
-              {format(fecha, "HH:mm")}
-            </p>
-          </div>
-
-          {/* Datos del cliente */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 flex-wrap">
-              <div>
-                {/* Nombre del cliente */}
-                <p className="font-body font-semibold text-navy-900">
-                  {consulta.cliente_nombre} {consulta.cliente_apellido}
-                </p>
-                <div className="flex items-center gap-3 mt-1 flex-wrap">
-                  {/* Modalidad */}
-                  <span className="flex items-center gap-1 font-body text-xs text-slate-500">
-                    {consulta.tipo === 'online'
-                      ? <><Video size={11} className="text-navy-700" /> Online</>
-                      : <><Building2 size={11} className="text-navy-700" /> Presencial</>
-                    }
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>
+                {consulta.cliente_nombre} {consulta.cliente_apellido}
+              </p>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                <span className="flex items-center gap-1 font-body text-xs" style={{ color: '#56534A' }}>
+                  {consulta.tipo === 'online'
+                    ? <><Video size={11} style={{ color: '#B86030' }} /> Online</>
+                    : <><Building2 size={11} style={{ color: '#B86030' }} /> Presencial</>
+                  }
+                </span>
+                <span className="font-body text-xs" style={{ color: '#8A8780' }}>
+                  {format(fecha, "HH:mm 'hs'")}
+                </span>
+                {consulta.especialidad && (
+                  <span
+                    className="font-body text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: 'rgba(184,96,48,0.08)', color: '#B86030' }}
+                  >
+                    {consulta.especialidad}
                   </span>
-                  {/* Especialidad */}
-                  {consulta.especialidad && (
-                    <span className="font-body text-xs text-navy-700 bg-navy-50 px-2 py-0.5 rounded-full">
-                      {consulta.especialidad}
-                    </span>
-                  )}
-                  {/* Teléfono si está disponible */}
-                  {consulta.cliente_telefono && (
-                    <a
-                      href={`tel:${consulta.cliente_telefono}`}
-                      className="flex items-center gap-1 font-body text-xs text-slate-500 hover:text-navy-900"
-                    >
-                      <Phone size={11} /> {consulta.cliente_telefono}
-                    </a>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <BadgeEstado estado={consulta.estado} />
-                {/* Botón expandir */}
-                <button
-                  onClick={() => setExpandida(!expandida)}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-                >
-                  <ChevronDown size={16} className={`text-slate-400 transition-transform ${expandida ? 'rotate-180' : ''}`} />
-                </button>
+                )}
               </div>
             </div>
-
-            {/* ── Acciones rápidas según estado ───────────── */}
-            <div className="flex flex-wrap gap-2 mt-4">
-
-              {/* Pendiente: Confirmar o Cancelar */}
-              {consulta.estado === 'pendiente' && (
-                <>
-                  <button
-                    onClick={() => ejecutarAccion('confirmada')}
-                    disabled={procesando}
-                    className="btn-primary text-xs px-4 py-2"
-                  >
-                    <Check size={13} /> Confirmar turno
-                  </button>
-                  <button
-                    onClick={() => ejecutarAccion('cancelada')}
-                    disabled={procesando}
-                    className="font-body text-xs text-red-500 hover:text-red-700 px-3 py-2 rounded-xl hover:bg-red-50 transition-colors"
-                  >
-                    <X size={13} className="inline mr-1" /> Rechazar
-                  </button>
-                </>
-              )}
-
-              {/* Confirmada: Completar o No asistió */}
-              {consulta.estado === 'confirmada' && (
-                <>
-                  <button
-                    onClick={() => ejecutarAccion('completada')}
-                    disabled={procesando}
-                    className="btn-primary text-xs px-4 py-2"
-                  >
-                    <Check size={13} /> Marcar completada
-                  </button>
-                  <button
-                    onClick={() => ejecutarAccion('no_asistio')}
-                    disabled={procesando}
-                    className="font-body text-xs text-amber-600 hover:text-amber-700 px-3 py-2 rounded-xl hover:bg-amber-50 transition-colors"
-                  >
-                    <Clock size={13} className="inline mr-1" /> No asistió
-                  </button>
-                  <button
-                    onClick={() => ejecutarAccion('cancelada')}
-                    disabled={procesando}
-                    className="font-body text-xs text-red-500 hover:text-red-700 px-3 py-2 rounded-xl hover:bg-red-50 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                </>
-              )}
-
-              {/* Indicador de procesando */}
-              {procesando && (
-                <div className="flex items-center gap-2 text-xs text-slate-400 font-body">
-                  <div className="w-3 h-3 border border-slate-400 border-t-transparent rounded-full animate-spin" />
-                  Procesando...
-                </div>
-              )}
+            <div className="flex items-center gap-2 shrink-0">
+              <BadgeEstado estado={consulta.estado} />
+              <ChevronDown
+                size={16}
+                className="transition-transform"
+                style={{
+                  color: '#8A8780',
+                  transform: expandida ? 'rotate(180deg)' : 'rotate(0deg)'
+                }}
+              />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── Detalle expandible ──────────────────────────── */}
+      {/* Detalle expandido */}
       {expandida && (
-        <div className="border-t border-slate-100 p-5 bg-slate-50 space-y-4 animate-slide-down">
+        <div className="px-5 pb-5 pt-0 border-t animate-slide-down" style={{ borderColor: '#F0EFED' }}>
+          <div className="pt-4 space-y-4">
 
-          {/* Descripción del caso */}
-          <div>
-            <h4 className="font-body text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              Descripción del cliente
-            </h4>
-            <p className="font-body text-sm text-slate-700 leading-relaxed bg-white rounded-xl p-4 border border-slate-100">
-              {consulta.descripcion}
-            </p>
-          </div>
-
-          {/* Campo para link de reunión (solo en consultas online confirmadas) */}
-          {consulta.tipo === 'online' && consulta.estado === 'confirmada' && (
-            <div>
-              <label className="input-label">
-                Link de videollamada
-                <span className="text-slate-400 font-normal ml-1">(Meet, Zoom, Teams...)</span>
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  placeholder="https://meet.google.com/abc-defg-hij"
-                  value={linkReunion}
-                  onChange={e => setLinkReunion(e.target.value)}
-                  className="input-field flex-1"
-                />
-                <button
-                  type="button"
-                  onClick={() => ejecutarAccion(consulta.estado)} // Guarda sin cambiar estado
-                  disabled={procesando}
-                  className="btn-secondary text-sm shrink-0"
-                >
-                  Guardar link
-                </button>
+            {/* Descripción del problema */}
+            {consulta.descripcion && (
+              <div>
+                <p className="font-body text-xs font-semibold uppercase tracking-wider mb-2"
+                  style={{ color: '#8A8780' }}>
+                  Motivo de consulta
+                </p>
+                <p className="font-body text-sm leading-relaxed p-3 rounded-xl"
+                  style={{ background: '#F7F6F4', color: '#3A3832' }}>
+                  {consulta.descripcion}
+                </p>
               </div>
-              {consulta.link_reunion && (
-                <a
-                  href={consulta.link_reunion}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 mt-2 text-xs font-body text-navy-700 hover:underline"
-                >
-                  <Video size={11} /> Ver enlace actual
-                </a>
+            )}
+
+            {/* Link de videollamada */}
+            {consulta.tipo === 'online' && consulta.estado === 'confirmada' && (
+              <div>
+                <p className="font-body text-xs font-semibold uppercase tracking-wider mb-2"
+                  style={{ color: '#8A8780' }}>
+                  Link de videollamada
+                </p>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <LinkIcon size={14} className="absolute left-3 top-1/2 -translate-y-1/2"
+                      style={{ color: '#8A8780' }} />
+                    <input
+                      type="url"
+                      placeholder="https://meet.google.com/..."
+                      value={linkVideo}
+                      onChange={e => setLinkVideo(e.target.value)}
+                      className="input-field pl-9 text-sm"
+                    />
+                  </div>
+                  <button
+                    onClick={guardarLink}
+                    disabled={guardandoLink}
+                    className="px-4 py-2.5 rounded-xl font-body font-medium text-sm text-white transition-colors"
+                    style={{ background: '#2C2B27' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}
+                  >
+                    {guardandoLink ? '...' : 'Guardar'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Calificación recibida */}
+            {consulta.calificacion && (
+              <div>
+                <p className="font-body text-xs font-semibold uppercase tracking-wider mb-2"
+                  style={{ color: '#8A8780' }}>
+                  Calificación del cliente
+                </p>
+                <div className="flex items-center gap-2 p-3 rounded-xl" style={{ background: '#F7F6F4' }}>
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map(i => (
+                      <Star key={i} size={14}
+                        style={{
+                          fill: i <= consulta.calificacion ? '#B86030' : '#E8E6E3',
+                          color: i <= consulta.calificacion ? '#B86030' : '#E8E6E3',
+                        }}
+                      />
+                    ))}
+                  </div>
+                  {consulta.comentario && (
+                    <p className="font-body text-sm italic" style={{ color: '#56534A' }}>
+                      "{consulta.comentario}"
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Acciones */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {consulta.estado === 'pendiente' && (
+                <>
+                  <button onClick={() => onAccion(consulta.id, 'confirmar')}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-body font-medium text-white transition-colors"
+                    style={{ background: '#16a34a' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#15803d'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#16a34a'; }}
+                  >
+                    <Check size={14} /> Confirmar
+                  </button>
+                  <button onClick={() => onAccion(consulta.id, 'cancelar')}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-body font-medium text-white transition-colors"
+                    style={{ background: '#dc2626' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#b91c1c'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#dc2626'; }}
+                  >
+                    <X size={14} /> Cancelar
+                  </button>
+                </>
+              )}
+              {consulta.estado === 'confirmada' && (
+                <>
+                  <button onClick={() => onAccion(consulta.id, 'completar')}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-body font-medium text-white transition-colors"
+                    style={{ background: '#2C2B27' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}
+                  >
+                    <Check size={14} /> Marcar completada
+                  </button>
+                  <button onClick={() => onAccion(consulta.id, 'no_asistio')}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-body font-medium border transition-colors"
+                    style={{ borderColor: '#D4D2CC', color: '#56534A' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+                  >
+                    <Clock size={14} /> No asistió
+                  </button>
+                  <button onClick={() => onAccion(consulta.id, 'cancelar')}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-body font-medium border transition-colors"
+                    style={{ borderColor: '#fca5a5', color: '#dc2626' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+                  >
+                    <X size={14} /> Cancelar
+                  </button>
+                </>
               )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Página principal
-// ─────────────────────────────────────────────────────────────
 export default function ConsultasAbogado() {
-  const [consultas,    setConsultas]    = useState([]);
-  const [cargando,     setCargando]     = useState(true);
-  const [filtroEstado, setFiltroEstado] = useState('');
-  const [busqueda,     setBusqueda]     = useState(''); // Búsqueda por nombre cliente
+  const [consultas,      setConsultas]      = useState([]);
+  const [cargando,       setCargando]       = useState(true);
+  const [filtroEstado,   setFiltroEstado]   = useState('');
+  const [busqueda,       setBusqueda]       = useState('');
 
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const params = filtroEstado ? { estado: filtroEstado } : {};
-      const { data } = await api.get('/consultas', { params });
-      setConsultas(data.consultas);
-    } catch {
-      toast.error('No se pudieron cargar las consultas.');
-    } finally {
-      setCargando(false);
-    }
+      const params = {};
+      if (filtroEstado) params.estado = filtroEstado;
+      const { data } = await api.get('/consultas/mis-consultas', { params });
+      setConsultas(data.consultas || []);
+    } catch { toast.error('No se pudieron cargar las consultas.'); }
+    finally { setCargando(false); }
   }, [filtroEstado]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  // Manejar cambios de estado desde las tarjetas
-  const handleAccion = async (consultaId, nuevoEstado, extras = {}) => {
+  const onAccion = async (id, accion) => {
     try {
-      await api.patch(`/consultas/${consultaId}/estado`, {
-        estado: nuevoEstado,
-        ...extras,
-      });
-
-      const mensajes = {
-        confirmada: 'Consulta confirmada. Se notificó al cliente.',
-        completada: 'Consulta marcada como completada.',
-        cancelada:  'Consulta cancelada.',
-        no_asistio: 'Marcado como "no asistió".',
-      };
-      toast.success(mensajes[nuevoEstado] || 'Estado actualizado.');
-      cargar(); // Recargar la lista
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al actualizar la consulta.');
-    }
+      await api.patch(`/consultas/${id}/estado`, { accion });
+      toast.success(
+        accion === 'confirmar'  ? '✅ Consulta confirmada.' :
+        accion === 'completar'  ? '✅ Consulta marcada como completada.' :
+        accion === 'cancelar'   ? 'Consulta cancelada.' :
+        'Estado actualizado.'
+      );
+      cargar();
+    } catch (err) { toast.error(err.response?.data?.error || 'Error al actualizar.'); }
   };
 
-  // Filtrar por búsqueda de nombre del cliente (filtrado local, sin llamada extra)
-  const consultasFiltradas = consultas.filter(c => {
-    if (!busqueda) return true;
-    const nombreCompleto = `${c.cliente_nombre} ${c.cliente_apellido}`.toLowerCase();
-    return nombreCompleto.includes(busqueda.toLowerCase());
+  const conteos = Object.fromEntries(
+    Object.keys(ESTADOS).map(e => [e, consultas.filter(c => c.estado === e).length])
+  );
+
+  const filtradas = consultas.filter(c => {
+    const texto = `${c.cliente_nombre} ${c.cliente_apellido}`.toLowerCase();
+    return (!busqueda || texto.includes(busqueda.toLowerCase()));
   });
 
-  // Contadores para los badges de filtro
-  const conteos = {
-    '':          consultas.length,
-    pendiente:   consultas.filter(c => c.estado === 'pendiente').length,
-    confirmada:  consultas.filter(c => c.estado === 'confirmada').length,
-    completada:  consultas.filter(c => c.estado === 'completada').length,
-    cancelada:   consultas.filter(c => c.estado === 'cancelada').length,
-  };
-
-  const FILTROS = [
-    { valor: '',           label: 'Todas' },
-    { valor: 'pendiente',  label: 'Pendientes' },
-    { valor: 'confirmada', label: 'Confirmadas' },
-    { valor: 'completada', label: 'Completadas' },
-    { valor: 'cancelada',  label: 'Canceladas' },
-  ];
-
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen" style={{ background: '#F0EFED' }}>
       <div className="page-container py-8">
 
-        {/* Encabezado */}
-        <div className="mb-8">
-          <h1 className="section-title">Mis consultas</h1>
-          <p className="section-subtitle">
-            Gestioná los turnos y consultas de tus clientes.
-          </p>
-        </div>
-
-        {/* Barra de búsqueda + filtros */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          {/* Búsqueda por nombre */}
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Buscar por nombre del cliente..."
-              value={busqueda}
-              onChange={e => setBusqueda(e.target.value)}
-              className="input-field pl-10"
-            />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="section-title">Mis consultas</h1>
+            <p className="section-subtitle">Gestioná tus consultas y turnos.</p>
           </div>
+          <button onClick={cargar} disabled={cargando} className="btn-secondary gap-2 shrink-0">
+            <RefreshCw size={16} className={cargando ? 'animate-spin' : ''} /> Actualizar
+          </button>
         </div>
 
-        {/* Filtros por estado con contadores */}
+        {/* Tabs de estado */}
         <div className="flex gap-2 flex-wrap mb-6">
-          {FILTROS.map(f => (
+          <button
+            onClick={() => setFiltroEstado('')}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-body font-medium transition-all"
+            style={!filtroEstado
+              ? { background: '#2C2B27', color: '#fff' }
+              : { background: '#fff', color: '#56534A', border: '1px solid #E8E6E3' }
+            }
+          >
+            Todas
+            <span className="text-xs px-2 py-0.5 rounded-full"
+              style={!filtroEstado
+                ? { background: 'rgba(255,255,255,0.2)', color: '#fff' }
+                : { background: '#F0EFED', color: '#8A8780' }
+              }>
+              {consultas.length}
+            </span>
+          </button>
+          {Object.entries(ESTADOS).map(([estado, cfg]) => (
             <button
-              key={f.valor}
-              onClick={() => setFiltroEstado(f.valor)}
-              className={`px-4 py-2 rounded-full text-sm font-body font-medium transition-all flex items-center gap-2 ${
-                filtroEstado === f.valor
-                  ? 'bg-navy-900 text-white'
-                  : 'bg-white border border-slate-200 text-slate-600 hover:border-navy-300'
-              }`}
+              key={estado}
+              onClick={() => setFiltroEstado(estado)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-body font-medium transition-all"
+              style={filtroEstado === estado
+                ? { background: '#2C2B27', color: '#fff' }
+                : { background: '#fff', color: '#56534A', border: '1px solid #E8E6E3' }
+              }
             >
-              {f.label}
-              {/* Badge con conteo */}
-              {conteos[f.valor] > 0 && (
-                <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                  filtroEstado === f.valor ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {conteos[f.valor]}
+              {cfg.label}
+              {conteos[estado] > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full"
+                  style={filtroEstado === estado
+                    ? { background: 'rgba(255,255,255,0.2)', color: '#fff' }
+                    : { background: '#F0EFED', color: '#8A8780' }
+                  }>
+                  {conteos[estado]}
                 </span>
               )}
             </button>
           ))}
         </div>
 
-        {/* Skeleton de carga */}
+        {/* Buscador */}
+        <div className="relative mb-6">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#8A8780' }} />
+          <input type="text" placeholder="Buscar por nombre del cliente..."
+            value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            className="input-field pl-10" />
+        </div>
+
+        {/* Skeleton */}
         {cargando && (
           <div className="space-y-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="card p-5 animate-pulse">
-                <div className="flex gap-4">
-                  <div className="w-14 h-16 bg-slate-200 rounded-xl shrink-0" />
-                  <div className="flex-1 space-y-2 py-1">
-                    <div className="h-4 bg-slate-200 rounded w-1/3" />
-                    <div className="h-3 bg-slate-200 rounded w-1/4" />
-                    <div className="h-8 bg-slate-200 rounded w-1/2 mt-3" />
-                  </div>
+            {[1,2,3].map(i => (
+              <div key={i} className="card p-5 animate-pulse flex gap-4">
+                <div className="w-14 h-14 rounded-xl shrink-0" style={{ background: '#E8E6E3' }} />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 rounded w-1/3" style={{ background: '#E8E6E3' }} />
+                  <div className="h-3 rounded w-1/4" style={{ background: '#E8E6E3' }} />
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Sin resultados */}
-        {!cargando && consultasFiltradas.length === 0 && (
+        {/* Sin consultas */}
+        {!cargando && filtradas.length === 0 && (
           <div className="card p-16 text-center">
-            <MessageSquare size={40} className="text-slate-300 mx-auto mb-4" />
-            <p className="font-display text-xl text-navy-900 mb-2">
-              {busqueda || filtroEstado ? 'Sin resultados' : 'No tenés consultas aún'}
-            </p>
-            <p className="font-body text-slate-500 text-sm">
-              {busqueda || filtroEstado
-                ? 'Probá con otro filtro o término de búsqueda.'
-                : 'Las consultas de tus clientes aparecerán aquí.'
-              }
+            <Calendar size={40} className="mx-auto mb-4" style={{ color: '#D4D2CC' }} />
+            <p className="font-display text-xl mb-2" style={{ color: '#1C1B18' }}>Sin consultas</p>
+            <p className="font-body text-sm" style={{ color: '#8A8780' }}>
+              {busqueda || filtroEstado ? 'Probá con otros filtros.' : 'Aún no tenés consultas registradas.'}
             </p>
           </div>
         )}
 
-        {/* Lista de consultas */}
-        {!cargando && consultasFiltradas.length > 0 && (
+        {/* Lista */}
+        {!cargando && filtradas.length > 0 && (
           <div className="space-y-4">
-            {consultasFiltradas.map(c => (
-              <TarjetaConsulta
-                key={c.id}
-                consulta={c}
-                onAccion={handleAccion}
-              />
+            {filtradas.map(c => (
+              <TarjetaConsulta key={c.id} consulta={c} onAccion={onAccion} />
             ))}
           </div>
         )}

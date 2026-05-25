@@ -1,35 +1,55 @@
 // ============================================================
-// src/pages/Planes.jsx
-// Página pública de planes con comparativa y precios
+// src/pages/Planes.jsx — Paleta C: Gris carbón + Cobre
 // ============================================================
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, X, Star, ArrowRight, Award } from 'lucide-react';
+import { Check, X, ArrowRight } from 'lucide-react';
 import api from '../services/api';
 
-// Íconos y descripciones para cada feature del plan
 const FEATURES = [
-  { key: 'aparece_en_grilla',       label: 'Visible en búsqueda de clientes' },
-  { key: 'gestion_turnos',          label: 'Gestión de consultas y turnos' },
-  { key: 'perfil_validado',         label: 'Perfil profesional validado' },
-  { key: 'acceso_campus',           label: 'Campus multimedia (cursos, biblioteca)' },
-  { key: 'acceso_campus_completo',  label: 'Campus completo + videoconferencias' },
-  { key: 'networking',              label: 'Networking profesional' },
-  { key: 'credencial_virtual',      label: 'Credencial virtual exclusiva' },
-  { key: 'beneficios_exclusivos',   label: 'Descuentos en librerías, coworkings y más' },
-  { key: 'difusion_profesional',    label: 'Difusión profesional destacada' },
+  { key: 'aparece_en_grilla',      label: 'Visible en búsqueda de clientes' },
+  { key: 'gestion_turnos',         label: 'Gestión de consultas y turnos' },
+  { key: 'perfil_validado',        label: 'Perfil profesional validado' },
+  { key: 'acceso_campus',          label: 'Acceso al campus multimedia' },
+  { key: 'acceso_campus_completo', label: 'Campus completo + videoconferencias' },
+  { key: 'networking',             label: 'Foro y networking profesional' },
+  { key: 'credencial_virtual',     label: 'Credencial virtual' },
+  { key: 'beneficios_exclusivos',  label: 'Descuentos y convenios exclusivos' },
+  { key: 'difusion_profesional',   label: 'Difusión profesional destacada' },
 ];
 
 export default function Planes() {
-  const [planes,   setPlanes]   = useState([]);
-  const [periodo,  setPeriodo]  = useState('mensual'); // 'mensual' | 'anual'
+  const [planes,  setPlanes]  = useState([]);
+  const [periodo, setPeriodo] = useState('mensual');
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     api.get('/pagos/planes')
-      .then(r => setPlanes(r.data.planes))
-      .catch(() => {})
+      .then(r => setPlanes(r.data.planes || []))
+      .catch(() => {
+        // Fallback con datos por defecto
+        setPlanes([
+          {
+            id: 1, nombre: 'Básico', slug: 'basico',
+            precio_mensual: 4999, precio_anual: 49990,
+            aparece_en_grilla: true, max_consultas_mes: 20,
+            acceso_campus: false, acceso_campus_completo: false,
+            gestion_turnos: true, perfil_validado: true,
+            credencial_virtual: false, networking: false,
+            beneficios_exclusivos: false, difusion_profesional: false,
+          },
+          {
+            id: 2, nombre: 'Comunidad', slug: 'comunidad',
+            precio_mensual: 9999, precio_anual: 99990,
+            aparece_en_grilla: true, max_consultas_mes: null,
+            acceso_campus: true, acceso_campus_completo: true,
+            gestion_turnos: true, perfil_validado: true,
+            credencial_virtual: true, networking: true,
+            beneficios_exclusivos: true, difusion_profesional: true,
+          },
+        ]);
+      })
       .finally(() => setCargando(false));
   }, []);
 
@@ -39,151 +59,137 @@ export default function Planes() {
     return `$${Math.round(p).toLocaleString('es-AR')}`;
   };
 
-  const ahorroAnual = (plan) => {
-    if (!plan.precio_anual || !plan.precio_mensual) return 0;
-    const sinDescuento = plan.precio_mensual * 12;
-    return Math.round(((sinDescuento - plan.precio_anual) / sinDescuento) * 100);
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen" style={{ background: '#F0EFED' }}>
 
-      {/* ── Header ────────────────────────────────────────── */}
-      <section className="bg-navy-900 text-white py-16">
-        <div className="page-container text-center">
-          <h1 className="font-display text-4xl md:text-5xl font-bold mb-4">
-            Planes para <span className="text-gradient-gold">profesionales</span>
-          </h1>
-          <p className="font-body text-white/60 text-lg max-w-xl mx-auto mb-8">
-            Elegí el plan que mejor se adapta a tu práctica. Sin costos ocultos. Cancelá cuando quieras.
-          </p>
+      {/* Hero */}
+      <div style={{ background: '#1C1B18' }} className="py-16 text-center">
+        <p className="font-body text-sm font-medium uppercase tracking-widest mb-4"
+          style={{ color: '#B86030' }}>
+          Planes y precios
+        </p>
+        <h1 className="font-display text-4xl md:text-5xl font-bold text-white mb-4">
+          Elegí el plan ideal
+        </h1>
+        <p className="font-body max-w-xl mx-auto mb-8" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          Sin costos ocultos. Sin permanencia mínima. Cancelá cuando quieras.
+        </p>
 
-          {/* Toggle mensual/anual */}
-          <div className="inline-flex items-center gap-3 bg-white/10 rounded-full p-1.5">
+        {/* Toggle mensual/anual */}
+        <div
+          className="inline-flex items-center gap-2 p-1.5 rounded-full"
+          style={{ background: 'rgba(255,255,255,0.08)' }}
+        >
+          {['mensual', 'anual'].map(p => (
             <button
-              onClick={() => setPeriodo('mensual')}
-              className={`px-6 py-2 rounded-full text-sm font-body font-medium transition-all ${
-                periodo === 'mensual' ? 'bg-white text-navy-900' : 'text-white/70 hover:text-white'
-              }`}
+              key={p}
+              onClick={() => setPeriodo(p)}
+              className="flex items-center gap-2 px-5 py-2 rounded-full text-sm font-body font-medium transition-all"
+              style={periodo === p
+                ? { background: '#fff', color: '#1C1B18' }
+                : { color: 'rgba(255,255,255,0.6)' }
+              }
             >
-              Mensual
+              {p === 'mensual' ? 'Mensual' : 'Anual'}
+              {p === 'anual' && (
+                <span className="text-xs px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(184,96,48,0.3)', color: '#C4522E' }}>
+                  -20%
+                </span>
+              )}
             </button>
-            <button
-              onClick={() => setPeriodo('anual')}
-              className={`px-6 py-2 rounded-full text-sm font-body font-medium transition-all flex items-center gap-2 ${
-                periodo === 'anual' ? 'bg-white text-navy-900' : 'text-white/70 hover:text-white'
-              }`}
-            >
-              Anual
-              <span className="text-xs bg-gold-500 text-white px-2 py-0.5 rounded-full">-20%</span>
-            </button>
-          </div>
+          ))}
         </div>
-      </section>
+      </div>
 
-      {/* ── Tarjetas de planes ────────────────────────────── */}
-      <section className="page-container py-16">
-
+      {/* Grilla de planes */}
+      <div className="page-container py-16">
         {cargando ? (
-          <div className="grid md:grid-cols-3 gap-6">
-            {[1,2,3].map(i => (
-              <div key={i} className="card p-8 h-96 animate-pulse">
-                <div className="h-5 bg-slate-200 rounded w-1/3 mb-4" />
-                <div className="h-10 bg-slate-200 rounded w-1/2 mb-8" />
-                <div className="space-y-3">
-                  {[1,2,3,4].map(j => <div key={j} className="h-4 bg-slate-200 rounded" />)}
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {[1,2].map(i => (
+              <div key={i} className="card p-8 animate-pulse space-y-4">
+                <div className="h-8 rounded w-1/3" style={{ background: '#E8E6E3' }} />
+                <div className="h-10 rounded w-1/2" style={{ background: '#E8E6E3' }} />
+                <div className="space-y-2">
+                  {[1,2,3,4,5].map(j => (
+                    <div key={j} className="h-4 rounded" style={{ background: '#E8E6E3' }} />
+                  ))}
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {planes.map((plan) => {
-              const esPremium  = plan.slug === 'premium';
-              const esGratuito = plan.slug === 'gratuito';
-              const ahorro     = ahorroAnual(plan);
-
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {planes.map((plan, idx) => {
+              const esComunidad = plan.slug === 'comunidad';
               return (
                 <div
                   key={plan.id}
-                  className={`relative card flex flex-col ${
-                    esPremium
-                      ? 'border-2 border-navy-900 shadow-card-hover'
-                      : ''
-                  }`}
+                  className="card flex flex-col relative"
+                  style={esComunidad ? { borderColor: '#2C2B27', borderWidth: '2px' } : {}}
                 >
-                  {/* Badge "Más popular" */}
-                  {esPremium && (
+                  {esComunidad && (
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                      <div className="flex items-center gap-1.5 bg-navy-900 text-white px-4 py-1.5 rounded-full text-xs font-body font-medium">
-                        <Star size={11} className="fill-gold-400 text-gold-400" />
-                        Más popular
-                      </div>
+                      <span className="text-white text-xs font-body font-medium px-4 py-1.5 rounded-full"
+                        style={{ background: '#B86030' }}>
+                        ★ Recomendado
+                      </span>
                     </div>
                   )}
 
                   <div className="p-8 flex flex-col flex-1">
-
-                    {/* Nombre del plan */}
+                    {/* Nombre y precio */}
                     <div className="mb-6">
-                      <span className={`text-xs font-body font-medium uppercase tracking-wider ${
-                        esPremium ? 'text-gold-500' : 'text-slate-400'
-                      }`}>
-                        Plan
-                      </span>
-                      <h2 className="font-display text-2xl font-bold text-navy-900 mt-1">{plan.nombre}</h2>
-                    </div>
-
-                    {/* Precio */}
-                    <div className="mb-8">
+                      <h2 className="font-display text-2xl font-bold mb-3" style={{ color: '#1C1B18' }}>
+                        {plan.nombre}
+                      </h2>
                       <div className="flex items-baseline gap-1">
-                        <span className="font-display text-4xl font-bold text-navy-900">
+                        <span className="font-display text-4xl font-bold" style={{ color: '#1C1B18' }}>
                           {precio(plan)}
                         </span>
                         {plan.precio_mensual > 0 && (
-                          <span className="font-body text-slate-400 text-sm">/mes</span>
+                          <span className="font-body text-sm" style={{ color: '#8A8780' }}>/mes</span>
                         )}
                       </div>
-                      {periodo === 'anual' && ahorro > 0 && (
-                        <p className="font-body text-xs text-green-600 mt-1 font-medium">
-                          Ahorrás {ahorro}% vs mensual
+                      {periodo === 'anual' && plan.precio_anual > 0 && (
+                        <p className="font-body text-xs mt-1 font-medium" style={{ color: '#16a34a' }}>
+                          ${Math.round(plan.precio_anual).toLocaleString('es-AR')}/año
                         </p>
-                      )}
-                      {esGratuito && (
-                        <p className="font-body text-xs text-slate-400 mt-1">Para siempre</p>
                       )}
                     </div>
 
-                    {/* Funcionalidades */}
+                    {/* Features */}
                     <div className="space-y-3 flex-1 mb-8">
-                      {FEATURES.map(({ key, label }) => {
-                        const incluido = plan[key];
-                        return (
-                          <div key={key} className="flex items-start gap-3">
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                              incluido ? 'bg-navy-900' : 'bg-slate-100'
-                            }`}>
-                              {incluido
-                                ? <Check size={11} className="text-white" />
-                                : <X size={11} className="text-slate-300" />
-                              }
-                            </div>
-                            <span className={`font-body text-sm ${incluido ? 'text-slate-700' : 'text-slate-400'}`}>
-                              {label}
-                            </span>
+                      {FEATURES.map(({ key, label }) => (
+                        <div key={key} className="flex items-start gap-3">
+                          <div
+                            className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                            style={plan[key]
+                              ? { background: '#2C2B27' }
+                              : { background: '#F0EFED' }
+                            }
+                          >
+                            {plan[key]
+                              ? <Check size={11} className="text-white" />
+                              : <X size={11} style={{ color: '#D4D2CC' }} />
+                            }
                           </div>
-                        );
-                      })}
-
-                      {/* Max consultas */}
+                          <span className="font-body text-sm"
+                            style={{ color: plan[key] ? '#3A3832' : '#B0AEA8' }}>
+                            {label}
+                          </span>
+                        </div>
+                      ))}
+                      {/* Consultas */}
                       <div className="flex items-start gap-3">
-                        <div className="w-5 h-5 rounded-full bg-navy-900 flex items-center justify-center shrink-0 mt-0.5">
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                          style={{ background: '#2C2B27' }}>
                           <Check size={11} className="text-white" />
                         </div>
-                        <span className="font-body text-sm text-slate-700">
+                        <span className="font-body text-sm" style={{ color: '#3A3832' }}>
                           {plan.max_consultas_mes === null
                             ? 'Consultas ilimitadas'
-                            : `Hasta ${plan.max_consultas_mes} consultas por mes`
+                            : `Hasta ${plan.max_consultas_mes} consultas/mes`
                           }
                         </span>
                       </div>
@@ -191,11 +197,17 @@ export default function Planes() {
 
                     {/* CTA */}
                     <Link
-                      to={esGratuito ? '/registro?rol=abogado' : `/registro?rol=abogado&plan=${plan.slug}`}
-                      className={esPremium ? 'btn-primary w-full justify-center' : 'btn-secondary w-full justify-center'}
+                      to={`/registro?rol=abogado&plan=${plan.slug}`}
+                      className="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-body font-medium text-sm text-white w-full transition-colors"
+                      style={{ background: esComunidad ? '#B86030' : '#2C2B27' }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = esComunidad ? '#8B4A1E' : '#1C1B18';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = esComunidad ? '#B86030' : '#2C2B27';
+                      }}
                     >
-                      {esGratuito ? 'Comenzar gratis' : `Elegir plan ${plan.nombre}`}
-                      <ArrowRight size={16} />
+                      Suscribirme a {plan.nombre} <ArrowRight size={14} />
                     </Link>
                   </div>
                 </div>
@@ -204,29 +216,26 @@ export default function Planes() {
           </div>
         )}
 
-        {/* FAQ o info adicional */}
-        <div className="mt-16 text-center">
-          <div className="inline-flex items-center gap-2 text-slate-500 font-body text-sm">
-            <Award size={16} className="text-gold-500" />
-            Todos los planes incluyen soporte por email · Sin permanencia mínima · Pagos seguros con MercadoPago
+        {/* FAQ simple */}
+        <div className="max-w-2xl mx-auto mt-16">
+          <h2 className="font-display text-2xl font-bold text-center mb-8" style={{ color: '#1C1B18' }}>
+            Preguntas frecuentes
+          </h2>
+          <div className="space-y-4">
+            {[
+              { q: '¿Puedo cancelar cuando quiera?', a: 'Sí. No hay permanencia mínima. Podés cancelar desde tu panel en cualquier momento.' },
+              { q: '¿Cómo se procesan los pagos?', a: 'Los pagos se procesan de forma segura a través de MercadoPago. Aceptamos tarjetas de crédito y débito.' },
+              { q: '¿Puedo cambiar de plan después?', a: 'Podés subir o bajar de plan en cualquier momento. El cambio se aplica al inicio del siguiente período.' },
+              { q: '¿Hay período de prueba?', a: 'Podés registrarte con el plan Básico y evaluar la plataforma antes de pasar al plan Comunidad.' },
+            ].map(({ q, a }) => (
+              <div key={q} className="card p-6">
+                <p className="font-body font-semibold text-sm mb-2" style={{ color: '#1C1B18' }}>{q}</p>
+                <p className="font-body text-sm leading-relaxed" style={{ color: '#8A8780' }}>{a}</p>
+              </div>
+            ))}
           </div>
         </div>
-      </section>
-
-      {/* ── CTA final ─────────────────────────────────────── */}
-      <section className="bg-white border-t border-slate-100 py-16">
-        <div className="page-container text-center">
-          <h2 className="font-display text-3xl font-bold text-navy-900 mb-3">
-            ¿Tenés dudas sobre qué plan elegir?
-          </h2>
-          <p className="font-body text-slate-500 mb-6">
-            Empezá con el plan gratuito y escalá cuando lo necesites.
-          </p>
-          <Link to="/registro?rol=abogado" className="btn-primary px-8 py-3.5">
-            Empezar gratis <ArrowRight size={16} />
-          </Link>
-        </div>
-      </section>
+      </div>
     </div>
   );
 }
