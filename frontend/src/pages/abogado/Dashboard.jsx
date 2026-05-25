@@ -1,6 +1,7 @@
 // ============================================================
 // src/pages/abogado/Dashboard.jsx
 // Panel principal del abogado con sidebar de navegación
+// Paleta C: Gris carbón + Cobre
 // ============================================================
 
 import { useState, useEffect } from 'react';
@@ -18,7 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
 // ─────────────────────────────────────────────────────────────
-// Componente: Sidebar de navegación lateral
+// Sidebar: navegación + links de interés en un solo card
 // ─────────────────────────────────────────────────────────────
 function Sidebar({ links }) {
   const MENU = [
@@ -37,23 +38,34 @@ function Sidebar({ links }) {
 
   return (
     <aside className="w-full lg:w-64 shrink-0">
-      <div className="space-y-3 sticky top-24">
-
-        {/* ── Navegación principal ──────────────────────── */}
+      {/* Un solo card sticky que contiene navegación + links */}
+      <div className="sticky top-24">
         <nav className="card p-3">
+
+          {/* ── Sección: Navegación ──────────────────────── */}
           <p className="font-body text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">
             Navegación
           </p>
           <div className="space-y-0.5">
             {MENU.map(({ href, label, icono: Icono }) => {
-              const activo = actual === href || (href !== '/abogado/dashboard' && actual.startsWith(href));
+              const activo = actual === href ||
+                (href !== '/abogado/dashboard' && actual.startsWith(href));
               return (
-                <Link key={href} to={href}
+                <Link
+                  key={href}
+                  to={href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-body font-medium transition-all ${
                     activo
-                      ? 'bg-navy-900 text-white'
-                      : 'text-slate-600 hover:bg-slate-50 hover:text-navy-900'
+                      ? 'text-white'
+                      : 'text-slate-600 hover:text-stone-900'
                   }`}
+                  // Color activo de la paleta C (carbón 800)
+                  style={activo
+                    ? { background: '#2C2B27' }
+                    : undefined
+                  }
+                  onMouseEnter={e => { if (!activo) e.currentTarget.style.background = '#F7F6F4'; }}
+                  onMouseLeave={e => { if (!activo) e.currentTarget.style.background = ''; }}
                 >
                   <Icono size={16} className={activo ? 'text-white' : 'text-slate-400'} />
                   {label}
@@ -61,46 +73,44 @@ function Sidebar({ links }) {
               );
             })}
           </div>
-        </nav>
 
-        {/* ── Links de interés ──────────────────────────── */}
-        {links.length > 0 && (
-          <div className="card p-4">
-            <p className="font-body text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-              Links de interés
-            </p>
-            <div className="space-y-2">
-              {links.map(link => (
-                <a
-                  key={link.id}
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-start gap-2.5 p-2.5 rounded-xl hover:bg-slate-50 transition-colors group"
-                >
-                  <ExternalLink size={13} className="text-slate-400 group-hover:text-navy-700 shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    <p className="font-body text-xs font-medium text-slate-700 group-hover:text-navy-900 leading-snug">
+          {/* ── Separador + Links de interés ─────────────── */}
+          {links.length > 0 && (
+            <div className="border-t border-slate-100 pt-3 mt-3">
+              <p className="font-body text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">
+                Links de interés
+              </p>
+              <div className="space-y-0.5">
+                {links.map(link => (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group"
+                    onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+                  >
+                    <ExternalLink
+                      size={14}
+                      className="text-slate-400 shrink-0 group-hover:text-stone-600 transition-colors"
+                    />
+                    <span className="font-body text-sm text-slate-600 group-hover:text-stone-900 leading-snug truncate transition-colors">
                       {link.titulo}
-                    </p>
-                    {link.descripcion && (
-                      <p className="font-body text-xs text-slate-400 mt-0.5 leading-snug line-clamp-2">
-                        {link.descripcion}
-                      </p>
-                    )}
-                  </div>
-                </a>
-              ))}
+                    </span>
+                  </a>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </nav>
       </div>
     </aside>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// Componente: Tarjeta de estadística
+// Tarjeta de estadística
 // ─────────────────────────────────────────────────────────────
 function StatCard({ icono: Icono, valor, label, colorFondo, colorIcono }) {
   return (
@@ -108,44 +118,72 @@ function StatCard({ icono: Icono, valor, label, colorFondo, colorIcono }) {
       <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl ${colorFondo} mb-3`}>
         <Icono size={18} className={colorIcono} />
       </div>
-      <p className="font-display text-2xl font-bold text-navy-900">{valor ?? '—'}</p>
+      {/* Texto con color carbón */}
+      <p className="font-display text-2xl font-bold" style={{ color: '#1C1B18' }}>
+        {valor ?? '—'}
+      </p>
       <p className="font-body text-xs text-slate-500 mt-0.5">{label}</p>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// Componente: Preview del próximo evento
+// Preview del próximo evento — con paleta C
 // ─────────────────────────────────────────────────────────────
 function ProximoEvento({ evento }) {
   if (!evento) return null;
   const fecha = new Date(evento.fecha_evento);
 
   return (
-    <Link to="/abogado/agenda" className="card p-5 bg-gradient-to-br from-navy-900 to-navy-800 border-0 hover:shadow-card-hover transition-shadow block">
+    <Link
+      to="/abogado/agenda"
+      className="block rounded-2xl p-5 hover:opacity-95 transition-opacity"
+      // Fondo carbón degradado
+      style={{ background: 'linear-gradient(135deg, #1C1B18 0%, #3A3832 100%)' }}
+    >
       <div className="flex items-start gap-4">
+
         {/* Bloque de fecha */}
-        <div className="shrink-0 text-center bg-white/10 rounded-xl px-3 py-2 min-w-[52px]">
-          <p className="font-body text-xs text-white/60 uppercase tracking-wider">
+        <div
+          className="shrink-0 text-center rounded-xl px-3 py-2 min-w-[52px]"
+          style={{ background: 'rgba(255,255,255,0.08)' }}
+        >
+          <p
+            className="font-body text-xs uppercase tracking-wider"
+            style={{ color: '#C4522E' }} // cobre
+          >
             {format(fecha, 'MMM', { locale: es })}
           </p>
           <p className="font-display font-bold text-white text-xl leading-none">
             {format(fecha, 'd')}
           </p>
         </div>
+
         {/* Info del evento */}
         <div className="flex-1 min-w-0">
-          <p className="font-body text-xs text-gold-400 font-medium mb-1">
+          <p
+            className="font-body text-xs font-medium mb-1"
+            style={{ color: '#B86030' }} // cobre principal
+          >
             Próximo evento
           </p>
           <p className="font-body font-semibold text-white text-sm leading-snug line-clamp-2">
             {evento.titulo}
           </p>
-          <p className="font-body text-xs text-white/50 mt-1">
-            {format(fecha, "HH:mm 'hs'")}{evento.autor ? ` · ${evento.autor}` : ''}
+          <p
+            className="font-body text-xs mt-1"
+            style={{ color: 'rgba(255,255,255,0.45)' }}
+          >
+            {format(fecha, "HH:mm 'hs'")}
+            {evento.autor ? ` · ${evento.autor}` : ''}
           </p>
         </div>
-        <ArrowRight size={14} className="text-white/40 shrink-0 mt-1" />
+
+        <ArrowRight
+          size={14}
+          className="shrink-0 mt-1"
+          style={{ color: 'rgba(255,255,255,0.35)' }}
+        />
       </div>
     </Link>
   );
@@ -155,11 +193,11 @@ function ProximoEvento({ evento }) {
 // Página principal
 // ─────────────────────────────────────────────────────────────
 export default function DashboardAbogado() {
-  const { usuario }               = useAuth();
-  const [datos,    setDatos]      = useState(null);
-  const [links,    setLinks]      = useState([]);
+  const { usuario }                       = useAuth();
+  const [datos,         setDatos]         = useState(null);
+  const [links,         setLinks]         = useState([]);
   const [proximoEvento, setProximoEvento] = useState(null);
-  const [cargando, setCargando]   = useState(true);
+  const [cargando,      setCargando]      = useState(true);
 
   useEffect(() => {
     const cargar = async () => {
@@ -171,16 +209,15 @@ export default function DashboardAbogado() {
           api.get('/agenda'),
         ]);
 
-        if (dashRes.status === 'fulfilled')  setDatos(dashRes.value.data);
-        if (linksRes.status === 'fulfilled') setLinks(linksRes.value.data.links || []);
+        if (dashRes.status   === 'fulfilled') setDatos(dashRes.value.data);
+        if (linksRes.status  === 'fulfilled') setLinks(linksRes.value.data.links || []);
         if (agendaRes.status === 'fulfilled') {
-          // Tomar el primer evento futuro
           const eventos = agendaRes.value.data.eventos || [];
           const futuro  = eventos.find(e => !isPast(new Date(e.fecha_evento)));
           setProximoEvento(futuro || null);
         }
       } catch {
-        // Silencioso
+        // Silencioso — cada sección muestra su estado vacío
       } finally {
         setCargando(false);
       }
@@ -188,11 +225,18 @@ export default function DashboardAbogado() {
     cargar();
   }, []);
 
+  // ── Estado de carga ─────────────────────────────────────────
   if (cargando) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: '#F0EFED' }}
+      >
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-navy-900 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <div
+            className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-3"
+            style={{ borderColor: '#2C2B27', borderTopColor: 'transparent' }}
+          />
           <p className="text-slate-500 text-sm font-body">Cargando tu panel...</p>
         </div>
       </div>
@@ -204,20 +248,33 @@ export default function DashboardAbogado() {
   const proximas = datos?.proximas_consultas || [];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen" style={{ background: '#F0EFED' }}>
       <div className="page-container py-8">
 
         {/* ── Encabezado ──────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="font-display text-3xl font-bold text-navy-900">
+            <h1
+              className="font-display text-3xl font-bold"
+              style={{ color: '#1C1B18' }}
+            >
               Bienvenido/a, Dr./Dra. {usuario?.nombre}
             </h1>
             <p className="font-body text-slate-500 mt-1">
-              Plan: <span className="font-medium text-navy-700">{perfil?.plan_nombre || 'Básico'}</span>
+              Plan:{' '}
+              <span className="font-medium" style={{ color: '#B86030' }}>
+                {perfil?.plan_nombre || 'Básico'}
+              </span>
             </p>
           </div>
-          <Link to="/abogado/suscripcion" className="btn-gold shrink-0">
+          {/* Botón con cobre */}
+          <Link
+            to="/abogado/suscripcion"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl font-body font-medium text-sm text-white shrink-0 transition-colors"
+            style={{ background: '#B86030' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#8B4A1E'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#B86030'; }}
+          >
             <Award size={16} /> Mejorar plan
           </Link>
         </div>
@@ -232,7 +289,11 @@ export default function DashboardAbogado() {
                 Completá tu perfil para aparecer en la búsqueda de clientes.
               </p>
             </div>
-            <Link to="/abogado/perfil" className="btn-secondary text-sm shrink-0 border-amber-300 text-amber-700 hover:bg-amber-50">
+            <Link
+              to="/abogado/perfil"
+              className="text-sm shrink-0 px-4 py-2 rounded-xl border font-body font-medium transition-colors"
+              style={{ borderColor: '#B86030', color: '#8B4A1E' }}
+            >
               Completar
             </Link>
           </div>
@@ -249,26 +310,56 @@ export default function DashboardAbogado() {
 
             {/* Estadísticas */}
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-              <StatCard icono={Clock}        valor={stats?.consultas_pendientes} label="Pendientes"         colorFondo="bg-amber-50"       colorIcono="text-amber-600" />
-              <StatCard icono={Calendar}     valor={stats?.consultas_confirmadas} label="Confirmadas"        colorFondo="bg-blue-50"        colorIcono="text-blue-600" />
-              <StatCard icono={CheckCircle}  valor={stats?.completadas_este_mes}  label="Completadas (mes)"  colorFondo="bg-green-50"       colorIcono="text-green-600" />
+              <StatCard
+                icono={Clock}
+                valor={stats?.consultas_pendientes}
+                label="Pendientes"
+                colorFondo="bg-amber-50"
+                colorIcono="text-amber-600"
+              />
+              <StatCard
+                icono={Calendar}
+                valor={stats?.consultas_confirmadas}
+                label="Confirmadas"
+                colorFondo="bg-blue-50"
+                colorIcono="text-blue-600"
+              />
+              <StatCard
+                icono={CheckCircle}
+                valor={stats?.completadas_este_mes}
+                label="Completadas (mes)"
+                colorFondo="bg-green-50"
+                colorIcono="text-green-600"
+              />
               <StatCard
                 icono={Star}
-                valor={perfil?.calificacion_promedio > 0 ? `${parseFloat(perfil.calificacion_promedio).toFixed(1)} ★` : '—'}
+                valor={perfil?.calificacion_promedio > 0
+                  ? `${parseFloat(perfil.calificacion_promedio).toFixed(1)} ★`
+                  : '—'
+                }
                 label={`${perfil?.total_calificaciones || 0} reseñas`}
-                colorFondo="bg-gold-300/20"
-                colorIcono="text-gold-600"
+                colorFondo="bg-stone-100"
+                colorIcono="text-stone-600"
               />
             </div>
 
-            {/* Preview próximo evento */}
+            {/* Preview del próximo evento */}
             {proximoEvento && <ProximoEvento evento={proximoEvento} />}
 
             {/* Próximas consultas */}
             <div className="card">
               <div className="flex items-center justify-between p-6 border-b border-slate-100">
-                <h2 className="font-display font-semibold text-navy-900 text-lg">Próximas consultas</h2>
-                <Link to="/abogado/consultas" className="font-body text-sm text-navy-700 hover:text-navy-900 flex items-center gap-1">
+                <h2
+                  className="font-display font-semibold text-lg"
+                  style={{ color: '#1C1B18' }}
+                >
+                  Próximas consultas
+                </h2>
+                <Link
+                  to="/abogado/consultas"
+                  className="font-body text-sm flex items-center gap-1 hover:underline"
+                  style={{ color: '#B86030' }}
+                >
                   Ver todas <ArrowRight size={14} />
                 </Link>
               </div>
@@ -281,26 +372,41 @@ export default function DashboardAbogado() {
               ) : (
                 <div className="divide-y divide-slate-50">
                   {proximas.map(c => (
-                    <div key={c.id} className="flex items-start gap-4 p-5 hover:bg-slate-50 transition-colors">
+                    <div
+                      key={c.id}
+                      className="flex items-start gap-4 p-5 transition-colors"
+                      onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+                    >
                       {/* Bloque fecha */}
-                      <div className="shrink-0 text-center bg-navy-50 rounded-xl px-3 py-2 min-w-[52px]">
+                      <div
+                        className="shrink-0 text-center rounded-xl px-3 py-2 min-w-[52px]"
+                        style={{ background: '#F0EFED' }}
+                      >
                         <p className="font-body text-xs text-slate-500 uppercase tracking-wider">
                           {format(new Date(c.fecha_hora), 'MMM', { locale: es })}
                         </p>
-                        <p className="font-display font-bold text-navy-900 text-xl leading-none">
+                        <p
+                          className="font-display font-bold text-xl leading-none"
+                          style={{ color: '#1C1B18' }}
+                        >
                           {format(new Date(c.fecha_hora), 'd')}
                         </p>
                       </div>
+
                       {/* Datos */}
                       <div className="flex-1 min-w-0">
-                        <p className="font-body font-medium text-navy-900 text-sm">
+                        <p
+                          className="font-body font-medium text-sm"
+                          style={{ color: '#1C1B18' }}
+                        >
                           {c.cliente_nombre} {c.cliente_apellido}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="flex items-center gap-1 font-body text-xs text-slate-500">
                             {c.tipo === 'online'
-                              ? <><Video size={11} className="text-navy-700" /> Online</>
-                              : <><Building2 size={11} className="text-navy-700" /> Presencial</>
+                              ? <><Video size={11} style={{ color: '#B86030' }} /> Online</>
+                              : <><Building2 size={11} style={{ color: '#B86030' }} /> Presencial</>
                             }
                           </span>
                           <span className="text-slate-300">·</span>
@@ -309,8 +415,11 @@ export default function DashboardAbogado() {
                           </span>
                         </div>
                       </div>
+
                       {/* Estado */}
-                      <span className={c.estado === 'pendiente' ? 'badge-pendiente' : 'badge-confirmada'}>
+                      <span className={
+                        c.estado === 'pendiente' ? 'badge-pendiente' : 'badge-confirmada'
+                      }>
                         {c.estado === 'pendiente' ? 'Pendiente' : 'Confirmada'}
                       </span>
                     </div>
@@ -319,17 +428,31 @@ export default function DashboardAbogado() {
               )}
             </div>
 
-            {/* Stat destacada */}
+            {/* Stat destacada — fondo carbón oscuro */}
             {perfil && (
-              <div className="card p-6 bg-navy-900 border-0 flex items-center justify-between">
+              <div
+                className="rounded-2xl p-6 flex items-center justify-between"
+                style={{ background: '#1C1B18' }}
+              >
                 <div>
-                  <TrendingUp size={20} className="text-gold-400 mb-2" />
+                  <TrendingUp size={20} className="mb-2" style={{ color: '#C4522E' }} />
                   <p className="font-display font-bold text-white text-3xl">
                     {stats?.completadas_este_mes ?? 0}
                   </p>
-                  <p className="font-body text-white/60 text-sm mt-1">consultas completadas este mes</p>
+                  <p
+                    className="font-body text-sm mt-1"
+                    style={{ color: 'rgba(255,255,255,0.45)' }}
+                  >
+                    consultas completadas este mes
+                  </p>
                 </div>
-                <Link to="/abogado/consultas" className="btn-gold text-sm">
+                <Link
+                  to="/abogado/consultas"
+                  className="inline-flex items-center gap-1.5 px-5 py-3 rounded-xl font-body font-medium text-sm text-white transition-colors"
+                  style={{ background: '#B86030' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#8B4A1E'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#B86030'; }}
+                >
                   Ver consultas <ChevronRight size={14} />
                 </Link>
               </div>

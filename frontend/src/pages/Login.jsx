@@ -1,6 +1,5 @@
 // ============================================================
-// src/pages/Login.jsx
-// Formulario de inicio de sesión con validación
+// src/pages/Login.jsx — Paleta C: Gris carbón + Cobre
 // ============================================================
 
 import { useState } from 'react';
@@ -12,41 +11,25 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
 export default function Login() {
-  const { login }              = useAuth();
-  const navigate               = useNavigate();
-  const [searchParams]         = useSearchParams();
-  const [verPassword, setVer]  = useState(false);
+  const { login }               = useAuth();
+  const navigate                = useNavigate();
+  const [searchParams]          = useSearchParams();
+  const [verPassword, setVer]   = useState(false);
   const [cargando, setCargando] = useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm();
+  const { register, handleSubmit, formState: { errors } } = useForm();
 
   const onSubmit = async (datos) => {
     setCargando(true);
     try {
       const { data } = await api.post('/auth/login', datos);
-
-      // Guardar sesión en el contexto global
       login(data.token, data.usuario);
-
-      // Mostrar advertencias si las hay (ej: email sin verificar)
       if (data.advertencias?.length) {
         data.advertencias.forEach(a => toast(a, { icon: '⚠️' }));
       }
-
       toast.success(`¡Bienvenido/a, ${data.usuario.nombre}!`);
-
-      // Redirigir según el rol
-      const destinos = {
-        abogado: '/abogado/dashboard',
-        cliente: '/cliente/dashboard',
-        admin:   '/admin/dashboard',
-      };
+      const destinos = { abogado: '/abogado/dashboard', cliente: '/cliente/dashboard', admin: '/admin/dashboard' };
       navigate(destinos[data.usuario.rol] || '/');
-
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error al iniciar sesión.');
     } finally {
@@ -55,32 +38,42 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: '#F0EFED' }}
+    >
       <div className="w-full max-w-md animate-slide-up">
 
         {/* Logo */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2.5">
-            <div className="w-10 h-10 bg-navy-900 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: '#2C2B27' }}>
               <Scale size={20} className="text-white" />
             </div>
-            <span className="font-display font-bold text-navy-900 text-xl">
-              Conexión<span className="text-gold-500">Legal</span>
+            <span className="font-display font-bold text-xl" style={{ color: '#1C1B18' }}>
+              Conexión<span style={{ color: '#B86030' }}>Legal</span>
             </span>
           </Link>
         </div>
 
         <div className="card p-8">
-          <h1 className="font-display text-2xl font-bold text-navy-900 mb-1">Iniciar sesión</h1>
-          <p className="font-body text-sm text-slate-500 mb-6">
+          <h1 className="font-display text-2xl font-bold mb-1" style={{ color: '#1C1B18' }}>
+            Iniciar sesión
+          </h1>
+          <p className="font-body text-sm mb-6" style={{ color: '#8A8780' }}>
             ¿No tenés cuenta?{' '}
-            <Link to="/registro" className="text-navy-700 hover:text-navy-900 font-medium">Registrate gratis</Link>
+            <Link to="/registro" className="font-medium hover:underline" style={{ color: '#B86030' }}>
+              Registrate gratis
+            </Link>
           </p>
 
-          {/* Aviso de sesión expirada */}
+          {/* Aviso sesión expirada */}
           {searchParams.get('sesion_expirada') && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-              <p className="font-body text-sm text-amber-700">Tu sesión expiró. Por favor iniciá sesión nuevamente.</p>
+              <p className="font-body text-sm text-amber-700">
+                Tu sesión expiró. Por favor iniciá sesión nuevamente.
+              </p>
             </div>
           )}
 
@@ -94,7 +87,7 @@ export default function Login() {
                 <input
                   type="email"
                   placeholder="tucorreo@email.com"
-                  className={`input-field pl-10 ${errors.email ? 'border-red-300 focus:border-red-400' : ''}`}
+                  className={`input-field pl-10 ${errors.email ? 'border-red-300' : ''}`}
                   {...register('email', {
                     required: 'El email es obligatorio',
                     pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Email inválido' }
@@ -108,7 +101,11 @@ export default function Login() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="input-label mb-0">Contraseña</label>
-                <Link to="/reset-password" className="font-body text-xs text-navy-700 hover:text-navy-900">
+                <Link
+                  to="/reset-password"
+                  className="font-body text-xs hover:underline"
+                  style={{ color: '#B86030' }}
+                >
                   ¿Olvidaste tu contraseña?
                 </Link>
               </div>
@@ -131,10 +128,19 @@ export default function Login() {
               {errors.password && <p className="input-error">{errors.password.message}</p>}
             </div>
 
-            <button type="submit" disabled={cargando} className="btn-primary w-full py-3.5">
-              {cargando ? (
-                <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Ingresando...</>
-              ) : 'Iniciar sesión'}
+            {/* Botón */}
+            <button
+              type="submit"
+              disabled={cargando}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-body font-medium text-sm text-white transition-colors disabled:opacity-50"
+              style={{ background: '#2C2B27' }}
+              onMouseEnter={e => { if (!cargando) e.currentTarget.style.background = '#1C1B18'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}
+            >
+              {cargando
+                ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Ingresando...</>
+                : 'Iniciar sesión'
+              }
             </button>
           </form>
         </div>
