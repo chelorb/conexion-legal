@@ -19,9 +19,11 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
 // ─────────────────────────────────────────────────────────────
-// Sidebar: navegación + links de interés en un solo card
+// Sidebar: navegación con submenú desplegable para links
 // ─────────────────────────────────────────────────────────────
 function Sidebar({ links }) {
+  const [linksAbierto, setLinksAbierto] = useState(false);
+
   const MENU = [
     { href: '/abogado/dashboard',   label: 'Panel',       icono: LayoutDashboard },
     { href: '/abogado/perfil',      label: 'Mi perfil',   icono: User },
@@ -38,7 +40,6 @@ function Sidebar({ links }) {
 
   return (
     <aside className="w-full lg:w-64 shrink-0">
-      {/* Un solo card sticky que contiene navegación + links */}
       <div className="sticky top-24">
         <nav className="card p-3">
 
@@ -47,6 +48,8 @@ function Sidebar({ links }) {
             Navegación
           </p>
           <div className="space-y-0.5">
+
+            {/* Links normales del menú */}
             {MENU.map(({ href, label, icono: Icono }) => {
               const activo = actual === href ||
                 (href !== '/abogado/dashboard' && actual.startsWith(href));
@@ -55,15 +58,9 @@ function Sidebar({ links }) {
                   key={href}
                   to={href}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-body font-medium transition-all ${
-                    activo
-                      ? 'text-white'
-                      : 'text-slate-600 hover:text-stone-900'
+                    activo ? 'text-white' : 'text-slate-600'
                   }`}
-                  // Color activo de la paleta C (carbón 800)
-                  style={activo
-                    ? { background: '#2C2B27' }
-                    : undefined
-                  }
+                  style={activo ? { background: '#2C2B27' } : undefined}
                   onMouseEnter={e => { if (!activo) e.currentTarget.style.background = '#F7F6F4'; }}
                   onMouseLeave={e => { if (!activo) e.currentTarget.style.background = ''; }}
                 >
@@ -72,37 +69,115 @@ function Sidebar({ links }) {
                 </Link>
               );
             })}
-          </div>
 
-          {/* ── Separador + Links de interés ─────────────── */}
-          {links.length > 0 && (
-            <div className="border-t border-slate-100 pt-3 mt-3">
-              <p className="font-body text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">
-                Links de interés
-              </p>
-              <div className="space-y-0.5">
-                {links.map(link => (
-                  <a
-                    key={link.id}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors group"
-                    onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+            {/* ── Links de interés con submenú ─────────── */}
+            {links.length > 0 && (
+              <div
+                className="relative"
+                onMouseEnter={() => setLinksAbierto(true)}
+                onMouseLeave={() => setLinksAbierto(false)}
+              >
+                {/* Ítem del menú — mismo estilo que los demás */}
+                <div
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-body font-medium cursor-default transition-all"
+                  style={{ color: '#56534A' }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = '#F7F6F4';
+                    e.currentTarget.style.color = '#1C1B18';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = '';
+                    e.currentTarget.style.color = '#56534A';
+                  }}
+                >
+                  <ExternalLink size={16} className="text-slate-400 shrink-0" />
+                  <span className="flex-1">Links de interés</span>
+                  {/* Indicador de submenú */}
+                  <ChevronRight
+                    size={14}
+                    className="text-slate-300 shrink-0 transition-transform"
+                    style={{ transform: linksAbierto ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                  />
+                </div>
+
+                {/* Submenú flotante — aparece a la derecha en desktop,
+                    o debajo en pantallas chicas */}
+                {linksAbierto && (
+                  <div
+                    className="absolute left-full top-0 ml-2 w-64 rounded-2xl py-2 z-50 animate-fade-in"
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #E8E6E3',
+                      boxShadow: '0 8px 32px rgba(28,27,24,0.14)',
+                    }}
                   >
-                    <ExternalLink
-                      size={14}
-                      className="text-slate-400 shrink-0 group-hover:text-stone-600 transition-colors"
+                    {/* Triángulo decorativo */}
+                    <div
+                      className="absolute -left-2 top-4 w-0 h-0"
+                      style={{
+                        borderTop: '6px solid transparent',
+                        borderBottom: '6px solid transparent',
+                        borderRight: '8px solid #E8E6E3',
+                      }}
                     />
-                    <span className="font-body text-sm text-slate-600 group-hover:text-stone-900 leading-snug truncate transition-colors">
-                      {link.titulo}
-                    </span>
-                  </a>
-                ))}
+                    <div
+                      className="absolute left-0 top-4 w-0 h-0"
+                      style={{
+                        borderTop: '6px solid transparent',
+                        borderBottom: '6px solid transparent',
+                        borderRight: '8px solid #fff',
+                      }}
+                    />
+
+                    {/* Título del submenú */}
+                    <p
+                      className="font-body text-xs font-semibold uppercase tracking-wider px-4 pb-2 pt-1"
+                      style={{ color: '#8A8780', borderBottom: '1px solid #F0EFED' }}
+                    >
+                      Links de interés
+                    </p>
+
+                    {/* Lista de links */}
+                    <div className="pt-1">
+                      {links.map(link => (
+                        <a
+                          key={link.id}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-start gap-3 px-4 py-3 transition-colors group"
+                          onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+                        >
+                          <ExternalLink
+                            size={13}
+                            className="shrink-0 mt-0.5 transition-colors"
+                            style={{ color: '#B86030' }}
+                          />
+                          <div className="min-w-0">
+                            <p
+                              className="font-body text-sm font-medium leading-snug truncate"
+                              style={{ color: '#1C1B18' }}
+                            >
+                              {link.titulo}
+                            </p>
+                            {link.descripcion && (
+                              <p
+                                className="font-body text-xs mt-0.5 leading-snug line-clamp-2"
+                                style={{ color: '#8A8780' }}
+                              >
+                                {link.descripcion}
+                              </p>
+                            )}
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </nav>
       </div>
     </aside>
