@@ -6,8 +6,9 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Calendar, Search, Filter, Video, Building2,
   Check, X, Clock, RefreshCw, Link as LinkIcon,
-  ChevronDown, Star
+  ChevronDown, Star, ArrowRight, MessageSquare
 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -96,6 +97,17 @@ function TarjetaConsulta({ consulta, onAccion }) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <BadgeEstado estado={consulta.estado} />
+              {/* Botón ver detalle */}
+              <Link
+                to={`/abogado/consultas/${consulta.id}`}
+                onClick={e => e.stopPropagation()}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl font-body text-xs font-medium border transition-colors shrink-0"
+                style={{ borderColor: '#E8E6E3', color: '#56534A' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; e.currentTarget.style.color = '#1C1B18'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = '#56534A'; }}
+              >
+                Ver <ArrowRight size={11} />
+              </Link>
               <ChevronDown
                 size={16}
                 className="transition-transform"
@@ -192,6 +204,17 @@ function TarjetaConsulta({ consulta, onAccion }) {
             <div className="flex flex-wrap gap-2 pt-1">
               {consulta.estado === 'pendiente' && (
                 <>
+                  {/* Pendiente: invitar a ir al detalle para leer y responder */}
+                  <Link
+                    to={`/abogado/consultas/${consulta.id}`}
+                    onClick={e => e.stopPropagation()}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-body font-medium text-white transition-colors"
+                    style={{ background: '#2C2B27' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}
+                  >
+                    <MessageSquare size={14} /> Ver y responder
+                  </Link>
                   <button onClick={() => onAccion(consulta.id, 'confirmar')}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-body font-medium text-white transition-colors"
                     style={{ background: '#16a34a' }}
@@ -201,12 +224,12 @@ function TarjetaConsulta({ consulta, onAccion }) {
                     <Check size={14} /> Confirmar
                   </button>
                   <button onClick={() => onAccion(consulta.id, 'cancelar')}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-body font-medium text-white transition-colors"
-                    style={{ background: '#dc2626' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#b91c1c'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#dc2626'; }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-body font-medium border transition-colors"
+                    style={{ borderColor: '#fca5a5', color: '#dc2626' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = ''; }}
                   >
-                    <X size={14} /> Cancelar
+                    <X size={14} /> Rechazar
                   </button>
                 </>
               )}
@@ -266,8 +289,15 @@ export default function ConsultasAbogado() {
   useEffect(() => { cargar(); }, [cargar]);
 
   const onAccion = async (id, accion) => {
+    // Mapear la acción al estado que espera el backend
+    const estadoMap = {
+      confirmar:  'confirmada',
+      completar:  'completada',
+      cancelar:   'cancelada',
+      no_asistio: 'no_asistio',
+    };
     try {
-      await api.patch(`/consultas/${id}/estado`, { accion });
+      await api.patch(`/consultas/${id}/estado`, { estado: estadoMap[accion] });
       toast.success(
         accion === 'confirmar'  ? '✅ Consulta confirmada.' :
         accion === 'completar'  ? '✅ Consulta marcada como completada.' :
