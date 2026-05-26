@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 import { es } from 'date-fns/locale';
+import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
@@ -265,6 +266,147 @@ function ProximoEvento({ evento }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Componente: Fila de consulta en el dashboard
+// Clickeable → va al detalle. Muestra link de zoom si es online.
+// ─────────────────────────────────────────────────────────────
+function ConsultaItem({ consulta: c }) {
+  const [guardandoLink, setGuardandoLink] = useState(false);
+  const [link, setLink]                   = useState(c.link_reunion || '');
+  const [editando, setEditando]           = useState(false);
+
+  const guardarLink = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setGuardandoLink(true);
+    try {
+      await api.patch(`/consultas/${c.id}/link`, { link_videollamada: link });
+      toast.success('Link guardado. El cliente lo verá en su panel.');
+      setEditando(false);
+    } catch {
+      toast.error('Error al guardar el link.');
+    } finally {
+      setGuardandoLink(false);
+    }
+  };
+
+  return (
+    <div className="transition-colors" style={{ borderBottom: '1px solid #F7F6F4' }}>
+      {/* Fila principal — clickeable */}
+      <Link
+        to={`/abogado/consultas/${c.id}`}
+        className="flex items-start gap-4 p-5 group transition-colors block"
+        onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+      >
+        {/* Bloque fecha */}
+        <div
+          className="shrink-0 text-center rounded-xl px-3 py-2 min-w-[52px]"
+          style={{ background: '#F0EFED' }}
+        >
+          <p className="font-body text-xs text-slate-500 uppercase tracking-wider">
+            {format(new Date(c.fecha_hora), 'MMM', { locale: es })}
+          </p>
+          <p className="font-display font-bold text-xl leading-none" style={{ color: '#1C1B18' }}>
+            {format(new Date(c.fecha_hora), 'd')}
+          </p>
+        </div>
+
+        {/* Datos */}
+        <div className="flex-1 min-w-0">
+          <p className="font-body font-medium text-sm" style={{ color: '#1C1B18' }}>
+            {c.cliente_nombre} {c.cliente_apellido}
+          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <span className="flex items-center gap-1 font-body text-xs text-slate-500">
+              {c.tipo === 'online'
+                ? <><Video size={11} style={{ color: '#B86030' }} /> Online</>
+                : <><Building2 size={11} style={{ color: '#B86030' }} /> Presencial</>
+              }
+            </span>
+            <span className="text-slate-300">·</span>
+            <span className="font-body text-xs text-slate-500">
+              {format(new Date(c.fecha_hora), "HH:mm 'hs'")}
+            </span>
+          </div>
+        </div>
+
+        {/* Estado + flecha */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={c.estado === 'pendiente' ? 'badge-pendiente' : 'badge-confirmada'}>
+            {c.estado === 'pendiente' ? 'Pendiente' : 'Confirmada'}
+          </span>
+          <ChevronRight size={14} className="transition-colors shrink-0"
+            style={{ color: '#D4D2CC' }} />
+        </div>
+      </Link>
+
+      {/* Campo de link de videollamada — solo si es online y está confirmada */}
+      {c.tipo === 'online' && c.estado === 'confirmada' && (
+        <div className="px-5 pb-4">
+          {!editando ? (
+            <div className="flex items-center gap-3">
+              {link ? (
+                <>
+                  <a href={link} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 font-body text-xs font-medium transition-colors"
+                    style={{ color: '#B86030' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#8B4A1E'; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#B86030'; }}
+                  >
+                    <Video size={12} /> Abrir videollamada
+                  </a>
+                  <span style={{ color: '#D4D2CC' }}>·</span>
+                </>
+              ) : (
+                <p className="font-body text-xs" style={{ color: '#8A8780' }}>
+                  Sin link de videollamada
+                </p>
+              )}
+              <button
+                onClick={() => setEditando(true)}
+                className="font-body text-xs transition-colors"
+                style={{ color: '#8A8780' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#1C1B18'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#8A8780'; }}
+              >
+                {link ? 'Cambiar link' : '+ Agregar link'}
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={guardarLink} className="flex gap-2" onClick={e => e.stopPropagation()}>
+              <input
+                type="url"
+                autoFocus
+                placeholder="https://meet.google.com/... o https://zoom.us/j/..."
+                value={link}
+                onChange={e => setLink(e.target.value)}
+                className="input-field flex-1 text-xs py-2"
+              />
+              <button type="submit" disabled={guardandoLink}
+                className="px-3 py-2 rounded-xl font-body text-xs font-medium text-white transition-colors shrink-0"
+                style={{ background: '#2C2B27' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}
+              >
+                {guardandoLink ? '...' : 'Guardar'}
+              </button>
+              <button type="button" onClick={() => setEditando(false)}
+                className="px-3 py-2 rounded-xl font-body text-xs border transition-colors"
+                style={{ borderColor: '#E8E6E3', color: '#56534A' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+              >
+                Cancelar
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Página principal
 // ─────────────────────────────────────────────────────────────
 export default function DashboardAbogado() {
@@ -447,57 +589,7 @@ export default function DashboardAbogado() {
               ) : (
                 <div className="divide-y divide-slate-50">
                   {proximas.map(c => (
-                    <div
-                      key={c.id}
-                      className="flex items-start gap-4 p-5 transition-colors"
-                      onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = ''; }}
-                    >
-                      {/* Bloque fecha */}
-                      <div
-                        className="shrink-0 text-center rounded-xl px-3 py-2 min-w-[52px]"
-                        style={{ background: '#F0EFED' }}
-                      >
-                        <p className="font-body text-xs text-slate-500 uppercase tracking-wider">
-                          {format(new Date(c.fecha_hora), 'MMM', { locale: es })}
-                        </p>
-                        <p
-                          className="font-display font-bold text-xl leading-none"
-                          style={{ color: '#1C1B18' }}
-                        >
-                          {format(new Date(c.fecha_hora), 'd')}
-                        </p>
-                      </div>
-
-                      {/* Datos */}
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className="font-body font-medium text-sm"
-                          style={{ color: '#1C1B18' }}
-                        >
-                          {c.cliente_nombre} {c.cliente_apellido}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="flex items-center gap-1 font-body text-xs text-slate-500">
-                            {c.tipo === 'online'
-                              ? <><Video size={11} style={{ color: '#B86030' }} /> Online</>
-                              : <><Building2 size={11} style={{ color: '#B86030' }} /> Presencial</>
-                            }
-                          </span>
-                          <span className="text-slate-300">·</span>
-                          <span className="font-body text-xs text-slate-500">
-                            {format(new Date(c.fecha_hora), "HH:mm 'hs'")}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Estado */}
-                      <span className={
-                        c.estado === 'pendiente' ? 'badge-pendiente' : 'badge-confirmada'
-                      }>
-                        {c.estado === 'pendiente' ? 'Pendiente' : 'Confirmada'}
-                      </span>
-                    </div>
+                    <ConsultaItem key={c.id} consulta={c} />
                   ))}
                 </div>
               )}
