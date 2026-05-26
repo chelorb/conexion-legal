@@ -329,4 +329,148 @@ const actualizarEstadoConsulta = async (req, res, next) => {
   }
 };
 
-module.exports = { crearConsulta, listarConsultas, actualizarEstadoConsulta };
+// exports al final del archivo
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/consultas/:id
+// Detalle completo de una consulta (abogado o cliente)
+// ─────────────────────────────────────────────────────────────
+const obtenerConsulta = async (req, res, next) => {
+  try {
+    const { id }       = req.params;
+    const usuarioId    = req.usuario.id;
+    const rol          = req.usuario.rol;
+
+    const { rows } = await query(
+      `SELECT
+         c.id, c.tipo, c.fecha_hora, c.estado, c.especialidad,
+         c.descripcion, c.link_reunion, c.motivo_cancelacion,
+         c.creado_en, c.duracion_min,
+         -- Cliente
+         uc.id AS cliente_id, uc.nombre AS cliente_nombre,
+         uc.apellido AS cliente_apellido, uc.email AS cliente_email,
+         uc.telefono AS cliente_telefono, uc.avatar_url AS cliente_avatar,
+         -- Abogado
+         ua.id AS abogado_id, ua.nombre AS abogado_nombre,
+         ua.apellido AS abogado_apellido, ua.email AS abogado_email,
+         -- Mensajes de respuesta
+         (SELECT json_agg(
+           json_build_object(
+             'id', m.id, 'contenido', m.contenido,
+             'autor_id', m.autor_id, 'creado_en', m.creado_en,
+             'autor_nombre', u2.nombre, 'autor_rol', r2.nombre
+           ) ORDER BY m.creado_en ASC
+         )
+         FROM mensajes_consulta m
+         JOIN usuarios u2 ON m.autor_id = u2.id
+         JOIN roles r2 ON u2.rol_id = r2.id
+         WHERE m.consulta_id = c.id
+         ) AS mensajes
+       FROM consultas c
+       JOIN usuarios uc ON c.cliente_id  = uc.id
+       JOIN usuarios ua ON c.abogado_id  = ua.id
+       WHERE c.id = $1`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta no encontrada.' });
+    }
+
+    const consulta = rows[0];
+
+    // Solo el abogado, el cliente o el admin pueden ver el detalle
+    const puedeVer =
+      rol === 'admin' ||
+      (rol === 'abogado' && consulta.abogado_id === usuarioId) ||
+      (rol === 'cliente' && consulta.cliente_id === usuarioId);
+
+    if (!puedeVer) {
+      return res.status(403).json({ error: 'No tenés permisos para ver esta consulta.' });
+    }
+
+    res.json({ consulta: { ...consulta, mensajes: consulta.mensajes || [] } });
+
+  } catch (error) { next(error); }
+};
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/consultas/:id/mensajes
+// El abogado o cliente envía un mensaje en la consulta
+// ─────────────────────────────────────────────────────────────
+const enviarMensaje = async (req, res, next) => {
+  try {
+    const { id }       = req.params;
+    const { contenido } = req.body;
+    const usuarioId    = req.usuario.id;
+    const rol          = req.usuario.rol;
+
+    if (!contenido?.trim()) {
+      return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
+    }
+
+    // Verificar que la consulta existe y el usuario es parte de ella
+    const { rows } = await query(
+      `SELECT c.id, c.cliente_id, c.abogado_id, c.estado,
+              uc.nombre AS cliente_nombre, uc.email AS cliente_email,
+              ua.nombre AS abogado_nombre, ua.email AS abogado_email
+       FROM consultas c
+       JOIN usuarios uc ON c.cliente_id = uc.id
+       JOIN usuarios ua ON c.abogado_id = ua.id
+       WHERE c.id = $1`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Consulta no encontrada.' });
+    }
+
+    const consulta = rows[0];
+    const esAbogado = rol === 'abogado' && consulta.abogado_id === usuarioId;
+    const esCliente = rol === 'cliente' && consulta.cliente_id === usuarioId;
+
+    if (!esAbogado && !esCliente && rol !== 'admin') {
+      return res.status(403).json({ error: 'No podés enviar mensajes en esta consulta.' });
+    }
+
+    if (['cancelada', 'completada', 'no_asistio'].includes(consulta.estado)) {
+      return res.status(400).json({ error: 'No se pueden enviar mensajes en consultas finalizadas.' });
+    }
+
+    // Insertar el mensaje
+    const { rows: [mensaje] } = await query(
+      `INSERT INTO mensajes_consulta (consulta_id, autor_id, contenido)
+       VALUES ($1, $2, $3)
+       RETURNING id, contenido, autor_id, creado_en`,
+      [id, usuarioId, contenido.trim()]
+    );
+
+    // Notificar al otro participante
+    const destinatarioId = esAbogado ? consulta.cliente_id : consulta.abogado_id;
+    const remitenteNombre = esAbogado
+      ? consulta.abogado_nombre
+      : consulta.cliente_nombre;
+
+    await query(
+      `INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, link)
+       VALUES ($1, 'mensaje_consulta', $2, $3, $4)`,
+      [
+        destinatarioId,
+        `Nuevo mensaje de ${remitenteNombre}`,
+        contenido.substring(0, 100),
+        esAbogado ? '/mis-consultas' : '/abogado/consultas',
+      ]
+    );
+
+    res.status(201).json({ mensaje });
+
+  } catch (error) { next(error); }
+};
+
+module.exports = {
+  crearConsulta,
+  listarConsultas,
+  actualizarEstadoConsulta,
+  obtenerConsulta,
+  enviarMensaje,
+};
