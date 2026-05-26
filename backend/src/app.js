@@ -27,6 +27,7 @@ const foroRoutes           = require('./routes/foro.routes');       // ← FORO
 const pagosRoutes          = require('./routes/pagos.routes');
 const beneficiosRoutes     = require('./routes/beneficios.routes');
 const adminRoutes          = require('./routes/admin.routes');
+const planesAdminRoutes    = require('./routes/planes.admin.routes');
 const notificacionesRoutes = require('./routes/notificaciones.routes');
 
 const app = express();
@@ -93,7 +94,8 @@ app.use('/api/agenda',         agendaRoutes);
 app.use('/api/foro',           foroRoutes);          // ← FORO
 app.use('/api/pagos',          pagosRoutes);
 app.use('/api/beneficios',     beneficiosRoutes);
-app.use('/api/admin',          adminRoutes);
+app.use('/api/admin',                adminRoutes);
+app.use('/api/admin/planes-gestion', planesAdminRoutes);
 // Ruta pública para links de interés (sin auth, visible en el dashboard)
 const { linksPublicos } = require('./routes/admin.routes');
 app.get('/api/links', linksPublicos);

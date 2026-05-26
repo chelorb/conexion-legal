@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Calendar, Star, CheckCircle, Clock,
-  AlertCircle, ArrowRight, Video, Building2,
+  AlertCircle, ArrowRight, Video, Building2, X,
   TrendingUp, Award, ExternalLink, ChevronRight,
   User, BookOpen, Gift, CreditCard, MessageSquare,
   FileText, LayoutDashboard
@@ -414,6 +414,7 @@ export default function DashboardAbogado() {
   const [datos,         setDatos]         = useState(null);
   const [links,         setLinks]         = useState([]);
   const [proximoEvento, setProximoEvento] = useState(null);
+  const [notifPlan,     setNotifPlan]     = useState([]);
   const [cargando,      setCargando]      = useState(true);
 
   useEffect(() => {
@@ -433,6 +434,12 @@ export default function DashboardAbogado() {
           const futuro  = eventos.find(e => !isPast(new Date(e.fecha_evento)));
           setProximoEvento(futuro || null);
         }
+
+        // Notificaciones de cambios de plan (no leídas)
+        try {
+          const notifRes = await api.get('/abogados/me/notificaciones-plan');
+          setNotifPlan((notifRes.data.notificaciones || []).filter(n => !n.leida));
+        } catch { /* silencioso */ }
       } catch {
         // Silencioso — cada sección muestra su estado vacío
       } finally {
@@ -495,6 +502,60 @@ export default function DashboardAbogado() {
             <Award size={16} /> Mejorar plan
           </Link>
         </div>
+
+        {/* ── Banners de notificaciones de plan ─────── */}
+        {notifPlan.length > 0 && (
+          <div className="space-y-3 mb-2">
+            {notifPlan.map(n => (
+              <div
+                key={n.id}
+                className="rounded-2xl p-4 flex items-start gap-3"
+                style={{ background: 'rgba(184,96,48,0.08)', border: '1px solid rgba(184,96,48,0.25)' }}
+              >
+                <AlertCircle size={18} style={{ color: '#B86030' }} className="shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>
+                    {n.titulo}
+                  </p>
+                  <p className="font-body text-xs mt-0.5 leading-relaxed" style={{ color: '#56534A' }}>
+                    {n.mensaje}
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.patch(`/abogados/me/notificaciones-plan/${n.id}/leida`);
+                      setNotifPlan(prev => prev.filter(x => x.id !== n.id));
+                    } catch {}
+                  }}
+                  className="p-1.5 rounded-lg transition-colors shrink-0"
+                  style={{ color: '#B0AEA8' }}
+                  onMouseEnter={e => { e.currentTarget.style.color = '#56534A'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = '#B0AEA8'; }}
+                  title="Marcar como leída"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+            {notifPlan.length > 1 && (
+              <button
+                onClick={async () => {
+                  try {
+                    await api.patch('/abogados/me/notificaciones-plan/marcar-todas');
+                    setNotifPlan([]);
+                  } catch {}
+                }}
+                className="font-body text-xs w-full text-center transition-colors"
+                style={{ color: '#8A8780' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#1C1B18'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#8A8780'; }}
+              >
+                Marcar todas como leídas
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Alerta perfil incompleto */}
         {!perfil?.perfil_completo && (
