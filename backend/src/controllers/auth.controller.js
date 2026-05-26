@@ -69,10 +69,18 @@ const registro = async (req, res, next) => {
 
     // ── Si es abogado: crear perfil con estado "pendiente" ──
     if (rol === 'abogado') {
-      const planGratuito = await client.query(
-        "SELECT id FROM planes_suscripcion WHERE slug = 'gratuito'"
+      // Buscar el plan más barato (básico) — sin importar el slug
+      const planDefault = await client.query(
+        `SELECT id FROM planes_suscripcion
+         WHERE activo = true
+         ORDER BY precio_mensual ASC
+         LIMIT 1`
       );
-      const planId = planGratuito.rows[0]?.id || 1;
+      const planId = planDefault.rows[0]?.id;
+
+      if (!planId) {
+        throw new Error('No hay planes disponibles en el sistema.');
+      }
 
       await client.query(
         `INSERT INTO perfiles_abogado
