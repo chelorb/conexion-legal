@@ -39,7 +39,8 @@ import Suscripcion      from './pages/abogado/Suscripcion';
 
 // ── Páginas del cliente (requieren auth + rol cliente) ───────
 import DashboardCliente from './pages/cliente/Dashboard';
-import MisConsultas     from './pages/cliente/MisConsultas';
+import MisConsultas            from './pages/cliente/MisConsultas';
+import DetalleConsultaCliente  from './pages/cliente/DetalleConsulta';
 import NuevaConsulta    from './pages/cliente/NuevaConsulta';
 
 // ── Panel admin (requiere auth + rol admin) ──────────────────
@@ -125,7 +126,8 @@ function AppRoutes() {
 
           {/* ── Cliente ───────────────────────────────────── */}
           <Route path="/cliente/dashboard"        element={<RutaProtegida rolesPermitidos={['cliente']}><DashboardCliente /></RutaProtegida>} />
-          <Route path="/mis-consultas"            element={<RutaProtegida rolesPermitidos={['cliente']}><MisConsultas /></RutaProtegida>} />
+          <Route path="/mis-consultas"      element={<RutaProtegida rolesPermitidos={['cliente']}><MisConsultas /></RutaProtegida>} />
+          <Route path="/mis-consultas/:id"  element={<RutaProtegida rolesPermitidos={['cliente']}><DetalleConsultaCliente /></RutaProtegida>} />
           <Route path="/nueva-consulta/:abogadoId" element={<RutaProtegida rolesPermitidos={['cliente']}><NuevaConsulta /></RutaProtegida>} />
 
           {/* ── Admin ─────────────────────────────────────── */}

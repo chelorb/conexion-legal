@@ -323,6 +323,17 @@ function TarjetaConsulta({ consulta, onAccion }) {
             </button>
           )}
 
+          {/* Ver conversación con el abogado */}
+          <Link
+            to={`/mis-consultas/${consulta.id}`}
+            className="flex items-center gap-1.5 font-body text-xs px-4 py-2 rounded-xl border transition-colors font-medium"
+            style={{ borderColor: '#D4D2CC', color: '#2C2B27' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+          >
+            <MessageSquare size={13} /> Ver conversación
+          </Link>
+
           {/* Cancelar */}
           {puedeCancelar && (
             <button
