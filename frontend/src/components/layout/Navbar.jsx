@@ -34,6 +34,7 @@ export default function Navbar() {
     { href: '/admin/dashboard', label: 'Dashboard' },
     { href: '/admin/abogados',  label: 'Abogados' },
     { href: '/admin/usuarios',  label: 'Usuarios' },
+    { href: '/admin/planes',    label: 'Planes' },
     { href: '/admin/campus',    label: 'Campus' },
     { href: '/admin/eventos',   label: 'Eventos' },
     { href: '/admin/links',     label: 'Links' },

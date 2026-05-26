@@ -437,3 +437,82 @@ router.delete('/links/:id', async (req, res, next) => {
     res.json({ mensaje: 'Link eliminado.' });
   } catch (error) { next(error); }
 });
+
+// ─────────────────────────────────────────────────────────────
+// GESTIÓN DE PLANES (Admin)
+// ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/planes — Listar todos los planes
+router.get('/planes', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, nombre, slug,
+              CAST(precio_mensual AS FLOAT) AS precio_mensual,
+              CAST(precio_anual AS FLOAT) AS precio_anual,
+              aparece_en_grilla, max_consultas_mes,
+              acceso_campus, acceso_campus_completo,
+              gestion_turnos, perfil_validado,
+              credencial_virtual, networking,
+              beneficios_exclusivos, difusion_profesional,
+              activo
+       FROM planes_suscripcion
+       ORDER BY precio_mensual ASC`
+    );
+    res.json({ planes: rows });
+  } catch (error) { next(error); }
+});
+
+// PUT /api/admin/planes/:id — Actualizar un plan
+router.put('/planes/:id', async (req, res, next) => {
+  try {
+    const {
+      nombre, precio_mensual, precio_anual,
+      max_consultas_mes,
+      aparece_en_grilla, acceso_campus, acceso_campus_completo,
+      gestion_turnos, perfil_validado, credencial_virtual,
+      networking, beneficios_exclusivos, difusion_profesional,
+      activo,
+    } = req.body;
+
+    const { rows: [plan] } = await query(
+      `UPDATE planes_suscripcion SET
+         nombre                 = COALESCE($1,  nombre),
+         precio_mensual         = COALESCE($2,  precio_mensual),
+         precio_anual           = COALESCE($3,  precio_anual),
+         max_consultas_mes      = $4,
+         aparece_en_grilla      = COALESCE($5,  aparece_en_grilla),
+         acceso_campus          = COALESCE($6,  acceso_campus),
+         acceso_campus_completo = COALESCE($7,  acceso_campus_completo),
+         gestion_turnos         = COALESCE($8,  gestion_turnos),
+         perfil_validado        = COALESCE($9,  perfil_validado),
+         credencial_virtual     = COALESCE($10, credencial_virtual),
+         networking             = COALESCE($11, networking),
+         beneficios_exclusivos  = COALESCE($12, beneficios_exclusivos),
+         difusion_profesional   = COALESCE($13, difusion_profesional),
+         activo                 = COALESCE($14, activo),
+         actualizado_en         = NOW()
+       WHERE id = $15
+       RETURNING *`,
+      [
+        nombre || null,
+        precio_mensual !== undefined ? parseFloat(precio_mensual) : null,
+        precio_anual   !== undefined ? parseFloat(precio_anual)   : null,
+        max_consultas_mes !== undefined ? (max_consultas_mes === '' || max_consultas_mes === null ? null : parseInt(max_consultas_mes)) : undefined,
+        aparece_en_grilla      ?? null,
+        acceso_campus          ?? null,
+        acceso_campus_completo ?? null,
+        gestion_turnos         ?? null,
+        perfil_validado        ?? null,
+        credencial_virtual     ?? null,
+        networking             ?? null,
+        beneficios_exclusivos  ?? null,
+        difusion_profesional   ?? null,
+        activo                 ?? null,
+        req.params.id,
+      ]
+    );
+
+    if (!plan) return res.status(404).json({ error: 'Plan no encontrado.' });
+    res.json({ mensaje: 'Plan actualizado correctamente.', plan });
+  } catch (error) { next(error); }
+});
