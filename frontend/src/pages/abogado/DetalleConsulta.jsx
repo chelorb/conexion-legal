@@ -79,6 +79,96 @@ function BurbujaMensaje({ mensaje, esPropio }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Componente: Sección de link de videollamada
+// ─────────────────────────────────────────────────────────────
+function LinkVideollamada({ consultaId, linkActual }) {
+  const [link,     setLink]     = useState(linkActual || '');
+  const [editando, setEditando] = useState(!linkActual); // abre directo si no tiene link
+  const [guardando, setGuardando] = useState(false);
+
+  const guardar = async (e) => {
+    e.preventDefault();
+    if (!link.trim()) { toast.error('Pegá la URL de la videollamada.'); return; }
+    setGuardando(true);
+    try {
+      await api.patch(`/consultas/${consultaId}/link`, { link_videollamada: link.trim() });
+      toast.success('Link guardado. El cliente ya puede verlo.');
+      setEditando(false);
+    } catch {
+      toast.error('Error al guardar el link.');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl p-4 mb-2" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)' }}>
+      <p className="font-body text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: '#1d4ed8' }}>
+        🎥 Link de videollamada
+      </p>
+
+      {!editando ? (
+        <div className="space-y-2">
+          <a href={link} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-2 font-body text-sm font-medium truncate transition-colors"
+            style={{ color: '#1d4ed8' }}
+            onMouseEnter={e => { e.currentTarget.style.opacity = '0.8'; }}
+            onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+          >
+            <Video size={14} className="shrink-0" /> {link}
+          </a>
+          <button onClick={() => setEditando(true)}
+            className="font-body text-xs transition-colors"
+            style={{ color: '#8A8780' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#1C1B18'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#8A8780'; }}
+          >
+            Cambiar link
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={guardar} className="space-y-2">
+          <input
+            type="url"
+            autoFocus
+            placeholder="https://meet.google.com/... o https://zoom.us/j/..."
+            value={link}
+            onChange={e => setLink(e.target.value)}
+            className="input-field text-sm"
+          />
+          <p className="font-body text-xs" style={{ color: '#8A8780' }}>
+            El cliente verá este link para unirse a la reunión.
+          </p>
+          <div className="flex gap-2">
+            <button type="submit" disabled={guardando}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-body font-medium text-sm text-white transition-colors"
+              style={{ background: '#2C2B27' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}
+            >
+              {guardando
+                ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                : <><Video size={14} /> Guardar link</>
+              }
+            </button>
+            {linkActual && (
+              <button type="button" onClick={() => setEditando(false)}
+                className="px-4 py-2.5 rounded-xl font-body text-sm border transition-colors"
+                style={{ borderColor: '#E8E6E3', color: '#56534A' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // Página principal
 // ─────────────────────────────────────────────────────────────
 export default function DetalleConsulta() {
@@ -332,7 +422,13 @@ export default function DetalleConsulta() {
 
               {esConfirmada && (
                 <div className="space-y-2">
-                  <p className="font-body text-xs font-semibold uppercase tracking-wider mb-3"
+
+                  {/* ── Link videollamada (solo si es online) ── */}
+                  {consulta.tipo === 'online' && (
+                    <LinkVideollamada consultaId={consulta.id} linkActual={consulta.link_reunion} />
+                  )}
+
+                  <p className="font-body text-xs font-semibold uppercase tracking-wider mb-3 pt-2"
                     style={{ color: '#8A8780' }}>
                     Actualizar estado
                   </p>
