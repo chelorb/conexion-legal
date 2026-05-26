@@ -55,13 +55,135 @@ import AdminLinks      from './pages/admin/Links';
 // ─────────────────────────────────────────────────────────────
 // Protección de rutas por autenticación y rol
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+// Pantalla: abogado pendiente de aprobación
+// ─────────────────────────────────────────────────────────────
+function PantallaPendienteAprobacion() {
+  const { logout } = useAuth();
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#F0EFED' }}>
+      <div className="card p-10 max-w-lg w-full text-center animate-slide-up">
+
+        {/* Ícono animado */}
+        <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
+          style={{ background: 'rgba(184,96,48,0.1)' }}>
+          <div className="text-5xl animate-pulse-slow">⏳</div>
+        </div>
+
+        <h1 className="font-display text-3xl font-bold mb-3" style={{ color: '#1C1B18' }}>
+          Perfil en revisión
+        </h1>
+        <p className="font-body leading-relaxed mb-2" style={{ color: '#56534A' }}>
+          Tu cuenta fue creada correctamente. Nuestro equipo está revisando tu perfil profesional y matrícula.
+        </p>
+        <p className="font-body leading-relaxed mb-8" style={{ color: '#8A8780' }}>
+          Este proceso tarda entre <strong>24 y 48 horas hábiles</strong>. Te avisaremos por email cuando esté aprobado.
+        </p>
+
+        {/* Pasos */}
+        <div className="text-left space-y-4 mb-8">
+          {[
+            { num: '1', label: 'Verificación de email',       ok: true  },
+            { num: '2', label: 'Revisión del perfil y matrícula', ok: false },
+            { num: '3', label: 'Aprobación y activación',     ok: false },
+          ].map(({ num, label, ok }) => (
+            <div key={num} className="flex items-center gap-4">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-body font-semibold text-sm"
+                style={ok
+                  ? { background: 'rgba(22,163,74,0.1)', color: '#16a34a' }
+                  : { background: '#F0EFED', color: '#8A8780' }
+                }
+              >
+                {ok ? '✓' : num}
+              </div>
+              <span className="font-body text-sm" style={{ color: ok ? '#16a34a' : '#56534A' }}>
+                {label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {/* Mientras espera puede completar su perfil */}
+          <p className="font-body text-xs" style={{ color: '#8A8780' }}>
+            Mientras tanto, podés preparar tu perfil para cuando sea aprobado.
+          </p>
+          <button
+            onClick={logout}
+            className="font-body text-sm transition-colors"
+            style={{ color: '#8A8780' }}
+            onMouseEnter={e => { e.currentTarget.style.color = '#1C1B18'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = '#8A8780'; }}
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// Pantalla: abogado rechazado
+// ─────────────────────────────────────────────────────────────
+function PantallaRechazado({ motivo }) {
+  const { logout } = useAuth();
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: '#F0EFED' }}>
+      <div className="card p-10 max-w-lg w-full text-center animate-slide-up">
+
+        <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
+          style={{ background: 'rgba(220,38,38,0.08)' }}>
+          <div className="text-5xl">❌</div>
+        </div>
+
+        <h1 className="font-display text-3xl font-bold mb-3" style={{ color: '#1C1B18' }}>
+          Perfil no aprobado
+        </h1>
+        <p className="font-body leading-relaxed mb-6" style={{ color: '#56534A' }}>
+          Lamentablemente tu perfil no fue aprobado por nuestro equipo.
+        </p>
+
+        {motivo && (
+          <div className="rounded-2xl p-5 mb-6 text-left"
+            style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)' }}>
+            <p className="font-body text-xs font-semibold uppercase tracking-wider mb-2"
+              style={{ color: '#dc2626' }}>
+              Motivo indicado
+            </p>
+            <p className="font-body text-sm leading-relaxed" style={{ color: '#3A3832' }}>
+              {motivo}
+            </p>
+          </div>
+        )}
+
+        <p className="font-body text-sm mb-8" style={{ color: '#8A8780' }}>
+          Si creés que hubo un error o querés apelar la decisión, escribinos a{' '}
+          <a href="mailto:info@conexionlegal.com.ar" className="hover:underline" style={{ color: '#B86030' }}>
+            info@conexionlegal.com.ar
+          </a>
+        </p>
+
+        <button
+          onClick={logout}
+          className="btn-secondary w-full"
+        >
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RutaProtegida({ children, rolesPermitidos }) {
   const { estaAutenticado, usuario, cargando } = useAuth();
 
   if (cargando) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-navy-900 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#F0EFED' }}>
+        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin"
+          style={{ borderColor: '#2C2B27', borderTopColor: 'transparent' }} />
       </div>
     );
   }
@@ -69,8 +191,21 @@ function RutaProtegida({ children, rolesPermitidos }) {
   if (!estaAutenticado) return <Navigate to="/login" replace />;
 
   if (rolesPermitidos && !rolesPermitidos.includes(usuario.rol)) {
-    const destinos = { abogado: '/abogado/dashboard', cliente: '/cliente/dashboard', admin: '/admin/dashboard' };
+    const destinos = { abogado: '/abogado/dashboard', cliente: '/mis-consultas', admin: '/admin/dashboard' };
     return <Navigate to={destinos[usuario.rol] || '/'} replace />;
+  }
+
+  // ── Si es abogado, verificar estado de aprobación ──────────
+  if (usuario.rol === 'abogado') {
+    const estado = usuario.perfil_abogado?.estado_aprobacion;
+
+    if (estado === 'pendiente') {
+      return <PantallaPendienteAprobacion />;
+    }
+
+    if (estado === 'rechazado') {
+      return <PantallaRechazado motivo={usuario.perfil_abogado?.motivo_rechazo} />;
+    }
   }
 
   return children;
