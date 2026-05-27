@@ -98,13 +98,21 @@ const crearConsulta = async (req, res, next) => {
       [abogado_id]
     );
 
+    // Notificación real-time al abogado
+    const notifService = require('../services/notificaciones.service');
+    const { rows: [cliente] } = await query(
+      'SELECT nombre, apellido FROM usuarios WHERE id = $1', [clienteId]
+    );
+    const { format } = require('date-fns');
+    const { es } = require('date-fns/locale');
+
     await client.query('COMMIT');
 
-    // Notificar al abogado por email (no bloqueamos)
-    const { rows: [cliente] } = await query(
-      'SELECT nombre, apellido FROM usuarios WHERE id = $1',
-      [clienteId]
-    );
+    await notifService.nuevaConsulta({
+      abogadoId:    abogado_id,
+      clienteNombre: `${cliente.nombre} ${cliente.apellido}`,
+      fecha: format(new Date(fecha_hora), "d 'de' MMMM, HH:mm 'hs'", { locale: es }),
+    });
 
     emailService.notificarNuevaConsulta({
       abogadoEmail:  abogadoData.email,
@@ -304,8 +312,14 @@ const actualizarEstadoConsulta = async (req, res, next) => {
 
     await client.query('COMMIT');
 
-    // Enviar email si la consulta fue confirmada
+    // Notificaciones real-time según el nuevo estado
+    const notifService = require('../services/notificaciones.service');
+    const { format } = require('date-fns');
+    const { es } = require('date-fns/locale');
+    const fechaFormato = format(new Date(consulta.fecha_hora), "d 'de' MMMM, HH:mm 'hs'", { locale: es });
+
     if (estado === 'confirmada') {
+      // Email + notif al cliente
       emailService.enviarConfirmacionTurno({
         clienteNombre: consulta.cliente_nombre,
         clienteEmail:  consulta.cliente_email,
@@ -313,6 +327,19 @@ const actualizarEstadoConsulta = async (req, res, next) => {
         fecha:         consulta.fecha_hora,
         tipo:          consulta.tipo,
         linkReunion:   link_reunion,
+      });
+      await notifService.consultaConfirmada({
+        clienteId:    consulta.cliente_id,
+        abogadoNombre: consulta.abogado_nombre,
+        fecha:         fechaFormato,
+      });
+    }
+
+    if (estado === 'cancelada' && req.usuario.rol === 'abogado') {
+      // El abogado canceló → avisar al cliente
+      await notifService.consultaRechazada({
+        clienteId:    consulta.cliente_id,
+        abogadoNombre: consulta.abogado_nombre,
       });
     }
 
@@ -446,21 +473,17 @@ const enviarMensaje = async (req, res, next) => {
     );
 
     // Notificar al otro participante
-    const destinatarioId = esAbogado ? consulta.cliente_id : consulta.abogado_id;
-    const remitenteNombre = esAbogado
-      ? consulta.abogado_nombre
-      : consulta.cliente_nombre;
+    const destinatarioId  = esAbogado ? consulta.cliente_id : consulta.abogado_id;
+    const remitenteNombre = esAbogado ? consulta.abogado_nombre : consulta.cliente_nombre;
 
-    await query(
-      `INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, link)
-       VALUES ($1, 'mensaje_consulta', $2, $3, $4)`,
-      [
-        destinatarioId,
-        `Nuevo mensaje de ${remitenteNombre}`,
-        contenido.substring(0, 100),
-        esAbogado ? '/mis-consultas' : '/abogado/consultas',
-      ]
-    );
+    // Notificación real-time al destinatario
+    const notifService = require('../services/notificaciones.service');
+    await notifService.nuevoMensaje({
+      destinatarioId,
+      remitenteNombre,
+      consultaId: id,
+      esAbogado,  // true = el que envía es el abogado → destinatario es cliente
+    });
 
     res.status(201).json({ mensaje });
 

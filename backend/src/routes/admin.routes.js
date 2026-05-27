@@ -50,9 +50,12 @@ router.get('/usuarios', async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT u.id, u.nombre, u.apellido, u.email, u.activo,
-              u.email_verificado, u.creado_en, r.nombre AS rol
+              u.email_verificado, u.creado_en, r.nombre AS rol,
+              -- Para abogados: traer estado de aprobación
+              pa.estado_aprobacion, pa.visible_en_grilla
        FROM usuarios u
        JOIN roles r ON u.rol_id = r.id
+       LEFT JOIN perfiles_abogado pa ON u.id = pa.usuario_id
        ORDER BY u.creado_en DESC
        LIMIT 200`
     );
@@ -76,13 +79,16 @@ router.get('/abogados', async (req, res, next) => {
 
     const { rows } = await query(
       `SELECT
-         u.id, u.nombre, u.apellido, u.email, u.avatar_url, u.creado_en,
+         u.id, u.nombre, u.apellido, u.email, u.avatar_url, u.creado_en, u.telefono,
          pa.especialidades, pa.descripcion, pa.matricula,
          pa.matricula_verificada, pa.ciudad, pa.provincia,
          pa.calificacion_promedio, pa.total_calificaciones,
          pa.visible_en_grilla, pa.perfil_completo,
          pa.estado_aprobacion, pa.motivo_rechazo,
          pa.aprobado_en,
+         pa.cuil, pa.titulo_universitario, pa.universidad,
+         pa.anio_graduacion, pa.nro_credencial_letrado,
+         pa.doc_credencial_url, pa.doc_titulo_url, pa.doc_cuil_url,
          ps.nombre AS plan_nombre, ps.slug AS plan_slug
        FROM usuarios u
        JOIN perfiles_abogado pa ON u.id = pa.usuario_id
@@ -141,17 +147,13 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
         [matricula_verificada ?? null, adminId, id]
       );
 
-      // Notificación en la app para el abogado
-      await query(
-        `INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, link)
-         VALUES ($1, 'perfil_aprobado',
-                 '✅ ¡Tu perfil fue aprobado!',
-                 'Ya aparecés en la búsqueda de clientes. ¡Bienvenido/a a Conexión Legal!',
-                 '/abogado/dashboard')`,
-        [id]
-      );
+      // Notificación real-time + email
+      const notifService = require('../services/notificaciones.service');
+      await notifService.perfilAprobado({
+        abogadoId:     id,
+        abogadoNombre: `${abogado.nombre} ${abogado.apellido}`,
+      });
 
-      // Email de aprobación al abogado
       emailService.notificarAbogadoAprobado({
         nombre: `${abogado.nombre} ${abogado.apellido}`,
         email:  abogado.email,
@@ -173,17 +175,13 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
         [motivo || null, adminId, id]
       );
 
-      // Notificación en la app
-      await query(
-        `INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, link)
-         VALUES ($1, 'perfil_rechazado',
-                 'ℹ️ Tu perfil necesita correcciones',
-                 $2,
-                 '/abogado/perfil')`,
-        [id, motivo || 'Por favor revisá tu perfil y completá los datos faltantes.']
-      );
+      // Notificación real-time + email
+      const notifService = require('../services/notificaciones.service');
+      await notifService.perfilRechazado({
+        abogadoId: id,
+        motivo:    motivo || 'Por favor revisá tu perfil y completá los datos faltantes.',
+      });
 
-      // Email de rechazo con motivo
       emailService.notificarAbogadoRechazado({
         nombre: `${abogado.nombre} ${abogado.apellido}`,
         email:  abogado.email,
@@ -515,4 +513,30 @@ router.put('/planes/:id', async (req, res, next) => {
     if (!plan) return res.status(404).json({ error: 'Plan no encontrado.' });
     res.json({ mensaje: 'Plan actualizado correctamente.', plan });
   } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/admin/usuarios/:id/datos — Editar datos personales
+// ─────────────────────────────────────────────────────────────
+router.patch('/usuarios/:id/datos', async (req, res, next) => {
+  try {
+    const { nombre, apellido, email, telefono } = req.body;
+    const { rows: [usuario] } = await query(
+      `UPDATE usuarios SET
+         nombre   = COALESCE($1, nombre),
+         apellido = COALESCE($2, apellido),
+         email    = COALESCE($3, email),
+         telefono = COALESCE($4, telefono)
+       WHERE id = $5
+       RETURNING id, nombre, apellido, email, telefono`,
+      [nombre || null, apellido || null, email || null, telefono || null, req.params.id]
+    );
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado.' });
+    res.json({ mensaje: 'Datos actualizados.', usuario });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(400).json({ error: 'Ese email ya está en uso por otro usuario.' });
+    }
+    next(err);
+  }
 });

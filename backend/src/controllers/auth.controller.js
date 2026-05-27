@@ -31,22 +31,32 @@ const registro = async (req, res, next) => {
   try {
     await client.query('BEGIN');
 
-    const { nombre, apellido, email, password, rol = 'cliente', telefono } = req.body;
+    const {
+      nombre, apellido, email, password,
+      rol = 'cliente', telefono,
+      // Campos extra para abogados
+      cuil, titulo_universitario, universidad,
+      anio_graduacion, nro_credencial_letrado,
+    } = req.body;
+
+    // Teléfono obligatorio para abogados
+    if (rol === 'abogado' && !telefono?.trim()) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'El teléfono es obligatorio para abogados.' });
+    }
 
     // Verificar que el email no esté ya registrado
     const emailExistente = await client.query(
-      'SELECT id FROM usuarios WHERE email = $1',
-      [email]
+      'SELECT id FROM usuarios WHERE email = $1', [email]
     );
     if (emailExistente.rows.length > 0) {
       await client.query('ROLLBACK');
       return res.status(409).json({ error: 'El email ya está registrado en la plataforma.' });
     }
 
-    // Obtener el ID del rol solicitado
+    // Obtener el ID del rol
     const rolResult = await client.query(
-      'SELECT id FROM roles WHERE nombre = $1',
-      [rol]
+      'SELECT id FROM roles WHERE nombre = $1', [rol]
     );
     if (rolResult.rows.length === 0) {
       await client.query('ROLLBACK');
@@ -54,8 +64,7 @@ const registro = async (req, res, next) => {
     }
     const rolId = rolResult.rows[0].id;
 
-    // Hashear la contraseña con bcrypt
-    const passwordHash    = await bcrypt.hash(password, 12);
+    const passwordHash     = await bcrypt.hash(password, 12);
     const tokenVerificacion = uuidv4();
 
     // Crear el usuario
@@ -67,58 +76,65 @@ const registro = async (req, res, next) => {
       [nombre, apellido, email, passwordHash, rolId, telefono || null, tokenVerificacion]
     );
 
-    // ── Si es abogado: crear perfil con estado "pendiente" ──
+    // ── Si es abogado: crear perfil con datos de documentación ──
     if (rol === 'abogado') {
-      // Buscar el plan más barato (básico) — sin importar el slug
       const planDefault = await client.query(
         `SELECT id FROM planes_suscripcion
-         WHERE activo = true
-         ORDER BY precio_mensual ASC
-         LIMIT 1`
+         WHERE activo = true ORDER BY precio_mensual ASC LIMIT 1`
       );
       const planId = planDefault.rows[0]?.id;
+      if (!planId) throw new Error('No hay planes disponibles en el sistema.');
 
-      if (!planId) {
-        throw new Error('No hay planes disponibles en el sistema.');
-      }
+      // URLs de archivos subidos (si los hay)
+      const docCredencialUrl = req.files?.doc_credencial?.[0]?.path || null;
+      const docTituloUrl     = req.files?.doc_titulo?.[0]?.path     || null;
+      const docCuilUrl       = req.files?.doc_cuil?.[0]?.path       || null;
 
       await client.query(
-        `INSERT INTO perfiles_abogado
-           (usuario_id, plan_id, suscripcion_activa, visible_en_grilla, estado_aprobacion)
-         VALUES ($1, $2, true, false, 'pendiente')`,
-        [usuario.id, planId]
+        `INSERT INTO perfiles_abogado (
+           usuario_id, plan_id, suscripcion_activa, visible_en_grilla,
+           estado_aprobacion,
+           cuil, titulo_universitario, universidad, anio_graduacion,
+           nro_credencial_letrado,
+           doc_credencial_url, doc_titulo_url, doc_cuil_url
+         ) VALUES ($1,$2,true,false,'pendiente',$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [
+          usuario.id, planId,
+          cuil?.trim() || null,
+          titulo_universitario?.trim() || null,
+          universidad?.trim() || null,
+          anio_graduacion ? parseInt(anio_graduacion) : null,
+          nro_credencial_letrado?.trim() || null,
+          docCredencialUrl, docTituloUrl, docCuilUrl,
+        ]
       );
 
-      // Notificar al administrador — sin await para no bloquear el registro
-      // Si falla el email, el registro igual se completa correctamente
       notificarAdminNuevoAbogado({
         abogadoNombre:   nombre,
         abogadoApellido: apellido,
         abogadoEmail:    email,
       }).catch(err => console.warn('⚠️  No se pudo notificar al admin:', err.message));
+
+      // Notificación real-time al admin
+      const notifService = require('../services/notificaciones.service');
+      notifService.nuevoAbogadoRegistrado({
+        abogadoNombre: `${nombre} ${apellido}`,
+        abogadoEmail: email,
+      }).catch(() => {});
     }
 
     await client.query('COMMIT');
-
-    // Enviar email de bienvenida al usuario (sin bloquear la respuesta)
     emailService.enviarBienvenida({ nombre, email, rol, tokenVerificacion });
 
-    // ── Respuesta diferenciada según el rol ─────────────────
     const mensajeRespuesta = rol === 'abogado'
-      ? '¡Registro exitoso! Revisá tu email para verificar tu cuenta. Tu perfil será revisado por nuestro equipo antes de aparecer en la plataforma.'
+      ? '¡Registro exitoso! Revisá tu email para verificar tu cuenta. Tu perfil será revisado por nuestro equipo.'
       : '¡Registro exitoso! Revisá tu email para verificar tu cuenta.';
 
     res.status(201).json({
       mensaje: mensajeRespuesta,
       rol,
-      // Le avisamos al frontend que es abogado pendiente para mostrar pantalla correcta
       pendiente_aprobacion: rol === 'abogado',
-      usuario: {
-        id:       usuario.id,
-        nombre:   usuario.nombre,
-        apellido: usuario.apellido,
-        email:    usuario.email,
-      }
+      usuario: { id: usuario.id, nombre: usuario.nombre, apellido: usuario.apellido, email: usuario.email }
     });
 
   } catch (error) {
