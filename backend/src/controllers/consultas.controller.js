@@ -89,35 +89,26 @@ const crearConsulta = async (req, res, next) => {
       [clienteId, abogado_id, tipo, descripcion, fecha_hora, especialidad]
     );
 
-    // Crear notificación en la app para el abogado
-    await client.query(
-      `INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, link)
-       VALUES ($1, 'nueva_consulta', 'Nueva solicitud de consulta',
-               'Tenés una nueva solicitud de consulta pendiente de confirmación.',
-               '/abogado/consultas')`,
-      [abogado_id]
-    );
+    await client.query('COMMIT');
 
-    // Notificación real-time al abogado
+    // Notificación real-time al abogado (via Socket.io + guarda en DB)
     const notifService = require('../services/notificaciones.service');
-    const { rows: [cliente] } = await query(
+    const { rows: [clienteData] } = await query(
       'SELECT nombre, apellido FROM usuarios WHERE id = $1', [clienteId]
     );
     const { format } = require('date-fns');
     const { es } = require('date-fns/locale');
 
-    await client.query('COMMIT');
-
     await notifService.nuevaConsulta({
-      abogadoId:    abogado_id,
-      clienteNombre: `${cliente.nombre} ${cliente.apellido}`,
-      fecha: format(new Date(fecha_hora), "d 'de' MMMM, HH:mm 'hs'", { locale: es }),
+      abogadoId:     abogado_id,
+      clienteNombre: `${clienteData.nombre} ${clienteData.apellido}`,
+      fecha:         format(new Date(fecha_hora), "d 'de' MMMM, HH:mm 'hs'", { locale: es }),
     });
 
     emailService.notificarNuevaConsulta({
       abogadoEmail:  abogadoData.email,
       abogadoNombre: `${abogadoData.nombre} ${abogadoData.apellido}`,
-      clienteNombre: `${cliente.nombre} ${cliente.apellido}`,
+      clienteNombre: `${clienteData.nombre} ${clienteData.apellido}`,
       fecha:         fecha_hora,
       especialidad,
     });

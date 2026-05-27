@@ -126,15 +126,52 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   });
 });
 
-// ── Iniciar servidor ─────────────────────────────────────────
-// Render requiere que el servidor escuche en 0.0.0.0 (todas las interfaces)
-// El puerto lo asigna Render automáticamente via la variable PORT
-const PORT = process.env.PORT || 3001;
-const HOST = '0.0.0.0'; // Escuchar en todas las interfaces, no solo localhost
+// ── Iniciar servidor con Socket.io ───────────────────────────
+const http = require('http');
+const { Server } = require('socket.io');
+const jwt  = require('jsonwebtoken');
 
-app.listen(PORT, HOST, () => {
+const PORT = process.env.PORT || 3001;
+const HOST = '0.0.0.0';
+
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin:      process.env.FRONTEND_URL || 'http://localhost:5173',
+    methods:     ['GET', 'POST'],
+    credentials: true,
+  },
+});
+
+// Autenticación en WebSocket
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error('Token requerido'));
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    socket.usuarioId = payload.id;
+    next();
+  } catch {
+    next(new Error('Token inválido'));
+  }
+});
+
+io.on('connection', (socket) => {
+  const uid = socket.usuarioId;
+  socket.join(`user_${uid}`);
+  console.log(`🔌 Socket conectado: user_${uid}`);
+  socket.on('disconnect', () => console.log(`🔌 Socket desconectado: user_${uid}`));
+});
+
+// Inyectar io en el servicio de notificaciones
+const notifService = require('./services/notificaciones.service');
+notifService.setIO(io);
+
+server.listen(PORT, HOST, () => {
   console.log(`\n⚖️  Conexión Legal API — puerto ${PORT}`);
   console.log(`📡 Entorno: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔌 Socket.io habilitado`);
   console.log(`✅ Servidor listo en ${HOST}:${PORT}\n`);
 });
 
