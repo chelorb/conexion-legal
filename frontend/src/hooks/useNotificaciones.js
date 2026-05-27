@@ -20,7 +20,7 @@ export function useNotificaciones(usuario) {
 
   useEffect(() => {
     if (!usuario) return;
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('cl_token'); // mismo key que AuthContext
     if (!token) return;
 
     const socket = io(SOCKET_URL, {
