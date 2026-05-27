@@ -3,16 +3,24 @@
 // Barra de navegación — Paleta C: Gris carbón + Cobre
 // ============================================================
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Scale, Menu, X, Bell, ChevronDown, LogOut, User, Settings } from 'lucide-react';
+import { Scale, Menu, X, Bell, ChevronDown, LogOut, User, Settings, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNotificaciones } from '../../hooks/useNotificaciones';
+import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 
 export default function Navbar() {
   const { usuario, estaAutenticado, esAbogado, esCliente, esAdmin, logout } = useAuth();
   const [menuAbierto,   setMenuAbierto]   = useState(false);
   const [perfilAbierto, setPerfilAbierto] = useState(false);
+  const [campanaAbierta, setCampana]      = useState(false);
+  const campanaRef = useRef(null);
+
+  const { notificaciones, noLeidas, marcarLeida, marcarTodasLeidas } =
+    useNotificaciones(estaAutenticado ? usuario : null);
   const navigate  = useNavigate();
   const location  = useLocation();
 
@@ -31,13 +39,14 @@ export default function Navbar() {
   ];
 
   const linksAdmin = [
-    { href: '/admin/dashboard', label: 'Dashboard' },
-    { href: '/admin/abogados',  label: 'Abogados' },
-    { href: '/admin/usuarios',  label: 'Usuarios' },
-    { href: '/admin/planes',    label: 'Planes' },
-    { href: '/admin/campus',    label: 'Campus' },
-    { href: '/admin/eventos',   label: 'Eventos' },
-    { href: '/admin/links',     label: 'Links' },
+    { href: '/admin/dashboard',  label: 'Dashboard'  },
+    { href: '/admin/abogados',   label: 'Abogados'   },
+    { href: '/admin/usuarios',   label: 'Usuarios'   },
+    { href: '/admin/planes',     label: 'Planes'     },
+    { href: '/admin/campus',     label: 'Campus'     },
+    { href: '/admin/eventos',    label: 'Eventos'    },
+    { href: '/admin/links',      label: 'Links'      },
+    { href: '/admin/comunicado', label: '📢 Comunicado' },
   ];
 
   const linksPublicos = [
@@ -122,15 +131,108 @@ export default function Navbar() {
             {estaAutenticado ? (
               <>
                 {/* Notificaciones */}
-                <button
-                  className="relative p-2 rounded-lg transition-colors"
-                  style={{ color: '#56534A' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(44,43,39,0.06)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = ''; }}
-                >
-                  <Bell size={18} />
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{ background: '#C4522E' }} />
-                </button>
+                {/* ── Campana de notificaciones ─────────── */}
+                <div className="relative" ref={campanaRef}>
+                  <button
+                    onClick={() => setCampana(!campanaAbierta)}
+                    className="relative p-2 rounded-lg transition-colors"
+                    style={{ color: '#56534A' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(44,43,39,0.06)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+                  >
+                    <Bell size={18} />
+                    {noLeidas > 0 && (
+                      <span
+                        className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-white font-body font-bold text-[10px] px-1"
+                        style={{ background: '#C4522E' }}
+                      >
+                        {noLeidas > 9 ? '9+' : noLeidas}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* Dropdown de notificaciones */}
+                  {campanaAbierta && (
+                    <div
+                      className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-50 animate-slide-down"
+                      style={{ background: '#fff', border: '1px solid #E8E6E3', boxShadow: '0 8px 32px rgba(28,27,24,0.14)' }}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: '#F0EFED' }}>
+                        <p className="font-display font-semibold text-sm" style={{ color: '#1C1B18' }}>
+                          Notificaciones {noLeidas > 0 && <span className="text-xs font-body font-medium px-2 py-0.5 rounded-full ml-1" style={{ background: 'rgba(196,82,46,0.1)', color: '#C4522E' }}>{noLeidas} nuevas</span>}
+                        </p>
+                        {noLeidas > 0 && (
+                          <button
+                            onClick={() => { marcarTodasLeidas(); }}
+                            className="font-body text-xs transition-colors flex items-center gap-1"
+                            style={{ color: '#8A8780' }}
+                            onMouseEnter={e => { e.currentTarget.style.color = '#1C1B18'; }}
+                            onMouseLeave={e => { e.currentTarget.style.color = '#8A8780'; }}
+                          >
+                            <Check size={11} /> Marcar todas
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Lista */}
+                      <div className="overflow-y-auto" style={{ maxHeight: '360px' }}>
+                        {notificaciones.length === 0 ? (
+                          <div className="py-10 text-center">
+                            <Bell size={28} className="mx-auto mb-2" style={{ color: '#D4D2CC' }} />
+                            <p className="font-body text-sm" style={{ color: '#8A8780' }}>Sin notificaciones</p>
+                          </div>
+                        ) : (
+                          notificaciones.map(n => (
+                            <div
+                              key={n.id}
+                              onClick={() => {
+                                if (!n.leida) marcarLeida(n.id);
+                                setCampana(false);
+                              }}
+                              className="flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-colors border-b last:border-0"
+                              style={{
+                                background: n.leida ? '#fff' : 'rgba(184,96,48,0.04)',
+                                borderColor: '#F7F6F4',
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = n.leida ? '#fff' : 'rgba(184,96,48,0.04)'; }}
+                            >
+                              {/* Ícono */}
+                              <span className="text-lg shrink-0 mt-0.5">
+                                {n.tipo === 'nueva_consulta'      ? '📅'
+                                 : n.tipo === 'consulta_confirmada' ? '✅'
+                                 : n.tipo === 'consulta_rechazada'  ? '❌'
+                                 : n.tipo === 'mensaje_abogado'     ? '💬'
+                                 : n.tipo === 'mensaje_cliente'     ? '💬'
+                                 : n.tipo === 'perfil_aprobado'     ? '🎉'
+                                 : n.tipo === 'perfil_rechazado'    ? '❌'
+                                 : n.tipo === 'nuevo_abogado'       ? '👤'
+                                 : '🔔'}
+                              </span>
+                              {/* Contenido */}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-body font-semibold text-xs leading-snug" style={{ color: '#1C1B18' }}>
+                                  {n.titulo}
+                                </p>
+                                <p className="font-body text-xs mt-0.5 line-clamp-2 leading-relaxed" style={{ color: '#56534A' }}>
+                                  {n.mensaje}
+                                </p>
+                                <p className="font-body text-xs mt-1" style={{ color: '#B0AEA8' }}>
+                                  {formatDistanceToNow(new Date(n.creado_en), { addSuffix: true, locale: es })}
+                                </p>
+                              </div>
+                              {/* Punto no leída */}
+                              {!n.leida && (
+                                <div className="w-2 h-2 rounded-full shrink-0 mt-1.5" style={{ background: '#C4522E' }} />
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Menú de perfil */}
                 <div className="relative">
@@ -285,9 +387,12 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Cerrar dropdown al hacer click fuera */}
+      {/* Cerrar dropdowns al hacer click fuera */}
       {perfilAbierto && (
         <div className="fixed inset-0 z-[-1]" onClick={() => setPerfilAbierto(false)} />
+      )}
+      {campanaAbierta && (
+        <div className="fixed inset-0 z-40" onClick={() => setCampana(false)} />
       )}
     </nav>
   );
