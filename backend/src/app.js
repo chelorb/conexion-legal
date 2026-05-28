@@ -50,9 +50,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-const limiterGlobal = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
-const limiterAuth   = rateLimit({ windowMs: 15 * 60 * 1000, max: 10,
-  message: { error: 'Demasiados intentos. Esperá 15 minutos.' } });
+const limiterGlobal = rateLimit({ windowMs: 15 * 60 * 1000, max: 500 });
+const limiterAuth   = rateLimit({ windowMs: 15 * 60 * 1000, max: 30,
+  message: { error: 'Demasiados intentos de acceso. Esperá 15 minutos.' } });
 
 app.use(limiterGlobal);
 
