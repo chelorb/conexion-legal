@@ -4,32 +4,32 @@
 
 require('dotenv').config();
 
-const express    = require('express');
-const cors       = require('cors');
-const helmet     = require('helmet');
-const morgan     = require('morgan');
-const rateLimit  = require('express-rate-limit');
-const path       = require('path');
-const http       = require('http');
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+const path = require('path');
+const http = require('http');
 const { Server } = require('socket.io');
-const jwt        = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 
 require('./config/database');
 
 // ── Rutas ─────────────────────────────────────────────────────
-const authRoutes           = require('./routes/auth.routes');
-const usuariosRoutes       = require('./routes/usuarios.routes');
-const abogadosRoutes       = require('./routes/abogados.routes');
-const consultasRoutes      = require('./routes/consultas.routes');
+const authRoutes = require('./routes/auth.routes');
+const usuariosRoutes = require('./routes/usuarios.routes');
+const abogadosRoutes = require('./routes/abogados.routes');
+const consultasRoutes = require('./routes/consultas.routes');
 const calificacionesRoutes = require('./routes/calificaciones.routes');
-const campusRoutes         = require('./routes/campus.routes');
-const agendaRoutes         = require('./routes/agenda.routes');
-const foroRoutes           = require('./routes/foro.routes');
-const pagosRoutes          = require('./routes/pagos.routes');
-const beneficiosRoutes     = require('./routes/beneficios.routes');
+const campusRoutes = require('./routes/campus.routes');
+const agendaRoutes = require('./routes/agenda.routes');
+const foroRoutes = require('./routes/foro.routes');
+const pagosRoutes = require('./routes/pagos.routes');
+const beneficiosRoutes = require('./routes/beneficios.routes');
 const notificacionesRoutes = require('./routes/notificaciones.routes');
-const adminRoutes          = require('./routes/admin.routes');
-const planesAdminRoutes    = require('./routes/planes.admin.routes');
+const adminRoutes = require('./routes/admin.routes');
+const planesAdminRoutes = require('./routes/planes.admin.routes');
 
 const app = express();
 
@@ -43,16 +43,21 @@ const origenesPermitidos = [
   'http://localhost:3000',
 ].filter(Boolean);
 
-app.use(cors({
-  origin:       origenesPermitidos,
-  credentials:  true,
-  methods:      ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+app.use(
+  cors({
+    origin: origenesPermitidos,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
 
 const limiterGlobal = rateLimit({ windowMs: 15 * 60 * 1000, max: 500 });
-const limiterAuth   = rateLimit({ windowMs: 15 * 60 * 1000, max: 30,
-  message: { error: 'Demasiados intentos de acceso. Esperá 15 minutos.' } });
+const limiterAuth = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Demasiados intentos de acceso. Esperá 15 minutos.' },
+});
 
 app.use(limiterGlobal);
 
@@ -63,23 +68,21 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ── Health check ──────────────────────────────────────────────
-app.get('/health', (req, res) =>
-  res.json({ status: 'ok', timestamp: new Date().toISOString() })
-);
+app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 // ── Rutas API ─────────────────────────────────────────────────
-app.use('/api/auth',               limiterAuth, authRoutes);
-app.use('/api/usuarios',           usuariosRoutes);
-app.use('/api/abogados',           abogadosRoutes);
-app.use('/api/consultas',          consultasRoutes);
-app.use('/api/calificaciones',     calificacionesRoutes);
-app.use('/api/campus',             campusRoutes);
-app.use('/api/agenda',             agendaRoutes);
-app.use('/api/foro',               foroRoutes);
-app.use('/api/pagos',              pagosRoutes);
-app.use('/api/beneficios',         beneficiosRoutes);
-app.use('/api/notificaciones',     notificacionesRoutes);
-app.use('/api/admin',              adminRoutes);
+app.use('/api/auth', limiterAuth, authRoutes);
+app.use('/api/usuarios', usuariosRoutes);
+app.use('/api/abogados', abogadosRoutes);
+app.use('/api/consultas', consultasRoutes);
+app.use('/api/calificaciones', calificacionesRoutes);
+app.use('/api/campus', campusRoutes);
+app.use('/api/agenda', agendaRoutes);
+app.use('/api/foro', foroRoutes);
+app.use('/api/pagos', pagosRoutes);
+app.use('/api/beneficios', beneficiosRoutes);
+app.use('/api/notificaciones', notificacionesRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/admin/planes-gestion', planesAdminRoutes);
 
 // Ruta pública de links de interés
@@ -87,12 +90,11 @@ const { linksPublicos } = require('./routes/admin.routes');
 app.get('/api/links', linksPublicos);
 
 // ── 404 ───────────────────────────────────────────────────────
-app.use((req, res) =>
-  res.status(404).json({ error: 'Ruta no encontrada', path: req.originalUrl })
-);
+app.use((req, res) => res.status(404).json({ error: 'Ruta no encontrada', path: req.originalUrl }));
 
 // ── Error handler ─────────────────────────────────────────────
-app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
+app.use((err, req, res, next) => {
+  // eslint-disable-line no-unused-vars
   console.error(`[${new Date().toISOString()}]`, err.message);
   if (err.name === 'JsonWebTokenError') return res.status(401).json({ error: 'Token inválido.' });
   if (err.name === 'TokenExpiredError') return res.status(401).json({ error: 'Sesión expirada.' });
@@ -106,8 +108,8 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin:      origenesPermitidos,
-    methods:     ['GET', 'POST'],
+    origin: origenesPermitidos,
+    methods: ['GET', 'POST'],
     credentials: true,
   },
   // Permitir polling como fallback (importante para Render)
