@@ -50,9 +50,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-const limiterGlobal = rateLimit({ windowMs: 15 * 60 * 1000, max: 10000 });
-// TODO: Restaurar antes de producción: max: 10, windowMs: 15 * 60 * 1000
-const limiterAuth = (req, res, next) => next(); // Sin límite durante fase de prueba
+// Rate limiting deshabilitado durante fase de prueba
+// TODO: Restaurar antes de producción
+const limiterGlobal = (req, res, next) => next();
+const limiterAuth   = (req, res, next) => next();
 
 app.use(limiterGlobal);
 
@@ -82,9 +83,17 @@ app.use('/api/notificaciones',     notificacionesRoutes);
 app.use('/api/admin',              adminRoutes);
 app.use('/api/admin/planes-gestion', planesAdminRoutes);
 
-// Ruta pública de links de interés
-const { linksPublicos } = require('./routes/admin.routes');
-app.get('/api/links', linksPublicos);
+// Ruta pública de links de interés (sin auth)
+const adminRoutesModule = require('./routes/admin.routes');
+app.get('/api/links', adminRoutesModule.linksPublicos || (async (req, res, next) => {
+  try {
+    const { query: dbQuery } = require('./config/database');
+    const { rows } = await dbQuery(
+      'SELECT id, titulo, url, descripcion FROM links_interes WHERE activo = true ORDER BY orden ASC'
+    );
+    res.json({ links: rows });
+  } catch (error) { next(error); }
+}));
 
 // ── 404 ───────────────────────────────────────────────────────
 app.use((req, res) =>
