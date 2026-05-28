@@ -76,23 +76,25 @@ export function useNotificaciones(usuario) {
   }, [usuarioId]); // Solo reconectar si cambia el usuario
 
   // ── Marcar una como leída ─────────────────────────────────────
-  const marcarLeida = useCallback(async (id) => {
-    try {
-      await api.patch(`/notificaciones/${id}/leer`);
-      setNotificaciones(prev =>
-        prev.map(n => n.id === id ? { ...n, leida: true } : n)
-      );
-      setNoLeidas(prev => Math.max(0, prev - 1));
-    } catch {}
+  const marcarLeida = useCallback((id) => {
+    // Actualizar estado LOCAL INMEDIATAMENTE (optimistic update)
+    setNotificaciones(prev =>
+      prev.map(n => n.id === id ? { ...n, leida: true } : n)
+    );
+    setNoLeidas(prev => Math.max(0, prev - 1));
+
+    // Persistir en DB en segundo plano (fire and forget)
+    api.patch(`/notificaciones/${id}/leer`).catch(() => {});
   }, []);
 
   // ── Marcar todas como leídas ──────────────────────────────────
-  const marcarTodasLeidas = useCallback(async () => {
-    try {
-      await api.patch('/notificaciones/leer-todas');
-      setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })));
-      setNoLeidas(0);
-    } catch {}
+  const marcarTodasLeidas = useCallback(() => {
+    // Actualizar estado LOCAL INMEDIATAMENTE
+    setNotificaciones(prev => prev.map(n => ({ ...n, leida: true })));
+    setNoLeidas(0);
+
+    // Persistir en DB en segundo plano
+    api.patch('/notificaciones/leer-todas').catch(() => {});
   }, []);
 
   return { notificaciones, noLeidas, marcarLeida, marcarTodasLeidas, cargar };
