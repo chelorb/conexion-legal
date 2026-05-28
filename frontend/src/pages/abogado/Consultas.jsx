@@ -280,7 +280,7 @@ export default function ConsultasAbogado() {
     try {
       const params = {};
       if (filtroEstado) params.estado = filtroEstado;
-      const { data } = await api.get('/consultas/mis-consultas', { params });
+      const { data } = await api.get('/consultas', { params });
       setConsultas(data.consultas || []);
     } catch { toast.error('No se pudieron cargar las consultas.'); }
     finally { setCargando(false); }
