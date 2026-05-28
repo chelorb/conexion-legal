@@ -109,35 +109,35 @@ async function nuevoAbogadoRegistrado({ abogadoNombre, abogadoEmail }) {
 }
 
 // Consulta confirmada → cliente
-async function consultaConfirmada({ clienteId, abogadoNombre, fecha }) {
+async function consultaConfirmada({ clienteId, abogadoNombre, fecha, consultaId }) {
   await crear({
     usuarioId: clienteId,
     tipo:      'consulta_confirmada',
-    titulo:    'Consulta confirmada',
+    titulo:    '✅ Consulta confirmada',
     mensaje:   `Dr./Dra. ${abogadoNombre} confirmó tu consulta del ${fecha}.`,
-    link:      '/mis-consultas',
+    link:      `/mis-consultas/${consultaId}`,
   });
 }
 
-// Consulta rechazada → cliente
-async function consultaRechazada({ clienteId, abogadoNombre }) {
+// Consulta rechazada/cancelada → cliente
+async function consultaRechazada({ clienteId, abogadoNombre, consultaId }) {
   await crear({
     usuarioId: clienteId,
     tipo:      'consulta_rechazada',
-    titulo:    'Consulta no confirmada',
+    titulo:    '❌ Consulta no confirmada',
     mensaje:   `Dr./Dra. ${abogadoNombre} no pudo confirmar tu consulta. Podés buscar otro profesional.`,
-    link:      '/mis-consultas',
+    link:      `/mis-consultas/${consultaId}`,
   });
 }
 
 // Nueva consulta recibida → abogado
-async function nuevaConsulta({ abogadoId, clienteNombre, fecha }) {
+async function nuevaConsulta({ abogadoId, clienteNombre, fecha, consultaId }) {
   await crear({
     usuarioId: abogadoId,
     tipo:      'nueva_consulta',
-    titulo:    'Nueva solicitud de consulta',
+    titulo:    '📅 Nueva solicitud de consulta',
     mensaje:   `${clienteNombre} solicitó una consulta para el ${fecha}.`,
-    link:      '/abogado/consultas',
+    link:      `/abogado/consultas/${consultaId}`,
   });
 }
 
@@ -146,7 +146,7 @@ async function nuevoMensaje({ destinatarioId, remitenteNombre, consultaId, esAbo
   await crear({
     usuarioId: destinatarioId,
     tipo:      esAbogado ? 'mensaje_cliente' : 'mensaje_abogado',
-    titulo:    `Nuevo mensaje de ${remitenteNombre}`,
+    titulo:    `💬 Nuevo mensaje de ${remitenteNombre}`,
     mensaje:   `Tenés un mensaje nuevo en tu consulta.`,
     link:      esAbogado
       ? `/abogado/consultas/${consultaId}`
@@ -159,8 +159,8 @@ async function perfilAprobado({ abogadoId, abogadoNombre }) {
   await crear({
     usuarioId: abogadoId,
     tipo:      'perfil_aprobado',
-    titulo:    '¡Tu perfil fue aprobado!',
-    mensaje:   `Dr./Dra. ${abogadoNombre}, tu perfil ya está visible para los clientes en Conexión Legal.`,
+    titulo:    '🎉 ¡Tu perfil fue aprobado!',
+    mensaje:   `Dr./Dra. ${abogadoNombre}, tu perfil ya está visible para los clientes.`,
     link:      '/abogado/dashboard',
   });
 }
@@ -170,7 +170,7 @@ async function perfilRechazado({ abogadoId, motivo }) {
   await crear({
     usuarioId: abogadoId,
     tipo:      'perfil_rechazado',
-    titulo:    'Tu perfil no fue aprobado',
+    titulo:    '❌ Tu perfil no fue aprobado',
     mensaje:   motivo || 'Tu perfil no cumple con los requisitos. Contactá al equipo de soporte.',
     link:      '/abogado/dashboard',
   });
@@ -178,7 +178,7 @@ async function perfilRechazado({ abogadoId, motivo }) {
 
 // Comunicado manual del admin
 async function comunicadoAdmin({ usuarioIds, titulo, mensaje, link }) {
-  await crearBulk({ usuarioIds, tipo: 'comunicado', titulo, mensaje, link });
+  await crearBulk({ usuarioIds, tipo: 'comunicado', titulo, mensaje, link: link || null });
 }
 
 module.exports = {

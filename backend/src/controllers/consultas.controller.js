@@ -103,6 +103,7 @@ const crearConsulta = async (req, res, next) => {
       abogadoId:     abogado_id,
       clienteNombre: `${clienteData.nombre} ${clienteData.apellido}`,
       fecha:         format(new Date(fecha_hora), "d 'de' MMMM, HH:mm 'hs'", { locale: es }),
+      consultaId:    consulta.id,
     });
 
     emailService.notificarNuevaConsulta({
@@ -323,6 +324,7 @@ const actualizarEstadoConsulta = async (req, res, next) => {
         clienteId:    consulta.cliente_id,
         abogadoNombre: consulta.abogado_nombre,
         fecha:         fechaFormato,
+        consultaId:    id,
       });
     }
 
@@ -331,6 +333,7 @@ const actualizarEstadoConsulta = async (req, res, next) => {
       await notifService.consultaRechazada({
         clienteId:    consulta.cliente_id,
         abogadoNombre: consulta.abogado_nombre,
+        consultaId:    id,
       });
     }
 

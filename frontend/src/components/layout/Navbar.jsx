@@ -189,6 +189,7 @@ export default function Navbar() {
                               onClick={() => {
                                 if (!n.leida) marcarLeida(n.id);
                                 setCampana(false);
+                                if (n.link) navigate(n.link);
                               }}
                               className="flex items-start gap-3 px-4 py-3.5 cursor-pointer transition-colors border-b last:border-0"
                               style={{
