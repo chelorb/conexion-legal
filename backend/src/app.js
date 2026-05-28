@@ -51,8 +51,8 @@ app.use(cors({
 }));
 
 const limiterGlobal = rateLimit({ windowMs: 15 * 60 * 1000, max: 10000 });
-const limiterAuth   = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000,
-  message: { error: 'Demasiados intentos de acceso. Esperá 15 minutos.' } });
+// TODO: Restaurar antes de producción: max: 10, windowMs: 15 * 60 * 1000
+const limiterAuth = (req, res, next) => next(); // Sin límite durante fase de prueba
 
 app.use(limiterGlobal);
 
