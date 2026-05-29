@@ -8,7 +8,7 @@ const express    = require('express');
 const cors       = require('cors');
 const helmet     = require('helmet');
 const morgan     = require('morgan');
-const rateLimit  = require('express-rate-limit');
+// Rate limiting deshabilitado durante fase de prueba
 const path       = require('path');
 const http       = require('http');
 const { Server } = require('socket.io');
