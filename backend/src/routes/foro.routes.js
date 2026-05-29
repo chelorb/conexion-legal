@@ -198,7 +198,11 @@ router.post('/hilos/:id/respuestas', async (req, res, next) => {
 
     // Verificar que el hilo existe y no está cerrado
     const { rows: hilo } = await query(
-      'SELECT id, cerrado FROM foro_hilos WHERE id = $1',
+      `SELECT fh.id, fh.cerrado, fh.titulo, fh.autor_id,
+              u.nombre AS autor_nombre
+       FROM foro_hilos fh
+       JOIN usuarios u ON fh.autor_id = u.id
+       WHERE fh.id = $1`,
       [hiloId]
     );
 
@@ -216,6 +220,21 @@ router.post('/hilos/:id/respuestas', async (req, res, next) => {
        RETURNING id, contenido, creado_en`,
       [hiloId, autorId, contenido.trim()]
     );
+
+    // Notificar al autor del hilo si no es el mismo que responde
+    if (hilo[0].autor_id !== autorId) {
+      const { rows: [remitente] } = await query(
+        'SELECT nombre, apellido FROM usuarios WHERE id = $1', [autorId]
+      );
+      const notifService = require('../services/notificaciones.service');
+      await notifService.crear({
+        usuarioId: hilo[0].autor_id,
+        tipo:      'mensaje_foro',
+        titulo:    `💬 Nueva respuesta en tu hilo`,
+        mensaje:   `${remitente.nombre} ${remitente.apellido} respondió en "${hilo[0].titulo}".`,
+        link:      `/abogado/foro/hilo/${hiloId}`,
+      });
+    }
 
     res.status(201).json({
       mensaje: 'Respuesta publicada.',

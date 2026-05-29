@@ -23,6 +23,7 @@ const TIPOS = {
   // Abogado
   nueva_consulta:       { icono: '📅', importante: true  },
   mensaje_cliente:      { icono: '💬', importante: true  },
+  mensaje_foro:         { icono: '💬', importante: false },
   perfil_aprobado:      { icono: '✅', importante: true  },
   perfil_rechazado:     { icono: '❌', importante: true  },
   cambio_plan:          { icono: '📋', importante: true  },
