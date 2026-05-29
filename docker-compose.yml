@@ -1,0 +1,82 @@
+# ============================================================
+# docker-compose.yml — Orquestación de servicios para desarrollo local
+# Levanta PostgreSQL, el backend y el frontend con un solo comando:
+# $ docker-compose up
+# ============================================================
+
+version: '3.8'
+
+services:
+
+  # ─────────────────────────────────────────
+  # Base de datos PostgreSQL
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: conexion_legal_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: conexion_legal       # Nombre de la base de datos
+      POSTGRES_USER: admin              # Usuario administrador
+      POSTGRES_PASSWORD: secretpass     # Cambiar en producción
+    ports:
+      - "5432:5432"                     # Puerto accesible desde la máquina local
+    volumes:
+      - postgres_data:/var/lib/postgresql/data  # Persistencia de datos
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d conexion_legal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # Backend — API REST (Node.js + Express)
+  # ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: conexion_legal_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy     # Espera que la DB esté lista
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://admin:secretpass@postgres:5432/conexion_legal
+      JWT_SECRET: cambiar_este_secreto_en_produccion
+      JWT_EXPIRES_IN: 7d
+      FRONTEND_URL: http://localhost:5173
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app                 # Hot-reload del código fuente
+      - /app/node_modules              # Evita sobrescribir node_modules del container
+    command: npm run dev
+
+  # ─────────────────────────────────────────
+  # Frontend — React + Vite
+  # ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: conexion_legal_web
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:3001/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+# ─────────────────────────────────────────
+# Volúmenes persistentes
+# ─────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local

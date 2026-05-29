@@ -1,0 +1,138 @@
+### ============================================================
+### api.http — Archivo para probar la API directamente desde VSCode
+### Extensión requerida: REST Client (humao.rest-client)
+### Uso: hacer click en "Send Request" sobre cada bloque
+### ============================================================
+
+@baseUrl = http://localhost:3001/api
+@token = PEGAR_TOKEN_AQUI_DESPUES_DE_LOGIN
+
+### ─── AUTENTICACIÓN ─────────────────────────────────────────
+
+### Registrar un cliente nuevo
+POST {{baseUrl}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Juan",
+  "apellido": "Pérez",
+  "email": "juan@example.com",
+  "password": "Password1",
+  "rol": "cliente"
+}
+
+###
+
+### Registrar un abogado nuevo
+POST {{baseUrl}}/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "María",
+  "apellido": "García",
+  "email": "maria@example.com",
+  "password": "Password1",
+  "rol": "abogado"
+}
+
+###
+
+### Iniciar sesión
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "juan@example.com",
+  "password": "Password1"
+}
+
+###
+
+### Ver mi perfil (requiere token)
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{token}}
+
+###
+
+### ─── ABOGADOS (rutas públicas) ──────────────────────────────
+
+### Listar todos los abogados
+GET {{baseUrl}}/abogados
+
+###
+
+### Buscar abogados por especialidad y ciudad
+GET {{baseUrl}}/abogados?especialidad=Derecho Civil&ciudad=Buenos Aires&orden=calificacion
+
+###
+
+### Listar especialidades disponibles
+GET {{baseUrl}}/abogados/especialidades
+
+###
+
+### Ver perfil de un abogado específico (reemplazar con ID real)
+GET {{baseUrl}}/abogados/UUID_DEL_ABOGADO
+
+###
+
+### ─── CONSULTAS ───────────────────────────────────────────────
+
+### Crear una consulta (requiere token de cliente)
+POST {{baseUrl}}/consultas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "abogado_id": "UUID_DEL_ABOGADO",
+  "tipo": "online",
+  "descripcion": "Necesito asesoramiento sobre un contrato de alquiler. El propietario quiere aumentar el alquiler antes de tiempo.",
+  "fecha_hora": "2025-02-15T10:00:00.000Z",
+  "especialidad": "Derecho Civil"
+}
+
+###
+
+### Listar mis consultas (cliente o abogado)
+GET {{baseUrl}}/consultas
+Authorization: Bearer {{token}}
+
+###
+
+### Confirmar una consulta (abogado)
+PATCH {{baseUrl}}/consultas/UUID_CONSULTA/estado
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "estado": "confirmada",
+  "link_reunion": "https://meet.google.com/abc-defg-hij"
+}
+
+###
+
+### ─── PAGOS ───────────────────────────────────────────────────
+
+### Ver planes disponibles (público)
+GET {{baseUrl}}/pagos/planes
+
+###
+
+### Crear preferencia de pago (abogado)
+POST {{baseUrl}}/pagos/crear-preferencia
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "plan_slug": "premium",
+  "periodo": "mensual"
+}
+
+###
+
+### ─── HEALTH CHECK ───────────────────────────────────────────
+
+### Verificar que la API está corriendo
+GET http://localhost:3001/health
+
+###
