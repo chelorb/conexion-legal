@@ -154,8 +154,8 @@ export default function Navbar() {
                   {/* Dropdown de notificaciones */}
                   {campanaAbierta && (
                     <div
-                      className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-[50] animate-slide-down"
-                      style={{ background: '#fff', border: '1px solid #E8E6E3', boxShadow: '0 8px 32px rgba(28,27,24,0.14)' }}
+                      className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden animate-slide-down"
+                      style={{ background: '#fff', border: '1px solid #E8E6E3', boxShadow: '0 8px 32px rgba(28,27,24,0.14)', zIndex: 49 }}
                     >
                       {/* Header */}
                       <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: '#F0EFED' }}>
@@ -210,6 +210,7 @@ export default function Navbar() {
                                  : n.tipo === 'perfil_aprobado'     ? '🎉'
                                  : n.tipo === 'perfil_rechazado'    ? '❌'
                                  : n.tipo === 'nuevo_abogado'       ? '👤'
+                                 : n.tipo === 'nueva_calificacion'  ? '⭐'
                                  : '🔔'}
                               </span>
                               {/* Contenido */}
@@ -394,7 +395,11 @@ export default function Navbar() {
         <div className="fixed inset-0 z-[-1]" onClick={() => setPerfilAbierto(false)} />
       )}
       {campanaAbierta && (
-        <div className="fixed inset-0 z-[49]" onClick={() => setCampana(false)} />
+        <div
+          className="fixed inset-0"
+          style={{ zIndex: 48 }}
+          onClick={() => setCampana(false)}
+        />
       )}
     </nav>
   );

@@ -35,8 +35,9 @@ function BadgeEstado({ estado }) {
 // ─────────────────────────────────────────────────────────────
 function Estrellas({ valor, onChange, solo_lectura = false }) {
   const [hover, setHover] = useState(0);
+  const activo = hover || valor;
   return (
-    <div className="flex gap-1">
+    <div className="flex gap-2">
       {[1, 2, 3, 4, 5].map(i => (
         <button
           key={i}
@@ -48,11 +49,12 @@ function Estrellas({ valor, onChange, solo_lectura = false }) {
           className={`transition-transform ${!solo_lectura ? 'hover:scale-110 cursor-pointer' : 'cursor-default'}`}
         >
           <Star
-            size={solo_lectura ? 14 : 24}
-            className={i <= (hover || valor)
-              ? 'fill-gold-500 text-gold-500'
-              : 'text-slate-200 fill-slate-200'
-            }
+            size={solo_lectura ? 14 : 28}
+            style={{
+              fill:  i <= activo ? '#B86030' : '#E8E6E3',
+              color: i <= activo ? '#B86030' : '#E8E6E3',
+              transition: 'all 0.15s',
+            }}
           />
         </button>
       ))}
@@ -60,8 +62,11 @@ function Estrellas({ valor, onChange, solo_lectura = false }) {
   );
 }
 
+// Etiquetas para cada puntaje
+const ETIQUETAS_PUNTAJE = ['', 'Muy mala 😕', 'Regular 😐', 'Buena 👍', 'Muy buena 😊', 'Excelente ⭐'];
+
 // ─────────────────────────────────────────────────────────────
-// Componente: Modal para calificar al abogado
+// Componente: Modal para calificar al abogado — Paleta C
 // ─────────────────────────────────────────────────────────────
 function ModalCalificacion({ consulta, onCerrar, onCalificado }) {
   const [puntaje,    setPuntaje]    = useState(0);
@@ -70,7 +75,7 @@ function ModalCalificacion({ consulta, onCerrar, onCalificado }) {
 
   const enviar = async () => {
     if (puntaje === 0) {
-      toast.error('Por favor seleccioná una calificación.');
+      toast.error('Seleccioná al menos una estrella.');
       return;
     }
     setEnviando(true);
@@ -87,65 +92,103 @@ function ModalCalificacion({ consulta, onCerrar, onCalificado }) {
   };
 
   return (
-    // Overlay oscuro de fondo
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/60 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+      style={{ background: 'rgba(28,27,24,0.6)', backdropFilter: 'blur(4px)' }}
+    >
       <div className="card w-full max-w-md p-8 animate-slide-up">
 
-        {/* Encabezado del modal */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h3 className="font-display font-bold text-navy-900 text-xl">
-            Calificá tu consulta
-          </h3>
-          <button onClick={onCerrar} className="p-2 rounded-lg hover:bg-slate-100 transition-colors">
-            <X size={18} className="text-slate-500" />
+          <div>
+            <h3 className="font-display font-bold text-xl" style={{ color: '#1C1B18' }}>
+              ¿Cómo fue tu consulta?
+            </h3>
+            <p className="font-body text-sm mt-0.5" style={{ color: '#8A8780' }}>
+              Tu opinión ayuda a otros clientes
+            </p>
+          </div>
+          <button
+            onClick={onCerrar}
+            className="p-2 rounded-lg transition-colors"
+            onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+          >
+            <X size={18} style={{ color: '#56534A' }} />
           </button>
         </div>
 
-        {/* Datos del abogado calificado */}
-        <div className="bg-slate-50 rounded-xl p-4 mb-6">
-          <p className="font-body text-sm text-slate-500">Consulta con</p>
-          <p className="font-body font-semibold text-navy-900">
-            Dr./Dra. {consulta.abogado_nombre} {consulta.abogado_apellido}
-          </p>
-          <p className="font-body text-xs text-slate-400 mt-0.5">
-            {format(new Date(consulta.fecha_hora), "d 'de' MMMM yyyy", { locale: es })}
-          </p>
-        </div>
-
-        {/* Selector de estrellas */}
-        <div className="mb-5">
-          <label className="input-label mb-3">¿Cómo fue tu experiencia?</label>
-          <Estrellas valor={puntaje} onChange={setPuntaje} />
-          {puntaje > 0 && (
-            <p className="font-body text-xs text-slate-500 mt-2">
-              {['', 'Muy mala', 'Regular', 'Buena', 'Muy buena', 'Excelente'][puntaje]}
+        {/* Info del abogado */}
+        <div className="flex items-center gap-3 p-4 rounded-xl mb-6"
+          style={{ background: '#F7F6F4' }}>
+          <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+            style={{ background: '#2C2B27' }}>
+            <span className="font-display font-bold text-white text-sm">
+              {consulta.abogado_nombre?.[0]}{consulta.abogado_apellido?.[0]}
+            </span>
+          </div>
+          <div>
+            <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>
+              Dr./Dra. {consulta.abogado_nombre} {consulta.abogado_apellido}
             </p>
-          )}
+            <p className="font-body text-xs mt-0.5" style={{ color: '#8A8780' }}>
+              {format(new Date(consulta.fecha_hora), "d 'de' MMMM yyyy", { locale: es })}
+            </p>
+          </div>
         </div>
 
-        {/* Comentario opcional */}
+        {/* Estrellas */}
+        <div className="mb-5 text-center">
+          <p className="font-body text-sm font-medium mb-4" style={{ color: '#1C1B18' }}>
+            Calificación
+          </p>
+          <div className="flex justify-center mb-3">
+            <Estrellas valor={puntaje} onChange={setPuntaje} />
+          </div>
+          <p
+            className="font-body text-sm font-medium transition-all"
+            style={{
+              color: puntaje > 0 ? '#B86030' : 'transparent',
+              minHeight: '20px',
+            }}
+          >
+            {ETIQUETAS_PUNTAJE[puntaje]}
+          </p>
+        </div>
+
+        {/* Comentario */}
         <div className="mb-6">
           <label className="input-label">
-            Comentario <span className="text-slate-400 font-normal">(opcional)</span>
+            Comentario{' '}
+            <span className="font-normal" style={{ color: '#8A8780' }}>(opcional)</span>
           </label>
           <textarea
             rows={3}
-            placeholder="Contanos cómo fue la atención, la claridad en las explicaciones, etc."
+            placeholder="Contanos cómo fue la atención, la claridad en las explicaciones..."
             value={comentario}
             onChange={e => setComentario(e.target.value)}
             maxLength={1000}
             className="input-field resize-none"
           />
-          <p className="font-body text-xs text-slate-400 mt-1 text-right">
+          <p className="font-body text-xs mt-1 text-right" style={{ color: '#B0AEA8' }}>
             {comentario.length}/1000
           </p>
         </div>
 
-        {/* Acciones */}
+        {/* Botones */}
         <div className="flex gap-3">
-          <button onClick={onCerrar} className="btn-secondary flex-1">Cancelar</button>
-          <button onClick={enviar} disabled={enviando || puntaje === 0} className="btn-primary flex-1">
-            {enviando ? 'Enviando...' : 'Enviar calificación'}
+          <button onClick={onCerrar} className="btn-secondary flex-1">
+            Ahora no
+          </button>
+          <button
+            onClick={enviar}
+            disabled={enviando || puntaje === 0}
+            className="btn-primary flex-1"
+          >
+            {enviando
+              ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Enviando...</>
+              : 'Enviar calificación'
+            }
           </button>
         </div>
       </div>
@@ -326,12 +369,27 @@ function TarjetaConsulta({ consulta, onAccion }) {
           {/* Ver conversación con el abogado */}
           <Link
             to={`/mis-consultas/${consulta.id}`}
-            className="flex items-center gap-1.5 font-body text-xs px-4 py-2 rounded-xl border transition-colors font-medium"
-            style={{ borderColor: '#D4D2CC', color: '#2C2B27' }}
+            className="relative flex items-center gap-1.5 font-body text-xs px-4 py-2 rounded-xl border transition-colors font-medium"
+            style={parseInt(consulta.mensajes_no_leidos) > 0
+              ? { borderColor: '#B86030', color: '#B86030', background: 'rgba(184,96,48,0.06)' }
+              : { borderColor: '#D4D2CC', color: '#2C2B27' }
+            }
             onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = parseInt(consulta.mensajes_no_leidos) > 0
+                ? 'rgba(184,96,48,0.06)' : '';
+            }}
           >
-            <MessageSquare size={13} /> Ver conversación
+            <MessageSquare size={13} />
+            Ver conversación
+            {parseInt(consulta.mensajes_no_leidos) > 0 && (
+              <span
+                className="ml-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-white font-bold text-[10px] px-1"
+                style={{ background: '#B86030' }}
+              >
+                {consulta.mensajes_no_leidos}
+              </span>
+            )}
           </Link>
 
           {/* Cancelar */}

@@ -157,16 +157,25 @@ const listarConsultas = async (req, res, next) => {
          c.id, c.tipo, c.fecha_hora, c.estado, c.especialidad,
          c.descripcion, c.link_reunion, c.creado_en,
          -- Datos del cliente
-         uc.nombre  AS cliente_nombre,
-         uc.apellido AS cliente_apellido,
-         uc.telefono AS cliente_telefono,
+         uc.nombre     AS cliente_nombre,
+         uc.apellido   AS cliente_apellido,
+         uc.telefono   AS cliente_telefono,
          uc.avatar_url AS cliente_avatar,
          -- Datos del abogado
-         ua.nombre  AS abogado_nombre,
-         ua.apellido AS abogado_apellido,
+         ua.nombre     AS abogado_nombre,
+         ua.apellido   AS abogado_apellido,
          ua.avatar_url AS abogado_avatar,
          -- ¿Ya existe calificación?
-         EXISTS(SELECT 1 FROM calificaciones cal WHERE cal.consulta_id = c.id) AS tiene_calificacion
+         EXISTS(
+           SELECT 1 FROM calificaciones cal WHERE cal.consulta_id = c.id
+         ) AS tiene_calificacion,
+         -- Mensajes no leídos para el usuario actual
+         (
+           SELECT COUNT(*) FROM mensajes_consulta m
+           WHERE m.consulta_id = c.id
+             AND m.autor_id != $1
+             AND m.leido = false
+         ) AS mensajes_no_leidos
        FROM consultas c
        JOIN usuarios uc ON c.cliente_id  = uc.id
        JOIN usuarios ua ON c.abogado_id  = ua.id
@@ -405,6 +414,14 @@ const obtenerConsulta = async (req, res, next) => {
     if (!puedeVer) {
       return res.status(403).json({ error: 'No tenés permisos para ver esta consulta.' });
     }
+
+    // Marcar como leídos los mensajes del otro (no los propios)
+    await query(
+      `UPDATE mensajes_consulta
+       SET leido = true
+       WHERE consulta_id = $1 AND autor_id != $2 AND leido = false`,
+      [id, usuarioId]
+    );
 
     res.json({ consulta: { ...consulta, mensajes: consulta.mensajes || [] } });
 

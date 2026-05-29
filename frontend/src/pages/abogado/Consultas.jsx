@@ -97,16 +97,30 @@ function TarjetaConsulta({ consulta, onAccion }) {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <BadgeEstado estado={consulta.estado} />
-              {/* Botón ver detalle */}
+              {/* Botón ver detalle con badge de mensajes no leídos */}
               <Link
                 to={`/abogado/consultas/${consulta.id}`}
                 onClick={e => e.stopPropagation()}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-xl font-body text-xs font-medium border transition-colors shrink-0"
-                style={{ borderColor: '#E8E6E3', color: '#56534A' }}
+                style={parseInt(consulta.mensajes_no_leidos) > 0
+                  ? { borderColor: '#B86030', color: '#B86030', background: 'rgba(184,96,48,0.06)' }
+                  : { borderColor: '#E8E6E3', color: '#56534A' }
+                }
                 onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; e.currentTarget.style.color = '#1C1B18'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = '#56534A'; }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = parseInt(consulta.mensajes_no_leidos) > 0 ? 'rgba(184,96,48,0.06)' : '';
+                  e.currentTarget.style.color = parseInt(consulta.mensajes_no_leidos) > 0 ? '#B86030' : '#56534A';
+                }}
               >
                 Ver <ArrowRight size={11} />
+                {parseInt(consulta.mensajes_no_leidos) > 0 && (
+                  <span
+                    className="ml-1 min-w-[16px] h-[16px] rounded-full flex items-center justify-center text-white font-bold text-[10px] px-1"
+                    style={{ background: '#B86030' }}
+                  >
+                    {consulta.mensajes_no_leidos}
+                  </span>
+                )}
               </Link>
               <ChevronDown
                 size={16}
