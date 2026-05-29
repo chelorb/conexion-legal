@@ -217,8 +217,8 @@ const actualizarEstadoConsulta = async (req, res, next) => {
     const consulta = rows[0];
 
     // Verificar permisos: solo el abogado o el cliente de la consulta pueden modificarla
-    const esAbogado = rol === 'abogado' && consulta.abogado_id === usuarioId;
-    const esCliente = rol === 'cliente' && consulta.cliente_id === usuarioId;
+    const esAbogado = rol === 'abogado' && String(consulta.abogado_id) === String(usuarioId);
+    const esCliente = rol === 'cliente' && String(consulta.cliente_id) === String(usuarioId);
 
     if (!esAbogado && !esCliente && rol !== 'admin') {
       await client.query('ROLLBACK');
@@ -403,8 +403,8 @@ const obtenerConsulta = async (req, res, next) => {
     // Solo el abogado, el cliente o el admin pueden ver el detalle
     const puedeVer =
       rol === 'admin' ||
-      (rol === 'abogado' && consulta.abogado_id === usuarioId) ||
-      (rol === 'cliente' && consulta.cliente_id === usuarioId);
+      (rol === 'abogado' && String(consulta.abogado_id) === String(usuarioId)) ||
+      (rol === 'cliente' && String(consulta.cliente_id) === String(usuarioId));
 
     if (!puedeVer) {
       return res.status(403).json({ error: 'No tenés permisos para ver esta consulta.' });
@@ -446,9 +446,9 @@ const enviarMensaje = async (req, res, next) => {
       return res.status(404).json({ error: 'Consulta no encontrada.' });
     }
 
-    const consulta = rows[0];
-    const esAbogado = rol === 'abogado' && consulta.abogado_id === usuarioId;
-    const esCliente = rol === 'cliente' && consulta.cliente_id === usuarioId;
+    const consulta  = rows[0];
+    const esAbogado = rol === 'abogado' && String(consulta.abogado_id) === String(usuarioId);
+    const esCliente = rol === 'cliente' && String(consulta.cliente_id) === String(usuarioId);
 
     if (!esAbogado && !esCliente && rol !== 'admin') {
       return res.status(403).json({ error: 'No podés enviar mensajes en esta consulta.' });

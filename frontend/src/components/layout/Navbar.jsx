@@ -154,7 +154,7 @@ export default function Navbar() {
                   {/* Dropdown de notificaciones */}
                   {campanaAbierta && (
                     <div
-                      className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-50 animate-slide-down"
+                      className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-[50] animate-slide-down"
                       style={{ background: '#fff', border: '1px solid #E8E6E3', boxShadow: '0 8px 32px rgba(28,27,24,0.14)' }}
                     >
                       {/* Header */}
@@ -187,6 +187,7 @@ export default function Navbar() {
                             <div
                               key={n.id}
                               onClick={() => {
+                                // Actualizar estado local ANTES del fetch y navegación
                                 if (!n.leida) marcarLeida(n.id);
                                 setCampana(false);
                                 if (n.link) navigate(n.link);
@@ -393,7 +394,7 @@ export default function Navbar() {
         <div className="fixed inset-0 z-[-1]" onClick={() => setPerfilAbierto(false)} />
       )}
       {campanaAbierta && (
-        <div className="fixed inset-0 z-40" onClick={() => setCampana(false)} />
+        <div className="fixed inset-0 z-[49]" onClick={() => setCampana(false)} />
       )}
     </nav>
   );
