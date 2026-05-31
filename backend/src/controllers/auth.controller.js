@@ -36,7 +36,7 @@ const registro = async (req, res, next) => {
       nombre, apellido, email, password,
       rol = 'cliente', telefono,
       // Campos extra para abogados
-      cuil, titulo_universitario, universidad,
+      dni_cuit, cuil, titulo_universitario, universidad,
       anio_graduacion, nro_credencial_letrado,
     } = req.body;
 
@@ -95,12 +95,13 @@ const registro = async (req, res, next) => {
         `INSERT INTO perfiles_abogado (
            usuario_id, plan_id, suscripcion_activa, visible_en_grilla,
            estado_aprobacion,
-           cuil, titulo_universitario, universidad, anio_graduacion,
+           dni_cuit, cuil, titulo_universitario, universidad, anio_graduacion,
            nro_credencial_letrado,
            doc_credencial_url, doc_titulo_url, doc_cuil_url
-         ) VALUES ($1,$2,true,false,'pendiente',$3,$4,$5,$6,$7,$8,$9,$10)`,
+         ) VALUES ($1,$2,true,false,'pendiente',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [
           usuario.id, planId,
+          dni_cuit?.trim() || null,
           cuil?.trim() || null,
           titulo_universitario?.trim() || null,
           universidad?.trim() || null,

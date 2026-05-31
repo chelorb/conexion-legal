@@ -124,8 +124,8 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Plan', val: <BadgePlan slug={abogado.plan_slug} /> },
-                  { label: 'Estado', val: (
+                  { label: 'Plan',       val: <BadgePlan slug={abogado.plan_slug} /> },
+                  { label: 'Estado',     val: (
                     <span className="text-xs font-medium px-2.5 py-1 rounded-full"
                       style={abogado.estado_aprobacion === 'aprobado'
                         ? { background: 'rgba(22,163,74,0.1)', color: '#15803d' }
@@ -135,8 +135,9 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                       {abogado.estado_aprobacion}
                     </span>
                   )},
-                  { label: 'Ubicación', val: abogado.ciudad || '—' },
-                  { label: 'Matrícula', val: abogado.matricula || '—' },
+                  { label: 'DNI / CUIT', val: abogado.dni_cuit || '—' },
+                  { label: 'Ubicación',  val: abogado.ciudad || '—' },
+                  { label: 'Matrícula',  val: abogado.matricula || '—' },
                 ].map(({ label, val }) => (
                   <div key={label} className="rounded-xl p-3" style={{ background: '#F7F6F4' }}>
                     <p className="font-body text-xs mb-1" style={{ color: '#8A8780' }}>{label}</p>

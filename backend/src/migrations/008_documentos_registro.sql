@@ -6,6 +6,7 @@
 
 ALTER TABLE perfiles_abogado
   ADD COLUMN IF NOT EXISTS cuil                     VARCHAR(20),
+  ADD COLUMN IF NOT EXISTS dni_cuit                 VARCHAR(30),
   ADD COLUMN IF NOT EXISTS titulo_universitario     VARCHAR(255),
   ADD COLUMN IF NOT EXISTS universidad              VARCHAR(255),
   ADD COLUMN IF NOT EXISTS anio_graduacion          INTEGER,
