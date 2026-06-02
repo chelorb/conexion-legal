@@ -57,7 +57,7 @@ function BurbujaMensaje({ mensaje, esPropio }) {
       {/* Contenido */}
       <div className={`max-w-[75%] ${esPropio ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
         <div
-          className="px-4 py-3 rounded-2xl font-body text-sm leading-relaxed"
+          className="px-4 py-3 rounded-2xl font-body text-sm leading-relaxed break-words overflow-hidden"
           style={esPropio
             ? { background: '#2C2B27', color: '#fff', borderBottomRightRadius: '4px' }
             : { background: '#fff', color: '#1C1B18', border: '1px solid #E8E6E3', borderBottomLeftRadius: '4px' }
