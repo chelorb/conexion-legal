@@ -26,6 +26,7 @@ import PagoExitoso     from './pages/PagoExitoso';
 // ── Páginas del abogado (requieren auth + rol abogado) ───────
 import DashboardAbogado from './pages/abogado/Dashboard';
 import PerfilEditar     from './pages/abogado/PerfilEditar';
+import Disponibilidad   from './pages/abogado/Disponibilidad';
 import ConsultasAbogado from './pages/abogado/Consultas';
 import DetalleConsulta  from './pages/abogado/DetalleConsulta';
 import Campus           from './pages/abogado/Campus';
@@ -249,7 +250,8 @@ function AppRoutes() {
 
           {/* ── Abogado ───────────────────────────────────── */}
           <Route path="/abogado/dashboard"   element={<RutaProtegida rolesPermitidos={['abogado']}><DashboardAbogado /></RutaProtegida>} />
-          <Route path="/abogado/perfil"      element={<RutaProtegida rolesPermitidos={['abogado']}><PerfilEditar /></RutaProtegida>} />
+          <Route path="/abogado/perfil"          element={<RutaProtegida rolesPermitidos={['abogado']}><PerfilEditar /></RutaProtegida>} />
+          <Route path="/abogado/disponibilidad"  element={<RutaProtegida rolesPermitidos={['abogado']}><Disponibilidad /></RutaProtegida>} />
           <Route path="/abogado/consultas"      element={<RutaProtegida rolesPermitidos={['abogado']}><ConsultasAbogado /></RutaProtegida>} />
           <Route path="/abogado/consultas/:id"  element={<RutaProtegida rolesPermitidos={['abogado']}><DetalleConsulta /></RutaProtegida>} />
           <Route path="/abogado/campus"      element={<RutaProtegida rolesPermitidos={['abogado']}><Campus /></RutaProtegida>} />

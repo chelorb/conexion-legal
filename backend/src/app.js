@@ -28,7 +28,8 @@ const agendaRoutes         = require('./routes/agenda.routes');
 const foroRoutes           = require('./routes/foro.routes');
 const pagosRoutes          = require('./routes/pagos.routes');
 const beneficiosRoutes     = require('./routes/beneficios.routes');
-const notificacionesRoutes = require('./routes/notificaciones.routes');
+const notificacionesRoutes  = require('./routes/notificaciones.routes');
+const disponibilidadRoutes  = require('./routes/disponibilidad.routes');
 const adminRoutes          = require('./routes/admin.routes');
 const planesAdminRoutes    = require('./routes/planes.admin.routes');
 
@@ -80,6 +81,7 @@ app.use('/api/foro',                 foroRoutes);
 app.use('/api/pagos',                pagosRoutes);
 app.use('/api/beneficios',           beneficiosRoutes);
 app.use('/api/notificaciones',       notificacionesRoutes);
+app.use('/api/disponibilidad',       disponibilidadRoutes);
 app.use('/api/admin',                adminRoutes);
 app.use('/api/admin/planes-gestion', planesAdminRoutes);
 

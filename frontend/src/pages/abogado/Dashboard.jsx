@@ -26,15 +26,16 @@ function Sidebar({ links }) {
   const [linksAbierto, setLinksAbierto] = useState(false);
 
   const MENU = [
-    { href: '/abogado/dashboard',   label: 'Panel',       icono: LayoutDashboard },
-    { href: '/abogado/perfil',      label: 'Mi perfil',   icono: User },
-    { href: '/abogado/consultas',   label: 'Consultas',   icono: Calendar },
-    { href: '/abogado/campus',      label: 'Campus',      icono: BookOpen },
-    { href: '/abogado/agenda',      label: 'Agenda',      icono: Calendar },
-    { href: '/abogado/foro',        label: 'Foro',        icono: MessageSquare },
-    { href: '/abogado/beneficios',  label: 'Beneficios',  icono: Gift },
-    { href: '/abogado/credencial',  label: 'Credencial',  icono: FileText },
-    { href: '/abogado/suscripcion', label: 'Suscripción', icono: CreditCard },
+    { href: '/abogado/dashboard',      label: 'Panel',          icono: LayoutDashboard },
+    { href: '/abogado/perfil',         label: 'Mi perfil',      icono: User },
+    { href: '/abogado/consultas',      label: 'Consultas',      icono: Calendar },
+    { href: '/abogado/disponibilidad', label: 'Disponibilidad', icono: Clock },
+    { href: '/abogado/campus',         label: 'Campus',         icono: BookOpen },
+    { href: '/abogado/agenda',         label: 'Agenda',         icono: Calendar },
+    { href: '/abogado/foro',           label: 'Foro',           icono: MessageSquare },
+    { href: '/abogado/beneficios',     label: 'Beneficios',     icono: Gift },
+    { href: '/abogado/credencial',     label: 'Credencial',     icono: FileText },
+    { href: '/abogado/suscripcion',    label: 'Suscripción',    icono: CreditCard },
   ];
 
   const actual = window.location.pathname;
