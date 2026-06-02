@@ -371,12 +371,13 @@ export default function DetalleConsulta() {
               </div>
 
               {/* Descripción del cliente */}
-              <div className="rounded-xl p-4 mb-5" style={{ background: '#F0EFED' }}>
+              <div className="rounded-xl p-4 mb-5 overflow-hidden" style={{ background: '#F0EFED' }}>
                 <p className="font-body text-xs font-semibold uppercase tracking-wider mb-2"
                   style={{ color: '#8A8780' }}>
                   Descripción del caso
                 </p>
-                <p className="font-body text-sm leading-relaxed break-all" style={{ color: '#3A3832' }}>
+                <p className="font-body text-sm leading-relaxed break-all" 
+                  style={{ color: '#3A3832', overflowWrap: 'anywhere', wordBreak: 'break-all' }}>
                   {consulta.descripcion}
                 </p>
               </div>
