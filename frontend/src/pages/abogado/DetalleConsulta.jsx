@@ -376,7 +376,7 @@ export default function DetalleConsulta() {
                   style={{ color: '#8A8780' }}>
                   Descripción del caso
                 </p>
-                <p className="font-body text-sm leading-relaxed" style={{ color: '#3A3832' }}>
+                <p className="font-body text-sm leading-relaxed break-words" style={{ color: '#3A3832' }}>
                   {consulta.descripcion}
                 </p>
               </div>
