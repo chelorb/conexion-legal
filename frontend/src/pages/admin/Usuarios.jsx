@@ -1,6 +1,8 @@
 // ============================================================
 // src/pages/admin/Usuarios.jsx — Paleta C: Gris carbón + Cobre
 // ============================================================
+// v2 - con eliminación de usuarios
+// ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
 import { Search, UserCheck, UserX, Shield, RefreshCw, Mail, User, Briefcase, Crown, X, Filter } from 'lucide-react';
