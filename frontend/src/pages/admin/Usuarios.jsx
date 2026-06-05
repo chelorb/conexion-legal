@@ -26,6 +26,7 @@ function BadgeRol({ rol }) {
 
 function ModalUsuario({ usuario, onCerrar, onActualizar }) {
   const [procesando, setProcesando] = useState(false);
+  const [confirmaElim, setConfirmaElim] = useState(null); // null | 'suave' | 'definitivo'
 
   const toggleEstado = async () => {
     const nuevoEstado = !usuario.activo;
@@ -38,6 +39,24 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
       onCerrar();
     } catch { toast.error('Error al actualizar el estado.'); }
     finally { setProcesando(false); }
+  };
+
+  const eliminar = async (tipo) => {
+    setProcesando(true);
+    try {
+      await api.delete(`/admin/usuarios/${usuario.id}`, { data: { tipo } });
+      toast.success(tipo === 'definitivo'
+        ? 'Cuenta eliminada definitivamente.'
+        : 'Cuenta eliminada (puede recuperarse).'
+      );
+      onActualizar();
+      onCerrar();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al eliminar.');
+    } finally {
+      setProcesando(false);
+      setConfirmaElim(null);
+    }
   };
 
   return (
@@ -99,19 +118,85 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
 
         <div className="space-y-3">
           {usuario.rol !== 'admin' && (
-            <button onClick={toggleEstado} disabled={procesando}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm transition-colors"
-              style={usuario.activo
-                ? { background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }
-                : { background: 'rgba(22,163,74,0.08)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.2)' }
-              }>
-              {procesando
-                ? <div className="w-4 h-4 border-2 border-current/40 border-t-current rounded-full animate-spin" />
-                : usuario.activo
-                  ? <><UserX size={16} /> Deshabilitar cuenta</>
-                  : <><UserCheck size={16} /> Habilitar cuenta</>
-              }
-            </button>
+            <>
+              {/* Habilitar / Deshabilitar */}
+              <button onClick={toggleEstado} disabled={procesando}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm transition-colors"
+                style={usuario.activo
+                  ? { background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }
+                  : { background: 'rgba(22,163,74,0.08)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.2)' }
+                }>
+                {procesando
+                  ? <div className="w-4 h-4 border-2 border-current/40 border-t-current rounded-full animate-spin" />
+                  : usuario.activo
+                    ? <><UserX size={16} /> Deshabilitar cuenta</>
+                    : <><UserCheck size={16} /> Habilitar cuenta</>
+                }
+              </button>
+
+              {/* Separador */}
+              <div className="border-t pt-3" style={{ borderColor: '#F0EFED' }}>
+                <p className="font-body text-xs font-semibold mb-2" style={{ color: '#8A8780' }}>
+                  Zona de eliminación
+                </p>
+
+                {/* Panel de confirmación */}
+                {confirmaElim ? (
+                  <div className="rounded-xl p-4 animate-slide-down"
+                    style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)' }}>
+                    <p className="font-body text-sm font-semibold mb-1" style={{ color: '#dc2626' }}>
+                      {confirmaElim === 'definitivo'
+                        ? '⚠️ Esta acción es IRREVERSIBLE'
+                        : '¿Confirmás la eliminación?'}
+                    </p>
+                    <p className="font-body text-xs mb-3" style={{ color: '#7f1d1d' }}>
+                      {confirmaElim === 'definitivo'
+                        ? `Se borrarán todos los datos de ${usuario.nombre} ${usuario.apellido} de la base de datos. No hay vuelta atrás.`
+                        : `La cuenta de ${usuario.nombre} ${usuario.apellido} se desactivará y podrá recuperarse si es necesario.`
+                      }
+                    </p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setConfirmaElim(null)}
+                        className="flex-1 py-2 rounded-xl font-body text-sm border transition-colors"
+                        style={{ borderColor: '#E8E6E3', color: '#56534A' }}>
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={() => eliminar(confirmaElim)}
+                        disabled={procesando}
+                        className="flex-1 py-2 rounded-xl font-body text-sm font-medium text-white transition-colors"
+                        style={{ background: '#dc2626' }}>
+                        {procesando
+                          ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin mx-auto" />
+                          : 'Confirmar eliminación'
+                        }
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setConfirmaElim('suave')}
+                      className="py-2.5 px-3 rounded-xl font-body text-xs font-medium border transition-colors text-center"
+                      style={{ borderColor: '#E8E6E3', color: '#56534A' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+                    >
+                      🗂 Eliminación suave
+                    </button>
+                    <button
+                      onClick={() => setConfirmaElim('definitivo')}
+                      className="py-2.5 px-3 rounded-xl font-body text-xs font-medium border transition-colors text-center"
+                      style={{ borderColor: 'rgba(220,38,38,0.3)', color: '#dc2626' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.06)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+                    >
+                      🗑 Eliminar definitivo
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
           )}
           <button onClick={onCerrar} className="btn-secondary w-full">Cerrar</button>
         </div>
