@@ -3,11 +3,12 @@
 // Endpoints de notificaciones para usuarios + comunicado admin
 // ============================================================
 
-const express = require('express');
-const router  = express.Router();
-const { query } = require('../config/database');
+const express      = require('express');
+const router       = express.Router();
+const { query }    = require('../config/database');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
-const notifService = require('../services/notificaciones.service');
+const notifService  = require('../services/notificaciones.service');
+const emailService  = require('../services/email.service');
 
 router.use(verificarToken);
 
@@ -50,7 +51,6 @@ router.patch('/leer-todas', async (req, res, next) => {
 });
 
 // POST /api/notificaciones/comunicado — Solo admin
-// Envía comunicado a: todos | abogados | clientes | usuario específico
 router.post('/comunicado', requireRol('admin'), async (req, res, next) => {
   try {
     const { titulo, mensaje, link, destinatario, usuario_id } = req.body;
@@ -68,9 +68,11 @@ router.post('/comunicado', requireRol('admin'), async (req, res, next) => {
       if (!usuario_id) return res.status(400).json({ error: 'Falta usuario_id.' });
       usuarioIds = [usuario_id];
     } else {
-      const condicion = destinatario === 'todos'     ? "r.nombre IN ('abogado','cliente')"
-                       : destinatario === 'abogados'  ? "r.nombre = 'abogado'"
-                       : "r.nombre = 'cliente'";
+      const condicion = destinatario === 'todos'
+        ? "r.nombre IN ('abogado','cliente')"
+        : destinatario === 'abogados'
+          ? "r.nombre = 'abogado'"
+          : "r.nombre = 'cliente'";
       const { rows } = await query(
         `SELECT u.id FROM usuarios u
          JOIN roles r ON u.rol_id = r.id
@@ -83,6 +85,7 @@ router.post('/comunicado', requireRol('admin'), async (req, res, next) => {
       return res.status(400).json({ error: 'No se encontraron destinatarios.' });
     }
 
+    // Notificación in-app (Socket.io + DB)
     await notifService.comunicadoAdmin({
       usuarioIds,
       titulo:  titulo.trim(),
@@ -90,8 +93,28 @@ router.post('/comunicado', requireRol('admin'), async (req, res, next) => {
       link:    link?.trim() || null,
     });
 
+    // Email a cada destinatario (en background — no bloquea la respuesta)
+    Promise.allSettled(
+      usuarioIds.map(async (uid) => {
+        try {
+          const { rows: [u] } = await query(
+            'SELECT nombre, email FROM usuarios WHERE id = $1', [uid]
+          );
+          if (u) {
+            await emailService.enviarComunicado({
+              destinatarioEmail:  u.email,
+              destinatarioNombre: u.nombre,
+              titulo:  titulo.trim(),
+              mensaje: mensaje.trim(),
+              link:    link?.trim() || null,
+            });
+          }
+        } catch {}
+      })
+    );
+
     res.json({
-      mensaje: `Comunicado enviado a ${usuarioIds.length} usuario(s).`,
+      mensaje:  `Comunicado enviado a ${usuarioIds.length} usuario(s).`,
       enviados: usuarioIds.length,
     });
   } catch (error) { next(error); }

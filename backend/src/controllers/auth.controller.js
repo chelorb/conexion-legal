@@ -125,7 +125,14 @@ const registro = async (req, res, next) => {
     }
 
     await client.query('COMMIT');
+
+    // Email de bienvenida + verificación (todos los roles)
     emailService.enviarBienvenida({ nombre, email, rol, tokenVerificacion });
+
+    // Email adicional para abogados: aviso de que el perfil está en revisión
+    if (rol === 'abogado') {
+      emailService.notificarAbogadoPendiente({ nombre, email }).catch(() => {});
+    }
 
     const mensajeRespuesta = rol === 'abogado'
       ? '¡Registro exitoso! Revisá tu email para verificar tu cuenta. Tu perfil será revisado por nuestro equipo.'

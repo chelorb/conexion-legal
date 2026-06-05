@@ -1,37 +1,34 @@
 // ============================================================
 // src/services/email.service.js
 // Centraliza el envío de todos los emails de la plataforma
-// Usa Nodemailer con Gmail SMTP (se puede cambiar a SendGrid, etc.)
+// Paleta: Gris carbón #1C1B18 + Cobre #B86030
 // ============================================================
 
 const nodemailer = require('nodemailer');
 
-// Crear el transportador SMTP una sola vez (se reutiliza)
+// ── Transportador SMTP (se reutiliza en toda la app) ─────────
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: false, // true para puerto 465, false para 587
+  host:   process.env.SMTP_HOST || 'smtp.gmail.com',
+  port:   parseInt(process.env.SMTP_PORT) || 587,
+  secure: false,
   auth: {
     user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS, // Usar "Contraseña de aplicación" en Gmail
+    pass: process.env.SMTP_PASS,
   },
 });
 
-// Verificar conexión SMTP al iniciar (solo en desarrollo)
-if (process.env.NODE_ENV !== 'production') {
-  transporter.verify((error) => {
-    if (error) {
-      console.warn('⚠️  Email: No se pudo conectar al servidor SMTP:', error.message);
-    } else {
-      console.log('✅ Email: Servidor SMTP conectado correctamente');
-    }
-  });
-}
+// Verificar conexión al iniciar
+transporter.verify((error) => {
+  if (error) {
+    console.warn('⚠️  SMTP: No se pudo conectar:', error.message);
+  } else {
+    console.log('✅ SMTP: Conectado correctamente —', process.env.SMTP_USER);
+  }
+});
 
 // ─────────────────────────────────────────────────────────────
-// TEMPLATE BASE — HTML de todos los emails
+// TEMPLATE BASE — Paleta C
 // ─────────────────────────────────────────────────────────────
-
 const templateBase = (titulo, contenido) => `
 <!DOCTYPE html>
 <html lang="es">
@@ -40,34 +37,39 @@ const templateBase = (titulo, contenido) => `
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${titulo}</title>
   <style>
-    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f9; margin: 0; padding: 0; }
-    .container { max-width: 600px; margin: 40px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-    .header { background: linear-gradient(135deg, #1a2e5a 0%, #2d4a8a 100%); padding: 32px 40px; text-align: center; }
-    .header h1 { color: white; margin: 0; font-size: 24px; font-weight: 600; }
-    .header p { color: rgba(255,255,255,0.8); margin: 8px 0 0; font-size: 14px; }
-    .content { padding: 40px; color: #374151; }
-    .content h2 { color: #1a2e5a; font-size: 20px; margin-bottom: 16px; }
-    .content p { line-height: 1.7; margin-bottom: 16px; font-size: 15px; }
-    .btn { display: inline-block; background: linear-gradient(135deg, #1a2e5a, #2d4a8a); color: white !important; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px; margin: 16px 0; }
-    .info-box { background: #f0f4ff; border-left: 4px solid #2d4a8a; padding: 16px 20px; border-radius: 4px; margin: 20px 0; }
-    .footer { background: #f9fafb; padding: 24px 40px; text-align: center; border-top: 1px solid #e5e7eb; }
-    .footer p { color: #9ca3af; font-size: 13px; margin: 0; }
-    .logo { font-size: 18px; font-weight: 700; color: white; }
-    .logo span { color: #93c5fd; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #F0EFED; padding: 40px 16px; }
+    .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(28,27,24,0.10); }
+    .header { background: #1C1B18; padding: 32px 40px; text-align: center; }
+    .logo { font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px; }
+    .logo span { color: #B86030; }
+    .header-sub { color: rgba(255,255,255,0.45); font-size: 13px; margin-top: 6px; }
+    .content { padding: 40px; color: #3A3832; }
+    .content h2 { color: #1C1B18; font-size: 20px; font-weight: 700; margin-bottom: 16px; }
+    .content p { line-height: 1.7; margin-bottom: 16px; font-size: 15px; color: #56534A; }
+    .btn-wrap { text-align: center; margin: 28px 0; }
+    .btn { display: inline-block; background: #B86030; color: #ffffff !important; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 15px; }
+    .info-box { background: #F7F6F4; border-left: 3px solid #B86030; padding: 16px 20px; border-radius: 4px; margin: 20px 0; font-size: 14px; line-height: 1.7; color: #3A3832; }
+    .info-box strong { color: #1C1B18; }
+    .alert-box { background: rgba(220,38,38,0.06); border-left: 3px solid #dc2626; padding: 16px 20px; border-radius: 4px; margin: 20px 0; font-size: 14px; color: #7f1d1d; }
+    .success-box { background: rgba(22,163,74,0.06); border-left: 3px solid #16a34a; padding: 16px 20px; border-radius: 4px; margin: 20px 0; font-size: 14px; color: #14532d; }
+    .divider { border: none; border-top: 1px solid #F0EFED; margin: 24px 0; }
+    .footer { background: #F7F6F4; padding: 24px 40px; text-align: center; border-top: 1px solid #F0EFED; }
+    .footer p { color: #8A8780; font-size: 12px; line-height: 1.6; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
       <div class="logo">Conexión<span>Legal</span></div>
-      <p>Plataforma de Asesoría Legal Digital</p>
+      <p class="header-sub">Plataforma de Asesoría Legal Digital</p>
     </div>
     <div class="content">
       ${contenido}
     </div>
     <div class="footer">
       <p>© ${new Date().getFullYear()} Conexión Legal — Todos los derechos reservados</p>
-      <p style="margin-top: 8px;">Si no solicitaste este email, podés ignorarlo.</p>
+      <p style="margin-top:6px;">Si no solicitaste este email, podés ignorarlo con tranquilidad.</p>
     </div>
   </div>
 </body>
@@ -75,13 +77,13 @@ const templateBase = (titulo, contenido) => `
 `;
 
 // ─────────────────────────────────────────────────────────────
-// FUNCIONES DE ENVÍO
+// FUNCIÓN BASE DE ENVÍO
 // ─────────────────────────────────────────────────────────────
-
-/**
- * Envío genérico (base de todas las funciones de abajo)
- */
 const enviarEmail = async ({ to, subject, html }) => {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('⚠️  SMTP no configurado — email no enviado a:', to);
+    return { ok: false, error: 'SMTP no configurado' };
+  }
   try {
     const info = await transporter.sendMail({
       from: `"Conexión Legal" <${process.env.SMTP_USER}>`,
@@ -89,93 +91,155 @@ const enviarEmail = async ({ to, subject, html }) => {
       subject,
       html,
     });
-    console.log(`📧 Email enviado a ${to}: ${info.messageId}`);
-    return { ok: true };
+    console.log(`📧 Email enviado → ${to} [${info.messageId}]`);
+    return { ok: true, messageId: info.messageId };
   } catch (error) {
-    // Loguear el error pero no frenar el flujo principal de la app
-    console.error(`❌ Error al enviar email a ${to}:`, error.message);
+    console.error(`❌ Error email → ${to}:`, error.message);
     return { ok: false, error: error.message };
   }
 };
 
+// ═════════════════════════════════════════════════════════════
+// EMAILS DE REGISTRO Y VERIFICACIÓN
+// ═════════════════════════════════════════════════════════════
+
 /**
- * Email de bienvenida después del registro
+ * Bienvenida + verificación de email (clientes y abogados)
  */
 const enviarBienvenida = async ({ nombre, email, rol, tokenVerificacion }) => {
   const urlVerificacion = `${process.env.FRONTEND_URL}/verificar-email?token=${tokenVerificacion}`;
+  const esAbogado = rol === 'abogado';
 
   const contenido = `
     <h2>¡Bienvenido/a a Conexión Legal, ${nombre}!</h2>
-    <p>Tu cuenta fue creada exitosamente como <strong>${rol === 'abogado' ? 'Profesional del Derecho' : 'Cliente'}</strong>.</p>
-    <p>Para activar tu cuenta y comenzar a usar la plataforma, confirmá tu dirección de email:</p>
-    <div style="text-align: center;">
-      <a href="${urlVerificacion}" class="btn">Verificar mi Email</a>
+    <p>Tu cuenta fue creada exitosamente como <strong>${esAbogado ? 'Profesional del Derecho' : 'Cliente'}</strong>.</p>
+    <p>Para activar tu cuenta, confirmá tu dirección de email haciendo click en el botón:</p>
+    <div class="btn-wrap">
+      <a href="${urlVerificacion}" class="btn">Verificar mi email</a>
     </div>
     <div class="info-box">
-      <strong>⏱️ Este enlace expira en 24 horas.</strong><br>
-      Si no podés hacer click en el botón, copiá este enlace: <br>
-      <small>${urlVerificacion}</small>
+      <strong>⏱ Este enlace expira en 24 horas.</strong><br>
+      Si el botón no funciona, copiá este link en tu navegador:<br>
+      <small style="color:#B86030;">${urlVerificacion}</small>
     </div>
-    <p>Si tenés alguna pregunta, no dudes en contactarnos.</p>
+    ${esAbogado ? `
+    <hr class="divider">
+    <p style="color:#8A8780;font-size:13px;">
+      Recordá que tu perfil será revisado por nuestro equipo antes de aparecer en la plataforma.
+      Te avisaremos por email cuando esté aprobado.
+    </p>` : ''}
   `;
 
   return enviarEmail({
     to: email,
     subject: '✅ Verificá tu cuenta en Conexión Legal',
-    html: templateBase('Verificación de cuenta', contenido),
+    html: templateBase('Verificá tu cuenta', contenido),
   });
 };
 
 /**
- * Email de confirmación de turno para el cliente
+ * Aviso al abogado de que su perfil está pendiente de revisión
  */
-const enviarConfirmacionTurno = async ({ clienteNombre, clienteEmail, abogadoNombre, fecha, tipo, linkReunion }) => {
-  const fechaFormateada = new Date(fecha).toLocaleString('es-AR', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  });
-
+const notificarAbogadoPendiente = async ({ nombre, email }) => {
   const contenido = `
-    <h2>Tu consulta fue confirmada ✅</h2>
-    <p>Hola <strong>${clienteNombre}</strong>, tu consulta legal ha sido confirmada.</p>
+    <h2>Tu registro fue recibido ⏳</h2>
+    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, recibimos tu solicitud de registro en Conexión Legal.</p>
+    <p>Nuestro equipo está revisando tu perfil y documentación. Este proceso tarda entre <strong>24 y 48 horas hábiles</strong>.</p>
     <div class="info-box">
-      <strong>📅 Fecha y hora:</strong> ${fechaFormateada}<br>
-      <strong>👨‍💼 Abogado/a:</strong> Dr./Dra. ${abogadoNombre}<br>
-      <strong>📍 Modalidad:</strong> ${tipo === 'online' ? 'Online (videoconferencia)' : 'Presencial'}
-      ${linkReunion ? `<br><strong>🔗 Enlace:</strong> <a href="${linkReunion}">${linkReunion}</a>` : ''}
+      <strong>¿Qué pasa ahora?</strong><br>
+      1. Verificamos tu credencial y título universitario<br>
+      2. Confirmamos tu matrícula profesional<br>
+      3. Te enviamos un email cuando tu perfil esté aprobado
     </div>
-    <p>Te recomendamos tener a mano cualquier documentación relevante para tu caso.</p>
-    <p>Si necesitás cancelar o reprogramar, hacelo con al menos 24 horas de anticipación.</p>
+    <p>Una vez aprobado, tu perfil aparecerá en el catálogo y los clientes podrán contactarte.</p>
+    <p>Si tenés alguna consulta, respondé este email o escribinos a <strong>${process.env.SMTP_USER}</strong>.</p>
   `;
 
   return enviarEmail({
-    to: clienteEmail,
-    subject: '📅 Consulta confirmada — Conexión Legal',
-    html: templateBase('Consulta confirmada', contenido),
+    to: email,
+    subject: '⏳ Tu perfil está siendo revisado — Conexión Legal',
+    html: templateBase('Perfil en revisión', contenido),
+  });
+};
+
+// ═════════════════════════════════════════════════════════════
+// EMAILS DE APROBACIÓN / RECHAZO (ADMIN → ABOGADO)
+// ═════════════════════════════════════════════════════════════
+
+/**
+ * Perfil aprobado → abogado
+ */
+const notificarAbogadoAprobado = async ({ nombre, email }) => {
+  const contenido = `
+    <h2>¡Tu perfil fue aprobado! 🎉</h2>
+    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, nuestro equipo revisó tu perfil y documentación.</p>
+    <div class="success-box">
+      ✅ Tu perfil está activo y ya aparece en el catálogo de profesionales de Conexión Legal.
+      Los clientes ya pueden encontrarte y solicitar consultas.
+    </div>
+    <p>Te recomendamos completar tu perfil con una foto, descripción profesional y tus horarios de disponibilidad para que los clientes tengan toda la información necesaria.</p>
+    <div class="btn-wrap">
+      <a href="${process.env.FRONTEND_URL}/abogado/dashboard" class="btn">Ir a mi panel</a>
+    </div>
+  `;
+
+  return enviarEmail({
+    to: email,
+    subject: '🎉 ¡Tu perfil fue aprobado! — Conexión Legal',
+    html: templateBase('Perfil aprobado', contenido),
   });
 };
 
 /**
- * Notificación al abogado de nueva consulta solicitada
+ * Perfil rechazado → abogado
+ */
+const notificarAbogadoRechazado = async ({ nombre, email, motivo }) => {
+  const contenido = `
+    <h2>Tu perfil no pudo ser aprobado</h2>
+    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, revisamos tu perfil y encontramos algunos puntos que necesitamos que corrijas.</p>
+    <div class="alert-box">
+      <strong>Motivo:</strong><br>
+      ${motivo || 'Por favor revisá que todos los documentos estén completos y sean legibles, y que la matrícula sea válida.'}
+    </div>
+    <p>Podés corregir los datos y volver a solicitar la revisión desde tu perfil.</p>
+    <div class="btn-wrap">
+      <a href="${process.env.FRONTEND_URL}/abogado/perfil" class="btn">Actualizar mi perfil</a>
+    </div>
+    <p style="font-size:13px;color:#8A8780;">Si creés que hay un error, respondé este email y lo revisamos.</p>
+  `;
+
+  return enviarEmail({
+    to: email,
+    subject: 'ℹ️ Tu perfil necesita correcciones — Conexión Legal',
+    html: templateBase('Perfil pendiente de correcciones', contenido),
+  });
+};
+
+// ═════════════════════════════════════════════════════════════
+// EMAILS DE CONSULTAS
+// ═════════════════════════════════════════════════════════════
+
+/**
+ * Nueva consulta solicitada → abogado
  */
 const notificarNuevaConsulta = async ({ abogadoEmail, abogadoNombre, clienteNombre, fecha, especialidad }) => {
   const fechaFormateada = new Date(fecha).toLocaleString('es-AR', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-    hour: '2-digit', minute: '2-digit'
+    weekday: 'long', year: 'numeric', month: 'long',
+    day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 
   const contenido = `
     <h2>Nueva solicitud de consulta 📋</h2>
-    <p>Hola <strong>Dr./Dra. ${abogadoNombre}</strong>, tenés una nueva solicitud de consulta.</p>
+    <p>Hola <strong>Dr./Dra. ${abogadoNombre}</strong>, tenés una nueva solicitud de consulta esperando tu confirmación.</p>
     <div class="info-box">
       <strong>👤 Cliente:</strong> ${clienteNombre}<br>
       <strong>📅 Fecha solicitada:</strong> ${fechaFormateada}<br>
       ${especialidad ? `<strong>⚖️ Especialidad:</strong> ${especialidad}` : ''}
     </div>
-    <div style="text-align: center;">
-      <a href="${process.env.FRONTEND_URL}/abogado/consultas" class="btn">Ver y Confirmar Consulta</a>
+    <p>Tenés <strong>24 horas</strong> para confirmar o rechazar la solicitud.</p>
+    <div class="btn-wrap">
+      <a href="${process.env.FRONTEND_URL}/abogado/consultas" class="btn">Ver y confirmar consulta</a>
     </div>
-    <p>Tenés 24 horas para confirmar o rechazar la solicitud.</p>
   `;
 
   return enviarEmail({
@@ -186,20 +250,55 @@ const notificarNuevaConsulta = async ({ abogadoEmail, abogadoNombre, clienteNomb
 };
 
 /**
- * Email de recuperación de contraseña
+ * Consulta confirmada → cliente
+ */
+const enviarConfirmacionTurno = async ({ clienteNombre, clienteEmail, abogadoNombre, fecha, tipo, linkReunion }) => {
+  const fechaFormateada = new Date(fecha).toLocaleString('es-AR', {
+    weekday: 'long', year: 'numeric', month: 'long',
+    day: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+
+  const contenido = `
+    <h2>Tu consulta fue confirmada ✅</h2>
+    <p>Hola <strong>${clienteNombre}</strong>, tu consulta fue confirmada por el/la profesional.</p>
+    <div class="info-box">
+      <strong>📅 Fecha y hora:</strong> ${fechaFormateada}<br>
+      <strong>👨‍💼 Abogado/a:</strong> Dr./Dra. ${abogadoNombre}<br>
+      <strong>📍 Modalidad:</strong> ${tipo === 'online' ? 'Online (videollamada)' : 'Presencial'}
+      ${linkReunion ? `<br><strong>🔗 Link de acceso:</strong> <a href="${linkReunion}" style="color:#B86030;">${linkReunion}</a>` : ''}
+    </div>
+    <p>Te recomendamos tener a mano cualquier documentación relevante para tu caso.</p>
+    <div class="btn-wrap">
+      <a href="${process.env.FRONTEND_URL}/mis-consultas" class="btn">Ver mis consultas</a>
+    </div>
+  `;
+
+  return enviarEmail({
+    to: clienteEmail,
+    subject: '📅 Consulta confirmada — Conexión Legal',
+    html: templateBase('Consulta confirmada', contenido),
+  });
+};
+
+// ═════════════════════════════════════════════════════════════
+// EMAILS DE SEGURIDAD Y CUENTA
+// ═════════════════════════════════════════════════════════════
+
+/**
+ * Reset de contraseña
  */
 const enviarResetPassword = async ({ nombre, email, token }) => {
   const urlReset = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
 
   const contenido = `
-    <h2>Restablecé tu contraseña</h2>
+    <h2>Restablecé tu contraseña 🔒</h2>
     <p>Hola <strong>${nombre}</strong>, recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>
-    <div style="text-align: center;">
-      <a href="${urlReset}" class="btn">Restablecer Contraseña</a>
+    <div class="btn-wrap">
+      <a href="${urlReset}" class="btn">Restablecer contraseña</a>
     </div>
     <div class="info-box">
-      <strong>⏱️ Este enlace expira en 1 hora.</strong><br>
-      Si no solicitaste el cambio de contraseña, ignorá este email. Tu contraseña actual seguirá siendo válida.
+      <strong>⏱ Este enlace expira en 1 hora.</strong><br>
+      Si no solicitaste este cambio, ignorá este email. Tu contraseña actual seguirá siendo válida.
     </div>
   `;
 
@@ -211,23 +310,114 @@ const enviarResetPassword = async ({ nombre, email, token }) => {
 };
 
 /**
- * Email de confirmación de suscripción
+ * Cuenta deshabilitada por el admin
+ */
+const notificarCuentaDeshabilitada = async ({ nombre, email }) => {
+  const contenido = `
+    <h2>Tu cuenta fue deshabilitada</h2>
+    <p>Hola <strong>${nombre}</strong>, tu cuenta en Conexión Legal fue deshabilitada temporalmente por nuestro equipo de administración.</p>
+    <div class="alert-box">
+      No podrás acceder a la plataforma mientras tu cuenta esté deshabilitada.
+    </div>
+    <p>Si creés que esto es un error o querés más información, contactanos respondiendo este email.</p>
+  `;
+
+  return enviarEmail({
+    to: email,
+    subject: 'ℹ️ Tu cuenta fue deshabilitada — Conexión Legal',
+    html: templateBase('Cuenta deshabilitada', contenido),
+  });
+};
+
+/**
+ * Cuenta rehabilitada por el admin
+ */
+const notificarCuentaRehabilitada = async ({ nombre, email }) => {
+  const contenido = `
+    <h2>Tu cuenta fue reactivada ✅</h2>
+    <p>Hola <strong>${nombre}</strong>, tu cuenta en Conexión Legal fue reactivada y ya podés acceder normalmente.</p>
+    <div class="success-box">
+      ✅ Tu cuenta está activa. Podés iniciar sesión cuando quieras.
+    </div>
+    <div class="btn-wrap">
+      <a href="${process.env.FRONTEND_URL}/login" class="btn">Iniciar sesión</a>
+    </div>
+  `;
+
+  return enviarEmail({
+    to: email,
+    subject: '✅ Tu cuenta fue reactivada — Conexión Legal',
+    html: templateBase('Cuenta reactivada', contenido),
+  });
+};
+
+// ═════════════════════════════════════════════════════════════
+// EMAILS AL ADMIN
+// ═════════════════════════════════════════════════════════════
+
+/**
+ * Nuevo abogado registrado → admins
+ */
+const notificarAdminNuevoAbogado = async ({ adminEmail, adminNombre, abogadoNombre, abogadoApellido, abogadoEmail }) => {
+  const contenido = `
+    <h2>Nuevo abogado pendiente de revisión 📋</h2>
+    <p>Hola <strong>${adminNombre || 'Admin'}</strong>, un nuevo profesional se registró y está esperando tu revisión.</p>
+    <div class="info-box">
+      <strong>👤 Nombre:</strong> ${abogadoNombre} ${abogadoApellido || ''}<br>
+      <strong>📧 Email:</strong> ${abogadoEmail}
+    </div>
+    <div class="btn-wrap">
+      <a href="${process.env.FRONTEND_URL}/admin/abogados" class="btn">Revisar en el panel admin</a>
+    </div>
+  `;
+
+  return enviarEmail({
+    to: adminEmail,
+    subject: '🔔 Nuevo abogado pendiente de aprobación — Conexión Legal',
+    html: templateBase('Nuevo abogado pendiente', contenido),
+  });
+};
+
+/**
+ * Comunicado manual del admin → usuarios
+ */
+const enviarComunicado = async ({ destinatarioEmail, destinatarioNombre, titulo, mensaje, link }) => {
+  const contenido = `
+    <h2>${titulo}</h2>
+    <p>Hola <strong>${destinatarioNombre}</strong>,</p>
+    <p>${mensaje}</p>
+    ${link ? `
+    <div class="btn-wrap">
+      <a href="${process.env.FRONTEND_URL}${link}" class="btn">Ver más información</a>
+    </div>` : ''}
+    <hr class="divider">
+    <p style="font-size:13px;color:#8A8780;">Este es un comunicado oficial de Conexión Legal.</p>
+  `;
+
+  return enviarEmail({
+    to: destinatarioEmail,
+    subject: `📢 ${titulo} — Conexión Legal`,
+    html: templateBase(titulo, contenido),
+  });
+};
+
+/**
+ * Confirmación de suscripción
  */
 const enviarConfirmacionSuscripcion = async ({ nombre, email, plan, fechaFin }) => {
   const fechaFormateada = new Date(fechaFin).toLocaleDateString('es-AR', {
-    year: 'numeric', month: 'long', day: 'numeric'
+    year: 'numeric', month: 'long', day: 'numeric',
   });
 
   const contenido = `
     <h2>¡Tu suscripción está activa! 🎉</h2>
     <p>Hola <strong>Dr./Dra. ${nombre}</strong>, tu suscripción al plan <strong>${plan}</strong> fue procesada exitosamente.</p>
-    <div class="info-box">
+    <div class="success-box">
       <strong>📋 Plan:</strong> ${plan}<br>
       <strong>📅 Válido hasta:</strong> ${fechaFormateada}
     </div>
-    <p>Ya podés acceder a todas las funcionalidades de tu plan desde tu panel de control.</p>
-    <div style="text-align: center;">
-      <a href="${process.env.FRONTEND_URL}/abogado/dashboard" class="btn">Ir a mi Panel</a>
+    <div class="btn-wrap">
+      <a href="${process.env.FRONTEND_URL}/abogado/dashboard" class="btn">Ir a mi panel</a>
     </div>
   `;
 
@@ -238,88 +428,20 @@ const enviarConfirmacionSuscripcion = async ({ nombre, email, plan, fechaFin }) 
   });
 };
 
+// ─────────────────────────────────────────────────────────────
+// Exportar todo
+// ─────────────────────────────────────────────────────────────
 module.exports = {
   enviarBienvenida,
-  enviarConfirmacionTurno,
-  notificarNuevaConsulta,
-  enviarResetPassword,
-  enviarConfirmacionSuscripcion,
-};
-
-
-// ─────────────────────────────────────────────────────────────
-// Email al admin: nuevo abogado esperando aprobación
-// ─────────────────────────────────────────────────────────────
-const notificarAdminNuevoAbogado = async ({ adminNombre, adminEmail, abogadoNombre, abogadoApellido, abogadoEmail }) => {
-  const contenido = `
-    <h2>Nuevo abogado pendiente de aprobación 📋</h2>
-    <p>Hola <strong>${adminNombre}</strong>, un nuevo profesional se registró y está esperando tu revisión.</p>
-    <div class="info-box">
-      <strong>👤 Nombre:</strong> ${abogadoNombre} ${abogadoApellido}<br>
-      <strong>📧 Email:</strong> ${abogadoEmail}
-    </div>
-    <div style="text-align:center;">
-      <a href="${process.env.FRONTEND_URL}/admin/abogados" class="btn">
-        Revisar perfil en el panel admin
-      </a>
-    </div>
-  `;
-  return enviarEmail({
-    to:      adminEmail,
-    subject: '🔔 Nuevo abogado pendiente de aprobación — Conexión Legal',
-    html:    templateBase('Nuevo abogado pendiente', contenido),
-  });
-};
-
-// ─────────────────────────────────────────────────────────────
-// Email al abogado: perfil aprobado
-// ─────────────────────────────────────────────────────────────
-const notificarAbogadoAprobado = async ({ nombre, email }) => {
-  const contenido = `
-    <h2>¡Tu perfil fue aprobado! ✅</h2>
-    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, nuestro equipo revisó tu perfil y fue aprobado.</p>
-    <p>A partir de ahora aparecés en la grilla de búsqueda de Conexión Legal y los clientes pueden contactarte.</p>
-    <div style="text-align:center;">
-      <a href="${process.env.FRONTEND_URL}/abogado/dashboard" class="btn">
-        Ir a mi panel
-      </a>
-    </div>
-  `;
-  return enviarEmail({
-    to:      email,
-    subject: '✅ ¡Tu perfil fue aprobado! — Conexión Legal',
-    html:    templateBase('Perfil aprobado', contenido),
-  });
-};
-
-// ─────────────────────────────────────────────────────────────
-// Email al abogado: perfil rechazado con motivo
-// ─────────────────────────────────────────────────────────────
-const notificarAbogadoRechazado = async ({ nombre, email, motivo }) => {
-  const contenido = `
-    <h2>Tu perfil necesita correcciones</h2>
-    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, revisamos tu perfil y encontramos algunos puntos a mejorar antes de poder aprobarlo.</p>
-    <div class="info-box">
-      <strong>📋 Motivo:</strong><br>
-      ${motivo || 'Por favor completá todos los campos requeridos y asegurate de que la matrícula sea válida.'}
-    </div>
-    <p>Podés actualizar tu perfil desde tu panel y volver a solicitar la revisión.</p>
-    <div style="text-align:center;">
-      <a href="${process.env.FRONTEND_URL}/abogado/perfil" class="btn">
-        Actualizar mi perfil
-      </a>
-    </div>
-  `;
-  return enviarEmail({
-    to:      email,
-    subject: 'ℹ️ Tu perfil necesita correcciones — Conexión Legal',
-    html:    templateBase('Perfil pendiente de correcciones', contenido),
-  });
-};
-
-// Exportar las nuevas funciones junto con las existentes
-module.exports = Object.assign(module.exports, {
-  notificarAdminNuevoAbogado,
+  notificarAbogadoPendiente,
   notificarAbogadoAprobado,
   notificarAbogadoRechazado,
-});
+  notificarNuevaConsulta,
+  enviarConfirmacionTurno,
+  enviarResetPassword,
+  notificarCuentaDeshabilitada,
+  notificarCuentaRehabilitada,
+  notificarAdminNuevoAbogado,
+  enviarComunicado,
+  enviarConfirmacionSuscripcion,
+};

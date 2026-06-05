@@ -225,6 +225,21 @@ router.patch('/usuarios/:id/estado', async (req, res, next) => {
       [activo, req.params.id]
     );
 
+    // Notificar al usuario por email
+    try {
+      const { rows: [usuario] } = await query(
+        'SELECT nombre, email FROM usuarios WHERE id = $1',
+        [req.params.id]
+      );
+      if (usuario) {
+        if (activo) {
+          emailService.notificarCuentaRehabilitada({ nombre: usuario.nombre, email: usuario.email }).catch(() => {});
+        } else {
+          emailService.notificarCuentaDeshabilitada({ nombre: usuario.nombre, email: usuario.email }).catch(() => {});
+        }
+      }
+    } catch {}
+
     res.json({ mensaje: `Usuario ${activo ? 'habilitado' : 'deshabilitado'} correctamente.` });
   } catch (error) { next(error); }
 });
