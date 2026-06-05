@@ -9,12 +9,18 @@ const nodemailer = require('nodemailer');
 // ── Transportador SMTP (se reutiliza en toda la app) ─────────
 const transporter = nodemailer.createTransport({
   host:   process.env.SMTP_HOST || 'smtp.gmail.com',
-  port:   parseInt(process.env.SMTP_PORT) || 587,
-  secure: false,
+  port:   parseInt(process.env.SMTP_PORT) || 465,
+  secure: parseInt(process.env.SMTP_PORT) === 465 || !process.env.SMTP_PORT, // true para 465
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+  tls: {
+    rejectUnauthorized: false, // Evita errores de certificado en Render
+  },
+  connectionTimeout: 10000, // 10 segundos
+  greetingTimeout:   10000,
+  socketTimeout:     15000,
 });
 
 // Verificar conexión al iniciar
