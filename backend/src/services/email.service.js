@@ -6,29 +6,25 @@
 
 const nodemailer = require('nodemailer');
 
-// ── Transportador SMTP (se reutiliza en toda la app) ─────────
+// ── Transportador SendGrid (HTTP API — funciona en Render) ────
+// SendGrid no usa SMTP directo sino su propia API HTTP
+// Esto evita el bloqueo de puertos SMTP en Render Free
 const transporter = nodemailer.createTransport({
-  host:   process.env.SMTP_HOST || 'smtp.gmail.com',
-  port:   parseInt(process.env.SMTP_PORT) || 465,
-  secure: parseInt(process.env.SMTP_PORT) === 465 || !process.env.SMTP_PORT, // true para 465
+  host:   'smtp.sendgrid.net',
+  port:   587,
+  secure: false,
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
+    user: 'apikey',                          // Siempre es 'apikey' en SendGrid
+    pass: process.env.SENDGRID_API_KEY,      // La API Key generada en SendGrid
   },
-  tls: {
-    rejectUnauthorized: false, // Evita errores de certificado en Render
-  },
-  connectionTimeout: 10000, // 10 segundos
-  greetingTimeout:   10000,
-  socketTimeout:     15000,
 });
 
 // Verificar conexión al iniciar
 transporter.verify((error) => {
   if (error) {
-    console.warn('⚠️  SMTP: No se pudo conectar:', error.message);
+    console.warn('⚠️  SendGrid: No se pudo conectar:', error.message);
   } else {
-    console.log('✅ SMTP: Conectado correctamente —', process.env.SMTP_USER);
+    console.log('✅ SendGrid: Conectado correctamente');
   }
 });
 
@@ -92,7 +88,7 @@ const enviarEmail = async ({ to, subject, html }) => {
   }
   try {
     const info = await transporter.sendMail({
-      from: `"Conexión Legal" <${process.env.SMTP_USER}>`,
+      from: `"Conexión Legal" <${process.env.SMTP_USER || process.env.SENDGRID_FROM || 'adminiustixium@gmail.com'}>`,
       to,
       subject,
       html,
