@@ -87,9 +87,16 @@ const registro = async (req, res, next) => {
       if (!planId) throw new Error('No hay planes disponibles en el sistema.');
 
       // URLs de archivos subidos (si los hay)
-      const docCredencialUrl = req.files?.doc_credencial?.[0]?.path || null;
-      const docTituloUrl     = req.files?.doc_titulo?.[0]?.path     || null;
-      const docCuilUrl       = req.files?.doc_cuil?.[0]?.path       || null;
+      // Guardar path relativo (no absoluto) para que funcione en cualquier entorno
+      const toRelativo = (f) => {
+        if (!f) return null;
+        const p = f.path.replace(/\\/g, '/'); // normalizar separadores Windows
+        const idx = p.indexOf('uploads/');
+        return idx >= 0 ? p.substring(idx) : p;
+      };
+      const docCredencialUrl = toRelativo(req.files?.doc_credencial?.[0]);
+      const docTituloUrl     = toRelativo(req.files?.doc_titulo?.[0]);
+      const docCuilUrl       = toRelativo(req.files?.doc_cuil?.[0]);
 
       await client.query(
         `INSERT INTO perfiles_abogado (
@@ -111,6 +118,17 @@ const registro = async (req, res, next) => {
         ]
       );
 
+      notificarAdminNuevoAbogado({
+        abogadoNombre:   nombre,
+        abogadoApellido: apellido,
+        abogadoEmail:    email,
+      }).catch(err => console.warn('⚠️  No se pudo notificar al admin:', err.message));
+
+      // Notificación real-time al admin
+      notifService.nuevoAbogadoRegistrado({
+        abogadoNombre: `${nombre} ${apellido}`,
+        abogadoEmail: email,
+      }).catch(() => {});
     }
 
     await client.query('COMMIT');
@@ -118,23 +136,9 @@ const registro = async (req, res, next) => {
     // Email de bienvenida + verificación (todos los roles)
     emailService.enviarBienvenida({ nombre, email, rol, tokenVerificacion });
 
-    // Notificaciones específicas para abogados (después del COMMIT)
+    // Email adicional para abogados: aviso de que el perfil está en revisión
     if (rol === 'abogado') {
-      // Email al abogado: perfil en revisión
       emailService.notificarAbogadoPendiente({ nombre, email }).catch(() => {});
-
-      // Notificación in-app + email a todos los admins
-      notificarAdminNuevoAbogado({
-        abogadoNombre:   nombre,
-        abogadoApellido: apellido,
-        abogadoEmail:    email,
-      }).catch(err => console.warn('⚠️  No se pudo notificar al admin:', err.message));
-
-      // Notificación real-time al admin via Socket.io
-      notifService.nuevoAbogadoRegistrado({
-        abogadoNombre: `${nombre} ${apellido}`,
-        abogadoEmail:  email,
-      }).catch(() => {});
     }
 
     const mensajeRespuesta = rol === 'abogado'
