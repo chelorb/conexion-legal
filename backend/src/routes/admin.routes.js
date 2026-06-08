@@ -87,7 +87,7 @@ router.get('/abogados', async (req, res, next) => {
          pa.visible_en_grilla, pa.perfil_completo,
          pa.estado_aprobacion, pa.motivo_rechazo,
          pa.aprobado_en,
-         pa.cuil, pa.titulo_universitario, pa.universidad,
+         pa.dni_cuit, pa.cuil, pa.titulo_universitario, pa.universidad,
          pa.anio_graduacion, pa.nro_credencial_letrado,
          pa.doc_credencial_url, pa.doc_titulo_url, pa.doc_cuil_url,
          ps.nombre AS plan_nombre, ps.slug AS plan_slug
@@ -244,47 +244,10 @@ router.patch('/usuarios/:id/estado', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+
 // ─────────────────────────────────────────────────────────────
-// DELETE /api/admin/usuarios/:id
-// Eliminar cuenta — body: { tipo: 'suave' | 'definitivo' }
-// suave:      marca deleted_at (se puede recuperar)
-// definitivo: borra de la DB (irreversible)
-// ─────────────────────────────────────────────────────────────
-router.delete('/usuarios/:id', async (req, res, next) => {
-  try {
-    const { tipo = 'suave' } = req.body;
-
-    // No se puede eliminar la propia cuenta ni otras cuentas de admin
-    if (req.params.id === req.usuario.id) {
-      return res.status(400).json({ error: 'No podés eliminar tu propia cuenta.' });
-    }
-
-    const { rows: [usuario] } = await query(
-      `SELECT u.id, u.nombre, u.email, r.nombre AS rol
-       FROM usuarios u JOIN roles r ON u.rol_id = r.id
-       WHERE u.id = $1`, [req.params.id]
-    );
-
-    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado.' });
-    if (usuario.rol === 'admin') {
-      return res.status(403).json({ error: 'No se pueden eliminar cuentas de administrador.' });
-    }
-
-    if (tipo === 'definitivo') {
-      // Eliminación física — borra todo en cascada
-      await query('DELETE FROM usuarios WHERE id = $1', [req.params.id]);
-      return res.json({ mensaje: `La cuenta de ${usuario.nombre} fue eliminada definitivamente.` });
-    }
-
-    // Eliminación suave — desactiva y marca con timestamp
-    await query(
-      `UPDATE usuarios SET activo = false, deleted_at = NOW()
-       WHERE id = $1`, [req.params.id]
-    );
-    res.json({ mensaje: `La cuenta de ${usuario.nombre} fue eliminada (puede recuperarse).` });
-
-  } catch (error) { next(error); }
-});
+// PUT /api/admin/abogados/:id/perfil
+// Editar el perfil completo de un abogado desde el admin
 // ─────────────────────────────────────────────────────────────
 router.put('/abogados/:id/perfil', async (req, res, next) => {
   try {
