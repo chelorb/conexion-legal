@@ -136,16 +136,22 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
 
     // ── Acción: aprobar ──────────────────────────────────────
     if (accion === 'aprobar') {
+      // Respetar los toggles que el admin configuró antes de aprobar
+      // visible: default true si no se especifica
+      // matricula_verificada: default false si no se especifica
+      const visibleFinal    = visible !== undefined ? visible : true;
+      const matriculaFinal  = matricula_verificada !== undefined ? matricula_verificada : false;
+
       await query(
         `UPDATE perfiles_abogado SET
            estado_aprobacion    = 'aprobado',
-           visible_en_grilla    = true,
-           matricula_verificada = COALESCE($1, matricula_verificada),
+           visible_en_grilla    = $1,
+           matricula_verificada = $2,
            motivo_rechazo       = NULL,
-           aprobado_por         = $2,
+           aprobado_por         = $3,
            aprobado_en          = NOW()
-         WHERE usuario_id = $3`,
-        [matricula_verificada ?? null, adminId, id]
+         WHERE usuario_id = $4`,
+        [visibleFinal, matriculaFinal, adminId, id]
       );
 
       // Notificación real-time + email
