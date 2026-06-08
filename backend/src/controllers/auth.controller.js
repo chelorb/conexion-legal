@@ -111,17 +111,6 @@ const registro = async (req, res, next) => {
         ]
       );
 
-      notificarAdminNuevoAbogado({
-        abogadoNombre:   nombre,
-        abogadoApellido: apellido,
-        abogadoEmail:    email,
-      }).catch(err => console.warn('⚠️  No se pudo notificar al admin:', err.message));
-
-      // Notificación real-time al admin
-      notifService.nuevoAbogadoRegistrado({
-        abogadoNombre: `${nombre} ${apellido}`,
-        abogadoEmail: email,
-      }).catch(() => {});
     }
 
     await client.query('COMMIT');
@@ -129,9 +118,23 @@ const registro = async (req, res, next) => {
     // Email de bienvenida + verificación (todos los roles)
     emailService.enviarBienvenida({ nombre, email, rol, tokenVerificacion });
 
-    // Email adicional para abogados: aviso de que el perfil está en revisión
+    // Notificaciones específicas para abogados (después del COMMIT)
     if (rol === 'abogado') {
+      // Email al abogado: perfil en revisión
       emailService.notificarAbogadoPendiente({ nombre, email }).catch(() => {});
+
+      // Notificación in-app + email a todos los admins
+      notificarAdminNuevoAbogado({
+        abogadoNombre:   nombre,
+        abogadoApellido: apellido,
+        abogadoEmail:    email,
+      }).catch(err => console.warn('⚠️  No se pudo notificar al admin:', err.message));
+
+      // Notificación real-time al admin via Socket.io
+      notifService.nuevoAbogadoRegistrado({
+        abogadoNombre: `${nombre} ${apellido}`,
+        abogadoEmail:  email,
+      }).catch(() => {});
     }
 
     const mensajeRespuesta = rol === 'abogado'
