@@ -4,29 +4,9 @@
 // Paleta: Gris carbón #1C1B18 + Cobre #B86030
 // ============================================================
 
-const nodemailer = require('nodemailer');
-
-// ── Transportador SendGrid (HTTP API — funciona en Render) ────
-// SendGrid no usa SMTP directo sino su propia API HTTP
-// Esto evita el bloqueo de puertos SMTP en Render Free
-const transporter = nodemailer.createTransport({
-  host:   'smtp.sendgrid.net',
-  port:   587,
-  secure: false,
-  auth: {
-    user: 'apikey',                          // Siempre es 'apikey' en SendGrid
-    pass: process.env.SENDGRID_API_KEY,      // La API Key generada en SendGrid
-  },
-});
-
-// Verificar conexión al iniciar
-transporter.verify((error) => {
-  if (error) {
-    console.warn('⚠️  SendGrid: No se pudo conectar:', error.message);
-  } else {
-    console.log('✅ SendGrid: Conectado correctamente');
-  }
-});
+// ── SendGrid HTTP API (sin SMTP — funciona en Render Free) ──
+// Usamos fetch directo a la API de SendGrid en lugar de SMTP
+// para evitar el bloqueo de puertos en Render
 
 // ─────────────────────────────────────────────────────────────
 // TEMPLATE BASE — Paleta C
@@ -79,22 +59,39 @@ const templateBase = (titulo, contenido) => `
 `;
 
 // ─────────────────────────────────────────────────────────────
-// FUNCIÓN BASE DE ENVÍO
+// FUNCIÓN BASE DE ENVÍO — SendGrid HTTP API
 // ─────────────────────────────────────────────────────────────
 const enviarEmail = async ({ to, subject, html }) => {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.warn('⚠️  SMTP no configurado — email no enviado a:', to);
-    return { ok: false, error: 'SMTP no configurado' };
+  if (!process.env.SENDGRID_API_KEY) {
+    console.warn('⚠️  SENDGRID_API_KEY no configurada — email no enviado a:', to);
+    return { ok: false, error: 'SendGrid no configurado' };
   }
+
+  const from = process.env.SMTP_USER || 'adminiustixium@gmail.com';
+
   try {
-    const info = await transporter.sendMail({
-      from: `"Conexión Legal" <${process.env.SMTP_USER || process.env.SENDGRID_FROM || 'adminiustixium@gmail.com'}>`,
-      to,
-      subject,
-      html,
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: to }] }],
+        from:    { email: from, name: 'Conexión Legal' },
+        subject,
+        content: [{ type: 'text/html', value: html }],
+      }),
     });
-    console.log(`📧 Email enviado → ${to} [${info.messageId}]`);
-    return { ok: true, messageId: info.messageId };
+
+    if (response.ok) {
+      console.log(`📧 Email enviado → ${to} [${response.status}]`);
+      return { ok: true };
+    } else {
+      const body = await response.text();
+      console.error(`❌ SendGrid error → ${to}: ${response.status} ${body}`);
+      return { ok: false, error: body };
+    }
   } catch (error) {
     console.error(`❌ Error email → ${to}:`, error.message);
     return { ok: false, error: error.message };
