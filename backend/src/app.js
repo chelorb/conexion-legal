@@ -32,6 +32,7 @@ const notificacionesRoutes  = require('./routes/notificaciones.routes');
 const disponibilidadRoutes  = require('./routes/disponibilidad.routes');
 const adminRoutes          = require('./routes/admin.routes');
 const planesAdminRoutes    = require('./routes/planes.admin.routes');
+const documentosRoutes     = require('./routes/documentos.routes');
 
 const app = express();
 
@@ -84,6 +85,7 @@ app.use('/api/notificaciones',       notificacionesRoutes);
 app.use('/api/disponibilidad',       disponibilidadRoutes);
 app.use('/api/admin',                adminRoutes);
 app.use('/api/admin/planes-gestion', planesAdminRoutes);
+app.use('/api/documentos',           documentosRoutes);
 
 // Ruta pública de links de interés (sin autenticación, para el sidebar del abogado)
 app.get('/api/links', adminRoutes.linksPublicos);

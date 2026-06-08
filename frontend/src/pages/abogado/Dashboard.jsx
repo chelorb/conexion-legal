@@ -30,6 +30,7 @@ function Sidebar({ links }) {
     { href: '/abogado/perfil',         label: 'Mi perfil',      icono: User },
     { href: '/abogado/consultas',      label: 'Consultas',      icono: Calendar },
     { href: '/abogado/disponibilidad', label: 'Disponibilidad', icono: Clock },
+    { href: '/abogado/documentos',     label: 'Documentos',     icono: FileText },
     { href: '/abogado/campus',         label: 'Campus',         icono: BookOpen },
     { href: '/abogado/agenda',         label: 'Agenda',         icono: Calendar },
     { href: '/abogado/foro',           label: 'Foro',           icono: MessageSquare },

@@ -9,6 +9,7 @@ const jwt       = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { query, getClient } = require('../config/database');
 const emailService  = require('../services/email.service');
+const cloudSvc      = require('../services/cloudinary.service');
 const notifService  = require('../services/notificaciones.service');
 
 // ─────────────────────────────────────────────────────────────
@@ -77,6 +78,7 @@ const registro = async (req, res, next) => {
       [nombre, apellido, email, passwordHash, rolId, telefono || null, tokenVerificacion]
     );
 
+    const nuevoUsuarioId = usuario.id;
     // ── Si es abogado: crear perfil con datos de documentación ──
     if (rol === 'abogado') {
       const planDefault = await client.query(
@@ -87,16 +89,27 @@ const registro = async (req, res, next) => {
       if (!planId) throw new Error('No hay planes disponibles en el sistema.');
 
       // URLs de archivos subidos (si los hay)
-      // Guardar path relativo (no absoluto) para que funcione en cualquier entorno
-      const toRelativo = (f) => {
-        if (!f) return null;
-        const p = f.path.replace(/\\/g, '/'); // normalizar separadores Windows
-        const idx = p.indexOf('uploads/');
-        return idx >= 0 ? p.substring(idx) : p;
+      // Subir documentos a Cloudinary (almacenamiento permanente y seguro)
+      const subirDoc = async (file, tipo) => {
+        if (!file) return null;
+        try {
+          const resultado = await cloudSvc.subirArchivo(file.buffer, {
+            folder:        `conexion-legal/abogados/${nuevoUsuarioId}`,
+            public_id:     `${tipo}_${Date.now()}`,
+            resource_type: file.mimetype === 'application/pdf' ? 'raw' : 'image',
+          });
+          return resultado.url;
+        } catch (err) {
+          console.warn(`⚠️  Cloudinary: No se pudo subir ${tipo}:`, err.message);
+          return null;
+        }
       };
-      const docCredencialUrl = toRelativo(req.files?.doc_credencial?.[0]);
-      const docTituloUrl     = toRelativo(req.files?.doc_titulo?.[0]);
-      const docCuilUrl       = toRelativo(req.files?.doc_cuil?.[0]);
+
+      const [docCredencialUrl, docTituloUrl, docCuilUrl] = await Promise.all([
+        subirDoc(req.files?.doc_credencial?.[0], 'credencial'),
+        subirDoc(req.files?.doc_titulo?.[0],     'titulo'),
+        subirDoc(req.files?.doc_cuil?.[0],       'cuil'),
+      ]);
 
       await client.query(
         `INSERT INTO perfiles_abogado (
