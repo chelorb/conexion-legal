@@ -230,11 +230,15 @@ const login = async (req, res, next) => {
       return res.status(401).json({ error: 'Email o contraseña incorrectos.' });
     }
 
-    // Advertencias (email sin verificar, etc.)
-    const advertencias = [];
+    // ── SEGURIDAD: Bloquear acceso si el email no fue verificado ──
     if (!usuario.email_verificado) {
-      advertencias.push('Tu email aún no fue verificado. Revisá tu bandeja de entrada.');
+      return res.status(403).json({
+        error: 'Debés verificar tu email antes de iniciar sesión. Revisá tu bandeja de entrada.',
+        codigo: 'EMAIL_NO_VERIFICADO',
+      });
     }
+
+    const advertencias = [];
 
     // Actualizar fecha de último login
     await query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1', [usuario.id]);
@@ -299,17 +303,34 @@ const verificarEmail = async (req, res, next) => {
     const { rows, rowCount } = await query(
       `UPDATE usuarios
        SET email_verificado = true, token_verificacion = NULL
-       WHERE token_verificacion = $1 AND email_verificado = false
+       WHERE token_verificacion = $1
+         AND email_verificado  = false
+         AND creado_en         > NOW() - INTERVAL '24 hours'
        RETURNING nombre, email`,
       [token]
     );
 
     if (rowCount === 0) {
-      return res.status(400).json({ error: 'Token inválido o email ya verificado.' });
+      // Verificar si el token existe pero expiró
+      const { rows: tokenExpirado } = await query(
+        `SELECT id FROM usuarios
+         WHERE token_verificacion = $1 AND email_verificado = false`,
+        [token]
+      );
+      if (tokenExpirado.length > 0) {
+        return res.status(400).json({
+          error: 'El enlace de verificación expiró (24 horas). Solicitá uno nuevo.',
+          codigo: 'TOKEN_EXPIRADO',
+        });
+      }
+      return res.status(400).json({
+        error: 'Enlace inválido o email ya verificado.',
+        codigo: 'TOKEN_INVALIDO',
+      });
     }
 
     res.json({
-      mensaje: `¡Email verificado exitosamente! Ya podés iniciar sesión, ${rows[0].nombre}.`
+      mensaje: `¡Email verificado correctamente! Ya podés iniciar sesión, ${rows[0].nombre}.`,
     });
   } catch (error) {
     next(error);
@@ -426,10 +447,54 @@ const obtenerPerfil = async (req, res, next) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────
+// POST /api/auth/reenviar-verificacion
+// Reenvía el email de verificación si el token expiró
+// ─────────────────────────────────────────────────────────────
+const reenviarVerificacion = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'El email es obligatorio.' });
+
+    const { rows } = await query(
+      `SELECT id, nombre, email, email_verificado
+       FROM usuarios WHERE email = $1 AND activo = true`,
+      [email.toLowerCase().trim()]
+    );
+
+    // Respuesta genérica para no revelar si el email existe o no
+    if (rows.length === 0 || rows[0].email_verificado) {
+      return res.json({ mensaje: 'Si el email está registrado y sin verificar, recibirás un nuevo enlace.' });
+    }
+
+    const usuario = rows[0];
+
+    // Generar nuevo token y actualizar
+    const nuevoToken = uuidv4();
+    await query(
+      `UPDATE usuarios SET token_verificacion = $1, creado_en = NOW() WHERE id = $2`,
+      [nuevoToken, usuario.id]
+    );
+
+    // Enviar email
+    emailService.enviarBienvenida({
+      nombre:            usuario.nombre,
+      email:             usuario.email,
+      rol:               'cliente',
+      tokenVerificacion: nuevoToken,
+    });
+
+    res.json({ mensaje: 'Si el email está registrado y sin verificar, recibirás un nuevo enlace.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registro,
   login,
   verificarEmail,
+  reenviarVerificacion,
   solicitarResetPassword,
   resetPassword,
   obtenerPerfil,

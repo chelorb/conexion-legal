@@ -9,10 +9,10 @@ const path       = require('path');
 const fs         = require('fs');
 const multer     = require('multer');
 const ctrl       = require('../controllers/auth.controller');
-const { verificarToken }                       = require('../middleware/auth.middleware');
-const { validarRegistro, validarLogin }        = require('../middleware/validacion.middleware');
+const { verificarToken }                    = require('../middleware/auth.middleware');
+const { validarRegistro, validarLogin }     = require('../middleware/validacion.middleware');
 
-// ── Configurar multer para documentos de abogados ─────────────
+// ── Multer para documentos de abogados ───────────────────────
 const uploadDir = path.join(__dirname, '../../uploads/documentos');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -42,14 +42,13 @@ const uploadDocs = upload.fields([
   { name: 'doc_cuil',       maxCount: 1 },
 ]);
 
-// ── Rutas ──────────────────────────────────────────────────────
-// Registro (con soporte para archivos en el caso de abogados)
-router.post('/registro', uploadDocs, validarRegistro, ctrl.registro);
-
-router.post('/login',                    validarLogin,   ctrl.login);
-router.get('/verificar-email',                           ctrl.verificarEmail);
-router.post('/solicitar-reset-password',                 ctrl.solicitarResetPassword);
-router.post('/reset-password',                           ctrl.resetPassword);
-router.get('/me',                        verificarToken, ctrl.obtenerPerfil);
+// ── Rutas ─────────────────────────────────────────────────────
+router.post('/registro',                uploadDocs, validarRegistro, ctrl.registro);
+router.post('/login',                   validarLogin,                ctrl.login);
+router.get('/verificar-email',                                       ctrl.verificarEmail);
+router.post('/reenviar-verificacion',                                ctrl.reenviarVerificacion);
+router.post('/solicitar-reset-password',                             ctrl.solicitarResetPassword);
+router.post('/reset-password',                                       ctrl.resetPassword);
+router.get('/me',                       verificarToken,              ctrl.obtenerPerfil);
 
 module.exports = router;
