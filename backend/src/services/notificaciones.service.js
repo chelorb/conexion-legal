@@ -32,6 +32,11 @@ const TIPOS = {
   cambio_plan_solicitado: { icono: '💳', importante: true },
   // Manual (admin → usuarios)
   comunicado:           { icono: '📢', importante: false },
+  // Documentos
+  nueva_calificacion:   { icono: '⭐', importante: false },
+  documento_aprobado:   { icono: '✅', importante: true  },
+  documento_rechazado:  { icono: '❌', importante: true  },
+  nuevo_documento:      { icono: '📄', importante: true  },
 };
 
 // ─────────────────────────────────────────────────────────────

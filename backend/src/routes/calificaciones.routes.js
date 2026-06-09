@@ -1,21 +1,21 @@
 // ============================================================
 // src/routes/calificaciones.routes.js
 // ============================================================
-const expressC = require('express');
-const routerC  = expressC.Router();
-const { query: dbQuery } = require('../config/database');
+const express  = require('express');
+const router   = express.Router();
+const { query } = require('../config/database');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 const { validarCalificacion } = require('../middleware/validacion.middleware');
 
 // POST /api/calificaciones/:consulta_id — El cliente califica al abogado
-routerC.post('/:consulta_id', verificarToken, requireRol('cliente'), validarCalificacion, async (req, res, next) => {
+router.post('/:consulta_id', verificarToken, requireRol('cliente'), validarCalificacion, async (req, res, next) => {
   try {
     const { consulta_id } = req.params;
     const { puntaje, comentario } = req.body;
     const clienteId = req.usuario.id;
 
     // Verificar que la consulta existe, está completada y pertenece al cliente
-    const { rows: consulta } = await dbQuery(
+    const { rows: consulta } = await query(
       `SELECT c.abogado_id FROM consultas c
        WHERE c.id = $1 AND c.cliente_id = $2 AND c.estado = 'completada'`,
       [consulta_id, clienteId]
@@ -30,14 +30,14 @@ routerC.post('/:consulta_id', verificarToken, requireRol('cliente'), validarCali
     const abogadoId = consulta[0].abogado_id;
 
     // Insertar la calificación (UNIQUE en consulta_id previene duplicados)
-    await dbQuery(
+    await query(
       `INSERT INTO calificaciones (consulta_id, cliente_id, abogado_id, puntaje, comentario)
        VALUES ($1, $2, $3, $4, $5)`,
       [consulta_id, clienteId, abogadoId, puntaje, comentario]
     );
 
     // Recalcular el promedio del abogado
-    await dbQuery(
+    await query(
       `UPDATE perfiles_abogado SET
          calificacion_promedio = (
            SELECT ROUND(AVG(puntaje)::numeric, 2) FROM calificaciones WHERE abogado_id = $1
@@ -59,14 +59,14 @@ routerC.post('/:consulta_id', verificarToken, requireRol('cliente'), validarCali
   }
 });
 
-module.exports = routerC;
+module.exports = router;
 
 
 
 // GET /api/calificaciones/abogado/:id — Calificaciones públicas de un abogado
-routerC.get('/abogado/:id', async (req, res, next) => {
+router.get('/abogado/:id', async (req, res, next) => {
   try {
-    const { rows } = await dbQuery(
+    const { rows } = await query(
       `SELECT c.puntaje AS calificacion, c.comentario, c.creado_en,
               u.nombre AS cliente_nombre
        FROM calificaciones c

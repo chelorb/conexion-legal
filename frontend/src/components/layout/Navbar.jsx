@@ -211,6 +211,9 @@ export default function Navbar() {
                                  : n.tipo === 'perfil_rechazado'    ? '❌'
                                  : n.tipo === 'nuevo_abogado'       ? '👤'
                                  : n.tipo === 'nueva_calificacion'  ? '⭐'
+                                 : n.tipo === 'documento_aprobado'  ? '✅'
+                                 : n.tipo === 'documento_rechazado' ? '❌'
+                                 : n.tipo === 'nuevo_documento'     ? '📄'
                                  : '🔔'}
                               </span>
                               {/* Contenido */}
