@@ -564,8 +564,8 @@ export default function AdminAbogados() {
   };
 
   const TABS = [
+    { valor: 'aprobado',  label: 'Aprobados'  },
     { valor: 'pendiente', label: 'Pendientes' },
-    { valor: 'aprobado', label: 'Aprobados' },
     { valor: 'rechazado', label: 'Rechazados' },
   ];
 
