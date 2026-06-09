@@ -197,6 +197,41 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
         <div className="overflow-y-auto flex-1 p-6">
           {tab === 'revision' && (
             <div className="space-y-4">
+
+              {/* ── Documentación adjunta ─────────────────── */}
+              <div className="rounded-xl p-4" style={{ background: '#F7F6F4' }}>
+                <p className="font-body text-xs font-semibold uppercase tracking-wider mb-3"
+                  style={{ color: '#8A8780' }}>
+                  Documentación adjunta
+                </p>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Credencial del letrado', url: abogado.doc_credencial_url },
+                    { label: 'Título universitario',   url: abogado.doc_titulo_url     },
+                    { label: 'Constancia de CUIL',     url: abogado.doc_cuil_url       },
+                  ].map(({ label, url }) => (
+                    <div key={label} className="flex items-center justify-between py-2 px-3 rounded-lg"
+                      style={{ background: '#fff', border: '1px solid #E8E6E3' }}>
+                      <span className="font-body text-sm" style={{ color: '#3A3832' }}>{label}</span>
+                      {url ? (
+                        <a href={url} target="_blank" rel="noopener noreferrer"
+                          className="font-body text-xs font-medium px-3 py-1 rounded-lg transition-colors"
+                          style={{ background: 'rgba(184,96,48,0.1)', color: '#B86030' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.2)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.1)'; }}>
+                          Ver documento
+                        </a>
+                      ) : (
+                        <span className="font-body text-xs px-3 py-1 rounded-lg"
+                          style={{ background: '#F0EFED', color: '#B0AEA8' }}>
+                          No adjunto
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Plan', val: <BadgePlan slug={abogado.plan_slug} /> },
