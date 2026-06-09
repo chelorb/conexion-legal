@@ -299,10 +299,14 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
   try {
     const { id } = req.params;
     const {
+      // Datos de perfil profesional
       descripcion, anos_experiencia, ciudad, provincia,
       matricula, especialidades,
+      // Datos personales (tabla usuarios)
+      nombre, apellido, telefono, email,
     } = req.body;
 
+    // ── Actualizar perfil profesional ─────────────────────────
     await query(
       `UPDATE perfiles_abogado SET
          descripcion      = COALESCE($1, descripcion),
@@ -323,6 +327,60 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
         id,
       ]
     );
+
+    // ── Actualizar datos personales (si se enviaron) ──────────
+    const camposPersonales = [];
+    const valoresPersonales = [];
+    let idx = 1;
+
+    if (nombre?.trim())   { camposPersonales.push(`nombre   = $${idx++}`); valoresPersonales.push(nombre.trim()); }
+    if (apellido?.trim()) { camposPersonales.push(`apellido = $${idx++}`); valoresPersonales.push(apellido.trim()); }
+    if (telefono?.trim()) { camposPersonales.push(`telefono = $${idx++}`); valoresPersonales.push(telefono.trim()); }
+
+    // Email: validación básica antes de actualizar
+    let emailCambiado = false;
+    let emailAnterior = null;
+    if (email?.trim() && email.includes('@')) {
+      // Verificar que no esté en uso por otro usuario
+      const { rows: existe } = await query(
+        'SELECT id FROM usuarios WHERE email = $1 AND id != $2',
+        [email.trim().toLowerCase(), id]
+      );
+      if (existe.length > 0) {
+        return res.status(409).json({ error: 'Ese email ya está registrado por otro usuario.' });
+      }
+      // Obtener email anterior para el aviso
+      const { rows: [usr] } = await query('SELECT email FROM usuarios WHERE id = $1', [id]);
+      emailAnterior = usr?.email;
+      camposPersonales.push(`email = $${idx++}`);
+      valoresPersonales.push(email.trim().toLowerCase());
+      emailCambiado = true;
+    }
+
+    if (camposPersonales.length > 0) {
+      valoresPersonales.push(id);
+      await query(
+        `UPDATE usuarios SET ${camposPersonales.join(', ')} WHERE id = $${idx}`,
+        valoresPersonales
+      );
+
+      // Notificar al usuario por email si se modificaron sus datos
+      const { rows: [usuarioActualizado] } = await query(
+        'SELECT nombre, apellido, email FROM usuarios WHERE id = $1', [id]
+      );
+
+      if (usuarioActualizado) {
+        const destinoEmail = emailCambiado ? emailAnterior : usuarioActualizado.email;
+        emailService.enviarEmail({
+          to:      destinoEmail,
+          subject: 'ℹ️ Tus datos fueron actualizados — Conexión Legal',
+          html:    `<p>Hola <strong>${usuarioActualizado.nombre} ${usuarioActualizado.apellido}</strong>,</p>
+                    <p>Un administrador actualizó los datos de tu cuenta en Conexión Legal.</p>
+                    ${emailCambiado ? `<p><strong>Tu email fue cambiado</strong> de <em>${emailAnterior}</em> a <em>${email.trim()}</em>.</p>` : ''}
+                    <p>Si no reconocés este cambio, contactanos de inmediato.</p>`,
+        }).catch(() => {});
+      }
+    }
 
     res.json({ mensaje: 'Perfil actualizado correctamente.' });
   } catch (error) { next(error); }
