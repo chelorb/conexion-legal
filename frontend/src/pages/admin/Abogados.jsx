@@ -56,7 +56,8 @@ function BadgePlan({ slug }) {
 function ModalAbogado({ abogado, onCerrar, onActualizar }) {
   const [tab, setTab] = useState('revision');
   const [guardando, setGuardando] = useState(false);
-  const [accion, setAccion] = useState('');
+  const [accion,       setAccion]       = useState('');
+  const [confirmaElim, setConfirmaElim] = useState(false);
   const [motivo, setMotivo] = useState('');
   const [espSel, setEspSel] = useState(abogado.especialidades || []);
   const [datos, setDatos] = useState({
@@ -322,6 +323,82 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                   </div>
                 ))}
               </div>
+
+              {/* ── Acciones para abogados RECHAZADOS ──── */}
+              {abogado.estado_aprobacion === 'rechazado' && (
+                <div className="space-y-3">
+                  {/* Rehabilitar → vuelve a pendiente */}
+                  <button
+                    onClick={async () => {
+                      setGuardando(true);
+                      try {
+                        await api.patch(`/admin/abogados/${abogado.id}/aprobar`, {
+                          accion: 'rehabilitar',
+                        });
+                        toast.success('Abogado rehabilitado. Volvió al estado pendiente.');
+                        onActualizar();
+                        onCerrar();
+                      } catch { toast.error('Error al rehabilitar.'); }
+                      finally { setGuardando(false); }
+                    }}
+                    disabled={guardando}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
+                    style={{ background: 'rgba(22,163,74,0.08)', color: '#15803d', borderColor: 'rgba(22,163,74,0.2)' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#15803d'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(22,163,74,0.2)'; }}
+                  >
+                    <RefreshCw size={15} /> Rehabilitar (volver a pendiente)
+                  </button>
+
+                  {/* Eliminación definitiva */}
+                  {!confirmaElim ? (
+                    <button
+                      onClick={() => setConfirmaElim(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
+                      style={{ background: 'rgba(220,38,38,0.06)', color: '#dc2626', borderColor: 'rgba(220,38,38,0.15)' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#dc2626'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.15)'; }}
+                    >
+                      <Trash2 size={15} /> Eliminar definitivamente
+                    </button>
+                  ) : (
+                    <div className="rounded-xl p-4 animate-slide-down"
+                      style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)' }}>
+                      <p className="font-body text-sm font-semibold mb-1" style={{ color: '#dc2626' }}>
+                        ⚠️ Esta acción es IRREVERSIBLE
+                      </p>
+                      <p className="font-body text-xs mb-3" style={{ color: '#7f1d1d' }}>
+                        Se borrarán todos los datos de {abogado.nombre} {abogado.apellido}.
+                        El email quedará libre para un nuevo registro.
+                      </p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setConfirmaElim(false)}
+                          className="flex-1 py-2 rounded-xl font-body text-sm border"
+                          style={{ borderColor: '#E8E6E3', color: '#56534A' }}>
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setGuardando(true);
+                            try {
+                              await api.delete(`/admin/usuarios/${abogado.id}`, { data: { tipo: 'definitivo' } });
+                              toast.success('Cuenta eliminada definitivamente.');
+                              onActualizar();
+                              onCerrar();
+                            } catch (err) {
+                              toast.error(err.response?.data?.error || 'Error al eliminar.');
+                            } finally { setGuardando(false); setConfirmaElim(false); }
+                          }}
+                          disabled={guardando}
+                          className="flex-1 py-2 rounded-xl font-body text-sm font-medium text-white"
+                          style={{ background: '#dc2626' }}>
+                          {guardando ? 'Eliminando...' : 'Confirmar eliminación'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {abogado.estado_aprobacion === 'pendiente' && (
                 <div className="space-y-3 pt-2">
