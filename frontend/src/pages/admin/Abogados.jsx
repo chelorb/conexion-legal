@@ -345,7 +345,7 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
 export default function AdminAbogados() {
   const [abogados,   setAbogados]   = useState([]);
   const [cargando,   setCargando]   = useState(true);
-  const [tabActivo,  setTabActivo]  = useState('pendiente');
+  const [tabActivo,  setTabActivo]  = useState('aprobado');
   const [busqueda,   setBusqueda]   = useState('');
   const [abogadoSel, setAbogadoSel] = useState(null);
 
@@ -374,8 +374,8 @@ export default function AdminAbogados() {
   };
 
   const TABS = [
-    { valor: 'pendiente', label: 'Pendientes' },
     { valor: 'aprobado',  label: 'Aprobados'  },
+    { valor: 'pendiente', label: 'Pendientes' },
     { valor: 'rechazado', label: 'Rechazados' },
   ];
 
@@ -412,17 +412,34 @@ export default function AdminAbogados() {
         <div className="flex gap-2 flex-wrap mb-6">
           {TABS.map(tab => (
             <button key={tab.valor} onClick={() => setTabActivo(tab.valor)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-body font-medium transition-all"
+              className="relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-body font-medium transition-all"
               style={tabActivo === tab.valor
                 ? { background: '#2C2B27', color: '#fff' }
                 : { background: '#fff', border: '1px solid #E8E6E3', color: '#56534A' }}>
               {tab.label}
-              <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-                style={tabActivo === tab.valor
-                  ? { background: 'rgba(255,255,255,0.2)', color: '#fff' }
-                  : coloresBadge[tab.valor]}>
-                {conteos[tab.valor]}
-              </span>
+
+              {/* Badge de cantidad — con estilo de alerta para pendientes */}
+              {tab.valor === 'pendiente' && conteos.pendiente > 0 ? (
+                <span className="relative flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-xs font-bold"
+                  style={{
+                    background: tabActivo === 'pendiente' ? 'rgba(255,255,255,0.9)' : '#ef4444',
+                    color:      tabActivo === 'pendiente' ? '#dc2626'               : '#fff',
+                  }}>
+                  {conteos.pendiente}
+                  {/* Pulso animado solo cuando el tab no está activo */}
+                  {tabActivo !== 'pendiente' && (
+                    <span className="absolute inset-0 rounded-full animate-ping opacity-60"
+                      style={{ background: '#ef4444' }} />
+                  )}
+                </span>
+              ) : (
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                  style={tabActivo === tab.valor
+                    ? { background: 'rgba(255,255,255,0.2)', color: '#fff' }
+                    : coloresBadge[tab.valor]}>
+                  {conteos[tab.valor]}
+                </span>
+              )}
             </button>
           ))}
         </div>
