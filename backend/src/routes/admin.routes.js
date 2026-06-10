@@ -151,10 +151,12 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
         'SELECT nombre, email FROM usuarios WHERE id = $1', [id]
       );
       if (abogado) {
-        emailService.enviarEmail({
-          to:      abogado.email,
-          subject: '🔄 Tu perfil está nuevamente en revisión — Conexión Legal',
-          html:    `<p>Hola <strong>${abogado.nombre}</strong>, tu perfil fue rehabilitado y está siendo revisado nuevamente por nuestro equipo. Te avisaremos cuando haya novedades.</p>`,
+        emailService.enviarComunicado({
+          destinatarioEmail:  abogado.email,
+          destinatarioNombre: abogado.nombre,
+          titulo:  'Tu perfil está nuevamente en revisión',
+          mensaje: 'Tu perfil fue rehabilitado y está siendo revisado nuevamente por nuestro equipo. Te avisaremos cuando haya novedades.',
+          link:    null,
         }).catch(() => {});
       }
       return res.json({ mensaje: 'Abogado rehabilitado. Estado: pendiente.' });
