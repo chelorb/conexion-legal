@@ -7,7 +7,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   Search, SlidersHorizontal, MapPin, Star, Shield,
-  Video, Building2, ChevronLeft, ChevronRight, X
+  Video, Building2, ChevronLeft, ChevronRight, X,
+  Check, Save, Edit2, Trash2, RefreshCw
 } from 'lucide-react';
 import api from '../services/api';
 
