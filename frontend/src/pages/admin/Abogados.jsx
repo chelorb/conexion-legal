@@ -76,6 +76,13 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
     },
   });
 
+  // Cargar planes disponibles
+  useEffect(() => {
+    api.get('/admin/planes')
+      .then(r => setPlanes(r.data.planes || []))
+      .catch(() => {});
+  }, []);
+
   const toggleEsp = (esp) =>
     setEspSel((prev) => (prev.includes(esp) ? prev.filter((e) => e !== esp) : [...prev, esp]));
 
@@ -106,12 +113,13 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
     setGuardando(true);
     try {
       await api.patch(`/admin/abogados/${abogado.id}/aprobar`, {
-        visible: datos.visible,
+        visible:              datos.visible,
         matricula_verificada: datos.matricula_verificada,
       });
       await api.put(`/admin/abogados/${abogado.id}/perfil`, {
         ...formDatos,
         especialidades: espSel,
+        plan_id:        planSel || null,
       });
       toast.success('Perfil actualizado correctamente.');
       onActualizar();
@@ -506,6 +514,26 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
           {tab === 'perfil' && (
             <form onSubmit={handleSubmit(onSubmitPerfil)} className="space-y-5">
               <div>
+                {/* ── Plan de suscripción ─────────────── */}
+                <div className="mb-4">
+                  <label className="input-label">Plan de suscripción</label>
+                  <select
+                    value={planSel}
+                    onChange={e => setPlanSel(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="">Sin cambios</option>
+                    {planes.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.nombre}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="font-body text-xs mt-1" style={{ color: '#8A8780' }}>
+                    Cambiará el plan activo del abogado de forma inmediata.
+                  </p>
+                </div>
+
                 {/* ── Datos personales ──────────────────── */}
                 <div className="rounded-xl p-4 mb-4" style={{ background: '#F7F6F4', border: '1px solid #E8E6E3' }}>
                   <p className="font-body text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: '#8A8780' }}>

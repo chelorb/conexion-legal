@@ -326,30 +326,86 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
   try {
     const { id } = req.params;
     const {
-      descripcion, anos_experiencia, ciudad, provincia,
-      matricula, especialidades,
+      // Perfil profesional
+      descripcion, anos_experiencia, ciudad, provincia, matricula, especialidades,
+      // Plan
+      plan_id,
+      // Datos personales
+      nombre, apellido, telefono, email,
     } = req.body;
 
-    await query(
-      `UPDATE perfiles_abogado SET
-         descripcion      = COALESCE($1, descripcion),
-         anos_experiencia = COALESCE($2, anos_experiencia),
-         ciudad           = COALESCE($3, ciudad),
-         provincia        = COALESCE($4, provincia),
-         matricula        = COALESCE($5, matricula),
-         especialidades   = COALESCE($6, especialidades),
-         perfil_completo  = true
-       WHERE usuario_id = $7`,
-      [
-        descripcion || null,
-        anos_experiencia ? parseInt(anos_experiencia) : null,
-        ciudad || null,
-        provincia || null,
-        matricula || null,
-        especialidades?.length ? especialidades : null,
-        id,
-      ]
-    );
+    // ── Actualizar perfil profesional ─────────────────────────
+    const updatePerfil = plan_id
+      ? `UPDATE perfiles_abogado SET
+           descripcion      = COALESCE($1, descripcion),
+           anos_experiencia = COALESCE($2, anos_experiencia),
+           ciudad           = COALESCE($3, ciudad),
+           provincia        = COALESCE($4, provincia),
+           matricula        = COALESCE($5, matricula),
+           especialidades   = COALESCE($6, especialidades),
+           plan_id          = $7,
+           perfil_completo  = true
+         WHERE usuario_id = $8`
+      : `UPDATE perfiles_abogado SET
+           descripcion      = COALESCE($1, descripcion),
+           anos_experiencia = COALESCE($2, anos_experiencia),
+           ciudad           = COALESCE($3, ciudad),
+           provincia        = COALESCE($4, provincia),
+           matricula        = COALESCE($5, matricula),
+           especialidades   = COALESCE($6, especialidades),
+           perfil_completo  = true
+         WHERE usuario_id = $7`;
+
+    const valuesPerfil = plan_id
+      ? [descripcion||null, anos_experiencia ? parseInt(anos_experiencia) : null,
+         ciudad||null, provincia||null, matricula||null,
+         especialidades?.length ? especialidades : null, plan_id, id]
+      : [descripcion||null, anos_experiencia ? parseInt(anos_experiencia) : null,
+         ciudad||null, provincia||null, matricula||null,
+         especialidades?.length ? especialidades : null, id];
+
+    await query(updatePerfil, valuesPerfil);
+
+    // ── Actualizar datos personales si se enviaron ────────────
+    const camposPersonales = [];
+    const valoresPersonales = [];
+    let idx = 1;
+
+    if (nombre?.trim())   { camposPersonales.push(`nombre   = $${idx++}`); valoresPersonales.push(nombre.trim()); }
+    if (apellido?.trim()) { camposPersonales.push(`apellido = $${idx++}`); valoresPersonales.push(apellido.trim()); }
+    if (telefono?.trim()) { camposPersonales.push(`telefono = $${idx++}`); valoresPersonales.push(telefono.trim()); }
+
+    if (email?.trim() && email.includes('@')) {
+      const { rows: existe } = await query(
+        'SELECT id FROM usuarios WHERE email = $1 AND id != $2',
+        [email.trim().toLowerCase(), id]
+      );
+      if (existe.length > 0) {
+        return res.status(409).json({ error: 'Ese email ya está registrado por otro usuario.' });
+      }
+      camposPersonales.push(`email = $${idx++}`);
+      valoresPersonales.push(email.trim().toLowerCase());
+    }
+
+    if (camposPersonales.length > 0) {
+      valoresPersonales.push(id);
+      await query(
+        `UPDATE usuarios SET ${camposPersonales.join(', ')} WHERE id = $${idx}`,
+        valoresPersonales
+      );
+
+      // Notificar al usuario
+      const { rows: [usr] } = await query('SELECT nombre, email FROM usuarios WHERE id = $1', [id]);
+      if (usr) {
+        emailService.enviarComunicado({
+          destinatarioEmail:  usr.email,
+          destinatarioNombre: usr.nombre,
+          titulo:  'Tus datos fueron actualizados',
+          mensaje: 'Un administrador actualizó los datos de tu cuenta. Si no reconocés este cambio, contactanos.',
+          link:    null,
+        }).catch(() => {});
+      }
+    }
 
     res.json({ mensaje: 'Perfil actualizado correctamente.' });
   } catch (error) { next(error); }
