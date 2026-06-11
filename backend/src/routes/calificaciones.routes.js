@@ -3,7 +3,7 @@
 // ============================================================
 const express  = require('express');
 const router   = express.Router();
-const { query } = require('../config/database');
+const { query }          = require('../config/database');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 const { validarCalificacion } = require('../middleware/validacion.middleware');
 
@@ -59,7 +59,6 @@ router.post('/:consulta_id', verificarToken, requireRol('cliente'), validarCalif
   }
 });
 
-module.exports = router;
 
 
 
@@ -79,3 +78,5 @@ router.get('/abogado/:id', async (req, res, next) => {
     res.json({ calificaciones: rows });
   } catch (error) { next(error); }
 });
+
+module.exports = router;
