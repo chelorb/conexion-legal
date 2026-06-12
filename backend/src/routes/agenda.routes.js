@@ -115,14 +115,54 @@ router.post('/:id/inscribirse', verificarToken, requireRol('abogado'), async (re
       return res.status(409).json({ error: 'El evento ya no tiene cupos disponibles.' });
     }
 
-    // Inscribir (UNIQUE previene duplicados)
+    // Generar código de acceso único (8 caracteres alfanumérico)
+    const generarCodigo = () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin O,0,I,1 para evitar confusión
+      return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    };
+
+    let codigoAcceso;
+    let intentos = 0;
+    do {
+      codigoAcceso = generarCodigo();
+      const { rows: existe } = await query(
+        'SELECT id FROM inscripciones_eventos WHERE codigo_acceso = $1', [codigoAcceso]
+      );
+      if (existe.length === 0) break;
+      intentos++;
+    } while (intentos < 5);
+
+    // Inscribir con código único
     await query(
-      `INSERT INTO inscripciones_eventos (usuario_id, contenido_id)
-       VALUES ($1, $2)`,
-      [usuarioId, id]
+      `INSERT INTO inscripciones_eventos (usuario_id, contenido_id, codigo_acceso)
+       VALUES ($1, $2, $3)`,
+      [usuarioId, id, codigoAcceso]
     );
 
-    res.json({ mensaje: `Inscripto exitosamente a "${evento[0].titulo}".` });
+    // Enviar email con el código de acceso
+    const emailService = require('../services/email.service');
+    const { rows: [abogado] } = await query(
+      'SELECT nombre, email FROM usuarios WHERE id = $1', [usuarioId]
+    );
+    if (abogado) {
+      const tipoEvento = evento[0].tipo === 'videoconferencia' ? 'online' : 'presencial';
+      emailService.enviarComunicado({
+        destinatarioEmail:  abogado.email,
+        destinatarioNombre: abogado.nombre,
+        titulo: `Inscripción confirmada: ${evento[0].titulo}`,
+        mensaje: `Tu inscripción fue confirmada. Tu código de acceso es: <strong style="font-size:24px;letter-spacing:4px;">${codigoAcceso}</strong><br><br>
+          ${tipoEvento === 'online'
+            ? `Presentá este código al ingresar al evento online.${evento[0].link_evento ? `<br>Link del evento: <a href="${evento[0].link_evento}">${evento[0].link_evento}</a>` : ''}`
+            : 'Presentá este código en la puerta del evento para validar tu acceso.'
+          }`,
+        link: null,
+      }).catch(() => {});
+    }
+
+    res.json({
+      mensaje:       `Inscripto exitosamente a "${evento[0].titulo}".`,
+      codigo_acceso: codigoAcceso,
+    });
 
   } catch (error) {
     if (error.code === '23505') { // Violación UNIQUE
@@ -234,6 +274,74 @@ router.delete('/:id', verificarToken, requireRol('admin'), async (req, res, next
       [req.params.id]
     );
     res.json({ mensaje: 'Evento cancelado.' });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/agenda/:id/inscriptos
+// Admin ve la lista de inscriptos de un evento
+// ─────────────────────────────────────────────────────────────
+router.get('/:id/inscriptos', verificarToken, requireRol('admin'), async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT
+         ie.id, ie.codigo_acceso, ie.asistio, ie.validado_en, ie.creado_en,
+         u.nombre, u.apellido, u.email, u.telefono,
+         pa.matricula, pa.ciudad
+       FROM inscripciones_eventos ie
+       JOIN usuarios u ON ie.usuario_id = u.id
+       LEFT JOIN perfiles_abogado pa ON u.id = pa.usuario_id
+       WHERE ie.contenido_id = $1
+       ORDER BY ie.creado_en ASC`,
+      [req.params.id]
+    );
+    res.json({ inscriptos: rows });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/agenda/:id/validar
+// Validar código de acceso en la puerta del evento
+// ─────────────────────────────────────────────────────────────
+router.post('/:id/validar', verificarToken, requireRol('admin'), async (req, res, next) => {
+  try {
+    const { codigo } = req.body;
+    if (!codigo) return res.status(400).json({ error: 'Código requerido.' });
+
+    const { rows: [inscripcion] } = await query(
+      `SELECT ie.id, ie.asistio, ie.codigo_acceso,
+              u.nombre, u.apellido, u.email
+       FROM inscripciones_eventos ie
+       JOIN usuarios u ON ie.usuario_id = u.id
+       WHERE ie.contenido_id = $1
+         AND UPPER(ie.codigo_acceso) = UPPER($2)`,
+      [req.params.id, codigo.trim()]
+    );
+
+    if (!inscripcion) {
+      return res.status(404).json({ error: 'Código inválido. No se encontró ninguna inscripción.' });
+    }
+
+    if (inscripcion.asistio) {
+      return res.status(409).json({
+        error:  'Este código ya fue utilizado.',
+        nombre: `${inscripcion.nombre} ${inscripcion.apellido}`,
+      });
+    }
+
+    // Marcar asistencia
+    await query(
+      `UPDATE inscripciones_eventos
+       SET asistio = true, validado_en = NOW()
+       WHERE id = $1`,
+      [inscripcion.id]
+    );
+
+    res.json({
+      ok:     true,
+      nombre: `${inscripcion.nombre} ${inscripcion.apellido}`,
+      email:  inscripcion.email,
+    });
   } catch (error) { next(error); }
 });
 
