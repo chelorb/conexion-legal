@@ -58,6 +58,9 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
     matricula_verificada: abogado.matricula_verificada,
   });
 
+  const [planes,  setPlanes]  = useState([]);
+  const [planSel, setPlanSel] = useState(abogado.plan_id || '');
+
   const {
     register,
     handleSubmit,
