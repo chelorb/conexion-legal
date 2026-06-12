@@ -326,7 +326,7 @@ export default function Registro() {
           {/* Indicador de pasos (solo abogados) */}
           {rol === 'abogado' && <IndicadorPasos pasoActual={paso} />}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} autoComplete="off" className="space-y-4">
 
             {/* ══════════════════════════════════════════════
                 PASO 1 — Datos personales (cliente y abogado)
@@ -380,7 +380,7 @@ export default function Registro() {
                 {/* Email */}
                 <div>
                   <label className="input-label">Email *</label>
-                  <input type="email" placeholder="tucorreo@email.com"
+                  <input type="email" placeholder="tucorreo@email.com" autoComplete="off"
                     className={`input-field ${errors.email ? 'border-red-300' : ''}`}
                     {...register('email', {
                       required: 'El email es obligatorio',
@@ -412,6 +412,7 @@ export default function Registro() {
                     <input
                       type={verPass ? 'text' : 'password'}
                       placeholder="Mínimo 8 caracteres, una mayúscula y un número"
+                      autoComplete="new-password"
                       className={`input-field pr-10 ${errors.password ? 'border-red-300' : ''}`}
                       {...register('password', {
                         required: 'La contraseña es obligatoria',
