@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { Upload, FileText, CheckCircle, Clock, XCircle, X, Eye } from 'lucide-react';
+import { Upload, FileText, CheckCircle, Clock, XCircle, X, Eye, Trash2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
 
@@ -30,8 +30,8 @@ function BadgeEstado({ estado }) {
   );
 }
 
-function ModalSubir({ onSubido, onCerrar }) {
-  const [tipo,     setTipo]     = useState('credencial');
+function ModalSubir({ onSubido, onCerrar, docReemplazar }) {
+  const [tipo,     setTipo]     = useState(docReemplazar?.tipo || 'credencial');
   const [nombre,   setNombre]   = useState('');
   const [archivo,  setArchivo]  = useState(null);
   const [subiendo, setSubiendo] = useState(false);
@@ -148,7 +148,8 @@ function ModalSubir({ onSubido, onCerrar }) {
 export default function DocumentosAbogado() {
   const [documentos, setDocumentos] = useState([]);
   const [cargando,   setCargando]   = useState(true);
-  const [modal,      setModal]      = useState(false);
+  const [modal,        setModal]        = useState(false);
+  const [docReemplazar, setDocReemplazar] = useState(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -226,15 +227,48 @@ export default function DocumentosAbogado() {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <BadgeEstado estado={doc.estado} />
+                  {/* Ver */}
                   <a href={doc.url} target="_blank" rel="noopener noreferrer"
                     className="p-2 rounded-lg transition-colors"
                     style={{ color: '#8A8780' }}
+                    title="Ver documento"
                     onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; e.currentTarget.style.color = '#1C1B18'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = '#8A8780'; }}>
                     <Eye size={16} />
                   </a>
+                  {/* Reemplazar — abre el modal con el mismo tipo */}
+                  <button
+                    onClick={() => { setDocReemplazar(doc); setModal(true); }}
+                    className="p-2 rounded-lg transition-colors"
+                    style={{ color: '#8A8780' }}
+                    title="Reemplazar documento"
+                    onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; e.currentTarget.style.color = '#B86030'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = '#8A8780'; }}>
+                    <RefreshCw size={15} />
+                  </button>
+                  {/* Eliminar — solo si está rechazado o pendiente */}
+                  {doc.estado !== 'aprobado' && (
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm('¿Eliminar este documento?')) return;
+                        try {
+                          await api.delete(`/documentos/${doc.id}`);
+                          toast.success('Documento eliminado.');
+                          cargar();
+                        } catch {
+                          toast.error('Error al eliminar.');
+                        }
+                      }}
+                      className="p-2 rounded-lg transition-colors"
+                      style={{ color: '#8A8780' }}
+                      title="Eliminar documento"
+                      onMouseEnter={e => { e.currentTarget.style.background = '#FEF2F2'; e.currentTarget.style.color = '#dc2626'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = ''; e.currentTarget.style.color = '#8A8780'; }}>
+                      <Trash2 size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -242,7 +276,13 @@ export default function DocumentosAbogado() {
         )}
       </div>
 
-      {modal && <ModalSubir onSubido={cargar} onCerrar={() => setModal(false)} />}
+      {modal && (
+        <ModalSubir
+          onSubido={cargar}
+          docReemplazar={docReemplazar}
+          onCerrar={() => { setModal(false); setDocReemplazar(null); }}
+        />
+      )}
     </div>
   );
 }

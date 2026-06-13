@@ -192,14 +192,14 @@ router.patch('/:id/revisar', verificarToken, requireRol('admin'), async (req, re
     });
 
     // Email al abogado
-    emailSvc.enviarEmail({
-      to:      abogado.email,
-      subject: estado === 'aprobado'
-        ? `✅ Documento aprobado — Conexión Legal`
-        : `❌ Documento no aprobado — Conexión Legal`,
-      html: estado === 'aprobado'
-        ? `<p>Hola <strong>Dr./Dra. ${abogado.nombre}</strong>, tu documento <strong>"${doc.nombre}"</strong> fue aprobado por nuestro equipo.</p>`
-        : `<p>Hola <strong>Dr./Dra. ${abogado.nombre}</strong>, tu documento <strong>"${doc.nombre}"</strong> no fue aprobado. Motivo: ${motivo || 'Contactá al soporte.'}</p>`,
+    emailSvc.enviarComunicado({
+      destinatarioEmail:  abogado.email,
+      destinatarioNombre: `${abogado.nombre} ${abogado.apellido}`,
+      titulo:  estado === 'aprobado' ? '✅ Documento aprobado' : '❌ Documento no aprobado',
+      mensaje: estado === 'aprobado'
+        ? `Tu documento "${doc.nombre}" fue aprobado por nuestro equipo.`
+        : `Tu documento "${doc.nombre}" no fue aprobado. Motivo: ${motivo || 'Contactá al soporte.'}`,
+      link: '/abogado/documentos',
     }).catch(() => {});
 
     res.json({ mensaje: `Documento ${estado}.` });
@@ -208,16 +208,35 @@ router.patch('/:id/revisar', verificarToken, requireRol('admin'), async (req, re
 
 // ─────────────────────────────────────────────────────────────
 // DELETE /api/documentos/:id
-// Admin elimina un documento
+// Eliminar un documento — abogado (solo el suyo, no aprobado)
+//                       — admin  (cualquiera)
 // ─────────────────────────────────────────────────────────────
-router.delete('/:id', verificarToken, requireRol('admin'), async (req, res, next) => {
+router.delete('/:id', verificarToken, async (req, res, next) => {
   try {
+    const esAdmin   = req.usuario.rol === 'admin';
+    const esAbogado = req.usuario.rol === 'abogado';
+
+    if (!esAdmin && !esAbogado) {
+      return res.status(403).json({ error: 'Sin permisos.' });
+    }
+
     const { rows: [doc] } = await query(
-      'SELECT cloudinary_id FROM documentos_abogado WHERE id = $1',
+      `SELECT id, abogado_id, cloudinary_id, estado, nombre
+       FROM documentos_abogado WHERE id = $1`,
       [req.params.id]
     );
 
     if (!doc) return res.status(404).json({ error: 'Documento no encontrado.' });
+
+    // El abogado solo puede eliminar sus propios documentos no aprobados
+    if (esAbogado) {
+      if (doc.abogado_id !== req.usuario.id) {
+        return res.status(403).json({ error: 'No tenés permiso para eliminar este documento.' });
+      }
+      if (doc.estado === 'aprobado') {
+        return res.status(403).json({ error: 'No podés eliminar un documento ya aprobado. Contactá al administrador.' });
+      }
+    }
 
     // Eliminar de Cloudinary
     await cloudSvc.eliminarArchivo(doc.cloudinary_id);
