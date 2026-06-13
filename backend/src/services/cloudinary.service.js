@@ -33,8 +33,8 @@ const subirArchivo = (buffer, opciones = {}) => {
         folder,
         public_id,
         resource_type,
-        // URLs firmadas — acceso controlado
-        type: 'authenticated',
+        // Tipo upload = URL directa accesible (para admin y abogado)
+        type: 'upload',
         // Transformaciones básicas para imágenes
         transformation: resource_type === 'image'
           ? [{ quality: 'auto', fetch_format: 'auto' }]
@@ -60,7 +60,7 @@ const subirArchivo = (buffer, opciones = {}) => {
  */
 const eliminarArchivo = async (public_id, resource_type = 'image') => {
   try {
-    await cloudinary.uploader.destroy(public_id, { resource_type, type: 'authenticated' });
+    await cloudinary.uploader.destroy(public_id, { resource_type, type: 'upload' });
   } catch (err) {
     console.warn('⚠️  Cloudinary: No se pudo eliminar:', public_id, err.message);
   }
