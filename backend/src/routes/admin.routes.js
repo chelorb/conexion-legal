@@ -325,7 +325,8 @@ router.delete('/usuarios/:id', async (req, res, next) => {
 router.put('/abogados/:id/perfil', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {\n      // Perfil profesional
+    const {
+      // Perfil profesional
       descripcion, anos_experiencia, ciudad, provincia, matricula, especialidades,
       // Plan
       plan_id,
