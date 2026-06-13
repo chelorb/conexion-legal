@@ -211,21 +211,42 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                 </p>
                 <div className="space-y-2">
                   {[
-                    { label: 'Credencial del letrado', url: abogado.doc_credencial_url },
-                    { label: 'Título universitario',   url: abogado.doc_titulo_url     },
-                    { label: 'Constancia de CUIL',     url: abogado.doc_cuil_url       },
-                  ].map(({ label, url }) => (
+                    { label: 'Credencial del letrado', url: abogado.doc_credencial_url, campo: 'doc_credencial_url' },
+                    { label: 'Título universitario',   url: abogado.doc_titulo_url,     campo: 'doc_titulo_url'     },
+                    { label: 'Constancia de CUIL',     url: abogado.doc_cuil_url,       campo: 'doc_cuil_url'       },
+                  ].map(({ label, url, campo }) => (
                     <div key={label} className="flex items-center justify-between py-2 px-3 rounded-lg"
                       style={{ background: '#fff', border: '1px solid #E8E6E3' }}>
                       <span className="font-body text-sm" style={{ color: '#3A3832' }}>{label}</span>
                       {url ? (
-                        <a href={url} target="_blank" rel="noopener noreferrer"
-                          className="font-body text-xs font-medium px-3 py-1 rounded-lg transition-colors"
-                          style={{ background: 'rgba(184,96,48,0.1)', color: '#B86030' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.2)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.1)'; }}>
-                          Ver documento
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <a href={url} target="_blank" rel="noopener noreferrer"
+                            className="font-body text-xs font-medium px-3 py-1 rounded-lg transition-colors"
+                            style={{ background: 'rgba(184,96,48,0.1)', color: '#B86030' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.2)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.1)'; }}>
+                            Ver
+                          </a>
+                          <button
+                            onClick={async () => {
+                              if (!window.confirm(`¿Eliminar "${label}"? Esta acción no se puede deshacer.`)) return;
+                              try {
+                                await api.patch(`/admin/abogados/${abogado.id}/perfil`, { [campo]: null });
+                                toast.success('Documento eliminado.');
+                                onActualizar();
+                              } catch {
+                                toast.error('Error al eliminar el documento.');
+                              }
+                            }}
+                            className="p-1 rounded-lg transition-colors"
+                            style={{ color: '#dc2626' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.08)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+                            title="Eliminar documento"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       ) : (
                         <span className="font-body text-xs px-3 py-1 rounded-lg"
                           style={{ background: '#F0EFED', color: '#B0AEA8' }}>

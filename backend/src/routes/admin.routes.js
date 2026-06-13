@@ -325,14 +325,32 @@ router.delete('/usuarios/:id', async (req, res, next) => {
 router.put('/abogados/:id/perfil', async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {
-      // Perfil profesional
+    const {\n      // Perfil profesional
       descripcion, anos_experiencia, ciudad, provincia, matricula, especialidades,
       // Plan
       plan_id,
       // Datos personales
       nombre, apellido, telefono, email,
+      // Documentos (null para eliminar)
+      doc_credencial_url, doc_titulo_url, doc_cuil_url,
     } = req.body;
+
+    // ── Eliminar documentos si se envían como null ────────────
+    const camposDoc = [];
+    const valoresDoc = [];
+    let idxDoc = 1;
+
+    if (doc_credencial_url === null) { camposDoc.push(`doc_credencial_url = $${idxDoc++}`); valoresDoc.push(null); }
+    if (doc_titulo_url     === null) { camposDoc.push(`doc_titulo_url     = $${idxDoc++}`); valoresDoc.push(null); }
+    if (doc_cuil_url       === null) { camposDoc.push(`doc_cuil_url       = $${idxDoc++}`); valoresDoc.push(null); }
+
+    if (camposDoc.length > 0) {
+      valoresDoc.push(id);
+      await query(
+        `UPDATE perfiles_abogado SET ${camposDoc.join(', ')} WHERE usuario_id = $${idxDoc}`,
+        valoresDoc
+      );
+    }
 
     // ── Actualizar perfil profesional ─────────────────────────
     const updatePerfil = plan_id
