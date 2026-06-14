@@ -58,8 +58,10 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
     matricula_verificada: abogado.matricula_verificada,
   });
 
-  const [planes,  setPlanes]  = useState([]);
-  const [planSel, setPlanSel] = useState(abogado.plan_id || '');
+  const [planes,     setPlanes]     = useState([]);
+  const [planSel,    setPlanSel]    = useState(abogado.plan_id || '');
+  const [docsTabla,  setDocsTabla]  = useState([]);
+  const [cargandoDocs, setCargandoDocs] = useState(false);
 
   const {
     register,
@@ -85,6 +87,15 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
       .then(r => setPlanes(r.data.planes || []))
       .catch(() => {});
   }, []);
+
+  // Cargar documentos subidos desde el panel del abogado
+  useEffect(() => {
+    setCargandoDocs(true);
+    api.get(`/documentos/abogado/${abogado.id}`)
+      .then(r => setDocsTabla(r.data.documentos || []))
+      .catch(() => {})
+      .finally(() => setCargandoDocs(false));
+  }, [abogado.id]);
 
   const toggleEsp = (esp) =>
     setEspSel((prev) => (prev.includes(esp) ? prev.filter((e) => e !== esp) : [...prev, esp]));
@@ -203,11 +214,11 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
           {tab === 'revision' && (
             <div className="space-y-4">
 
-              {/* ── Documentación adjunta ─────────────────── */}
+              {/* ── Documentación del registro ──────────────── */}
               <div className="rounded-xl p-4" style={{ background: '#F7F6F4' }}>
                 <p className="font-body text-xs font-semibold uppercase tracking-wider mb-3"
                   style={{ color: '#8A8780' }}>
-                  Documentación adjunta
+                  Documentación del registro
                 </p>
                 <div className="space-y-2">
                   {[
@@ -229,21 +240,20 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                           </a>
                           <button
                             onClick={async () => {
-                              if (!window.confirm(`¿Eliminar "${label}"? Esta acción no se puede deshacer.`)) return;
+                              if (!window.confirm(`¿Eliminar "${label}"?`)) return;
                               try {
-                                await api.patch(`/admin/abogados/${abogado.id}/perfil`, { [campo]: null });
+                                await api.put(`/admin/abogados/${abogado.id}/perfil`, { [campo]: null });
                                 toast.success('Documento eliminado.');
                                 onActualizar();
                               } catch {
-                                toast.error('Error al eliminar el documento.');
+                                toast.error('Error al eliminar.');
                               }
                             }}
                             className="p-1 rounded-lg transition-colors"
                             style={{ color: '#dc2626' }}
                             onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.08)'; }}
                             onMouseLeave={e => { e.currentTarget.style.background = ''; }}
-                            title="Eliminar documento"
-                          >
+                            title="Eliminar">
                             <Trash2 size={13} />
                           </button>
                         </div>
@@ -257,6 +267,64 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                   ))}
                 </div>
               </div>
+
+              {/* ── Documentos adicionales (subidos desde panel) ── */}
+              {(cargandoDocs || docsTabla.length > 0) && (
+                <div className="rounded-xl p-4" style={{ background: '#F7F6F4' }}>
+                  <p className="font-body text-xs font-semibold uppercase tracking-wider mb-3"
+                    style={{ color: '#8A8780' }}>
+                    Documentos adicionales
+                  </p>
+                  {cargandoDocs ? (
+                    <div className="h-10 rounded-lg animate-pulse" style={{ background: '#E8E6E3' }} />
+                  ) : (
+                    <div className="space-y-2">
+                      {docsTabla.map(doc => (
+                        <div key={doc.id} className="flex items-center justify-between py-2 px-3 rounded-lg"
+                          style={{ background: '#fff', border: '1px solid #E8E6E3' }}>
+                          <div>
+                            <span className="font-body text-sm" style={{ color: '#3A3832' }}>{doc.nombre}</span>
+                            <span className={`ml-2 text-xs px-2 py-0.5 rounded-full font-body`}
+                              style={{
+                                background: doc.estado === 'aprobado' ? 'rgba(22,163,74,0.1)' : doc.estado === 'rechazado' ? 'rgba(220,38,38,0.1)' : 'rgba(245,158,11,0.1)',
+                                color:      doc.estado === 'aprobado' ? '#15803d'              : doc.estado === 'rechazado' ? '#dc2626'              : '#b45309',
+                              }}>
+                              {doc.estado === 'aprobado' ? 'Aprobado' : doc.estado === 'rechazado' ? 'Rechazado' : 'En revisión'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer"
+                              className="font-body text-xs font-medium px-3 py-1 rounded-lg transition-colors"
+                              style={{ background: 'rgba(184,96,48,0.1)', color: '#B86030' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.2)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.1)'; }}>
+                              Ver
+                            </a>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm(`¿Eliminar "${doc.nombre}"?`)) return;
+                                try {
+                                  await api.delete(`/documentos/${doc.id}`);
+                                  setDocsTabla(prev => prev.filter(d => d.id !== doc.id));
+                                  toast.success('Documento eliminado.');
+                                } catch {
+                                  toast.error('Error al eliminar.');
+                                }
+                              }}
+                              className="p-1 rounded-lg transition-colors"
+                              style={{ color: '#dc2626' }}
+                              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.08)'; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = ''; }}
+                              title="Eliminar">
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 {[
