@@ -44,6 +44,7 @@ export default function Navbar() {
     { href: '/admin/usuarios',   label: 'Usuarios'   },
     { href: '/admin/planes',     label: 'Planes'     },
     { href: '/admin/campus',     label: 'Campus'     },
+    { href: '/admin/foro',       label: 'Foro'       },   // ← NUEVO
     { href: '/admin/eventos',    label: 'Eventos'    },
     { href: '/admin/links',      label: 'Links'      },
     { href: '/admin/comunicado', label: '📢 Comunicado' },
@@ -93,7 +94,7 @@ export default function Navbar() {
               <Scale size={16} className="text-white" />
             </div>
             <span className="font-display font-bold text-lg" style={{ color: '#1C1B18' }}>
-              IUSTIXIUM
+              Conexión<span style={{ color: '#B86030' }}>Legal</span>
             </span>
           </Link>
 
@@ -154,8 +155,8 @@ export default function Navbar() {
                   {/* Dropdown de notificaciones */}
                   {campanaAbierta && (
                     <div
-                      className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden animate-slide-down"
-                      style={{ background: '#fff', border: '1px solid #E8E6E3', boxShadow: '0 8px 32px rgba(28,27,24,0.14)', zIndex: 49 }}
+                      className="absolute right-0 top-full mt-2 w-80 rounded-2xl overflow-hidden z-[50] animate-slide-down"
+                      style={{ background: '#fff', border: '1px solid #E8E6E3', boxShadow: '0 8px 32px rgba(28,27,24,0.14)' }}
                     >
                       {/* Header */}
                       <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: '#F0EFED' }}>
@@ -210,10 +211,6 @@ export default function Navbar() {
                                  : n.tipo === 'perfil_aprobado'     ? '🎉'
                                  : n.tipo === 'perfil_rechazado'    ? '❌'
                                  : n.tipo === 'nuevo_abogado'       ? '👤'
-                                 : n.tipo === 'nueva_calificacion'  ? '⭐'
-                                 : n.tipo === 'documento_aprobado'  ? '✅'
-                                 : n.tipo === 'documento_rechazado' ? '❌'
-                                 : n.tipo === 'nuevo_documento'     ? '📄'
                                  : '🔔'}
                               </span>
                               {/* Contenido */}
@@ -398,11 +395,7 @@ export default function Navbar() {
         <div className="fixed inset-0 z-[-1]" onClick={() => setPerfilAbierto(false)} />
       )}
       {campanaAbierta && (
-        <div
-          className="fixed inset-0"
-          style={{ zIndex: 48 }}
-          onClick={() => setCampana(false)}
-        />
+        <div className="fixed inset-0 z-[49]" onClick={() => setCampana(false)} />
       )}
     </nav>
   );

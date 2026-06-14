@@ -26,8 +26,6 @@ import PagoExitoso     from './pages/PagoExitoso';
 // ── Páginas del abogado (requieren auth + rol abogado) ───────
 import DashboardAbogado from './pages/abogado/Dashboard';
 import PerfilEditar     from './pages/abogado/PerfilEditar';
-import Documentos       from './pages/abogado/Documentos';
-import Disponibilidad   from './pages/abogado/Disponibilidad';
 import ConsultasAbogado from './pages/abogado/Consultas';
 import DetalleConsulta  from './pages/abogado/DetalleConsulta';
 import Campus           from './pages/abogado/Campus';
@@ -52,8 +50,9 @@ import AdminUsuarios    from './pages/admin/Usuarios';
 import AdminEventos     from './pages/admin/Eventos';
 import AdminPlanes      from './pages/admin/Planes';
 import AdminComunicado  from './pages/admin/Comunicado';
-import AdminCampus     from './pages/admin/Campus';
-import AdminLinks      from './pages/admin/Links';
+import AdminCampus      from './pages/admin/Campus';
+import AdminLinks       from './pages/admin/Links';
+import AdminForo        from './pages/admin/Foro';   // ← NUEVO
 
 // ─────────────────────────────────────────────────────────────
 // Protección de rutas por autenticación y rol
@@ -251,9 +250,7 @@ function AppRoutes() {
 
           {/* ── Abogado ───────────────────────────────────── */}
           <Route path="/abogado/dashboard"   element={<RutaProtegida rolesPermitidos={['abogado']}><DashboardAbogado /></RutaProtegida>} />
-          <Route path="/abogado/perfil"          element={<RutaProtegida rolesPermitidos={['abogado']}><PerfilEditar /></RutaProtegida>} />
-          <Route path="/abogado/disponibilidad"  element={<RutaProtegida rolesPermitidos={['abogado']}><Disponibilidad /></RutaProtegida>} />
-          <Route path="/abogado/documentos"      element={<RutaProtegida rolesPermitidos={['abogado']}><Documentos /></RutaProtegida>} />
+          <Route path="/abogado/perfil"      element={<RutaProtegida rolesPermitidos={['abogado']}><PerfilEditar /></RutaProtegida>} />
           <Route path="/abogado/consultas"      element={<RutaProtegida rolesPermitidos={['abogado']}><ConsultasAbogado /></RutaProtegida>} />
           <Route path="/abogado/consultas/:id"  element={<RutaProtegida rolesPermitidos={['abogado']}><DetalleConsulta /></RutaProtegida>} />
           <Route path="/abogado/campus"      element={<RutaProtegida rolesPermitidos={['abogado']}><Campus /></RutaProtegida>} />
@@ -280,6 +277,7 @@ function AppRoutes() {
           <Route path="/admin/comunicado"   element={<RutaProtegida rolesPermitidos={['admin']}><AdminComunicado /></RutaProtegida>} />
           <Route path="/admin/campus"    element={<RutaProtegida rolesPermitidos={['admin']}><AdminCampus /></RutaProtegida>} />
           <Route path="/admin/links"     element={<RutaProtegida rolesPermitidos={['admin']}><AdminLinks /></RutaProtegida>} />
+          <Route path="/admin/foro"      element={<RutaProtegida rolesPermitidos={['admin']}><AdminForo /></RutaProtegida>} />  {/* ← NUEVO */}
 
           {/* ── 404 ───────────────────────────────────────── */}
           <Route path="*" element={

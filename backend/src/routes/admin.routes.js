@@ -6,8 +6,7 @@
 
 const express = require('express');
 const router  = express.Router();
-const { query }     = require('../config/database');
-const notifService  = require('../services/notificaciones.service');
+const { query } = require('../config/database');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 const emailService = require('../services/email.service');
 
@@ -87,7 +86,7 @@ router.get('/abogados', async (req, res, next) => {
          pa.visible_en_grilla, pa.perfil_completo,
          pa.estado_aprobacion, pa.motivo_rechazo,
          pa.aprobado_en,
-         pa.dni_cuit, pa.cuil, pa.titulo_universitario, pa.universidad,
+         pa.cuil, pa.titulo_universitario, pa.universidad,
          pa.anio_graduacion, pa.nro_credencial_letrado,
          pa.doc_credencial_url, pa.doc_titulo_url, pa.doc_cuil_url,
          ps.nombre AS plan_nombre, ps.slug AS plan_slug
@@ -135,53 +134,21 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
     const abogado = abogadoRows[0];
 
     // ── Acción: aprobar ──────────────────────────────────────
-    // Rehabilitar: vuelve a pendiente para nueva revisión
-    if (accion === 'rehabilitar') {
-      await query(
-        `UPDATE perfiles_abogado SET
-           estado_aprobacion = 'pendiente',
-           motivo_rechazo    = NULL,
-           aprobado_por      = NULL,
-           aprobado_en       = NULL
-         WHERE usuario_id = $1`,
-        [id]
-      );
-      // Notificar al abogado
-      const { rows: [abogado] } = await query(
-        'SELECT nombre, email FROM usuarios WHERE id = $1', [id]
-      );
-      if (abogado) {
-        emailService.enviarComunicado({
-          destinatarioEmail:  abogado.email,
-          destinatarioNombre: abogado.nombre,
-          titulo:  'Tu perfil está nuevamente en revisión',
-          mensaje: 'Tu perfil fue rehabilitado y está siendo revisado nuevamente por nuestro equipo. Te avisaremos cuando haya novedades.',
-          link:    null,
-        }).catch(() => {});
-      }
-      return res.json({ mensaje: 'Abogado rehabilitado. Estado: pendiente.' });
-    }
-
     if (accion === 'aprobar') {
-      // Respetar los toggles que el admin configuró antes de aprobar
-      // visible: default true si no se especifica
-      // matricula_verificada: default false si no se especifica
-      const visibleFinal    = visible !== undefined ? visible : true;
-      const matriculaFinal  = matricula_verificada !== undefined ? matricula_verificada : false;
-
       await query(
         `UPDATE perfiles_abogado SET
            estado_aprobacion    = 'aprobado',
-           visible_en_grilla    = $1,
-           matricula_verificada = $2,
+           visible_en_grilla    = true,
+           matricula_verificada = COALESCE($1, matricula_verificada),
            motivo_rechazo       = NULL,
-           aprobado_por         = $3,
+           aprobado_por         = $2,
            aprobado_en          = NOW()
-         WHERE usuario_id = $4`,
-        [visibleFinal, matriculaFinal, adminId, id]
+         WHERE usuario_id = $3`,
+        [matricula_verificada ?? null, adminId, id]
       );
 
       // Notificación real-time + email
+      const notifService = require('../services/notificaciones.service');
       await notifService.perfilAprobado({
         abogadoId:     id,
         abogadoNombre: `${abogado.nombre} ${abogado.apellido}`,
@@ -209,6 +176,7 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
       );
 
       // Notificación real-time + email
+      const notifService = require('../services/notificaciones.service');
       await notifService.perfilRechazado({
         abogadoId: id,
         motivo:    motivo || 'Por favor revisá tu perfil y completá los datos faltantes.',
@@ -258,65 +226,11 @@ router.patch('/usuarios/:id/estado', async (req, res, next) => {
       [activo, req.params.id]
     );
 
-    // Notificar al usuario por email
-    try {
-      const { rows: [usuario] } = await query(
-        'SELECT nombre, email FROM usuarios WHERE id = $1',
-        [req.params.id]
-      );
-      if (usuario) {
-        if (activo) {
-          emailService.notificarCuentaRehabilitada({ nombre: usuario.nombre, email: usuario.email }).catch(() => {});
-        } else {
-          emailService.notificarCuentaDeshabilitada({ nombre: usuario.nombre, email: usuario.email }).catch(() => {});
-        }
-      }
-    } catch {}
-
     res.json({ mensaje: `Usuario ${activo ? 'habilitado' : 'deshabilitado'} correctamente.` });
   } catch (error) { next(error); }
 });
 
-// ─────────────────────────────────────────────────────────────
-// DELETE /api/admin/usuarios/:id
-// Eliminar cuenta — body: { tipo: 'suave' | 'definitivo' }
-// ─────────────────────────────────────────────────────────────
-router.delete('/usuarios/:id', async (req, res, next) => {
-  try {
-    const { tipo = 'suave' } = req.body;
-
-    if (req.params.id === req.usuario.id) {
-      return res.status(400).json({ error: 'No podés eliminar tu propia cuenta.' });
-    }
-
-    const { rows: [usuario] } = await query(
-      `SELECT u.id, u.nombre, u.email, r.nombre AS rol
-       FROM usuarios u JOIN roles r ON u.rol_id = r.id
-       WHERE u.id = $1`, [req.params.id]
-    );
-
-    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado.' });
-
-    if (usuario.rol === 'admin') {
-      return res.status(403).json({ error: 'No se pueden eliminar cuentas de administrador.' });
-    }
-
-    if (tipo === 'definitivo') {
-      await query('DELETE FROM usuarios WHERE id = $1', [req.params.id]);
-      return res.json({ mensaje: `La cuenta de ${usuario.nombre} fue eliminada definitivamente.` });
-    }
-
-    // Eliminación suave
-    await query(
-      `UPDATE usuarios SET activo = false, deleted_at = NOW() WHERE id = $1`,
-      [req.params.id]
-    );
-
-    res.json({ mensaje: `La cuenta de ${usuario.nombre} fue eliminada (puede recuperarse).` });
-
-  } catch (error) { next(error); }
-});
-
+module.exports = router;
 
 // ─────────────────────────────────────────────────────────────
 // PUT /api/admin/abogados/:id/perfil
@@ -326,105 +240,30 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
   try {
     const { id } = req.params;
     const {
-      // Perfil profesional
-      descripcion, anos_experiencia, ciudad, provincia, matricula, especialidades,
-      // Plan
-      plan_id,
-      // Datos personales
-      nombre, apellido, telefono, email,
-      // Documentos (null para eliminar)
-      doc_credencial_url, doc_titulo_url, doc_cuil_url,
+      descripcion, anos_experiencia, ciudad, provincia,
+      matricula, especialidades,
     } = req.body;
 
-    // ── Eliminar documentos si se envían como null ────────────
-    const camposDoc = [];
-    const valoresDoc = [];
-    let idxDoc = 1;
-
-    if (doc_credencial_url === null) { camposDoc.push(`doc_credencial_url = $${idxDoc++}`); valoresDoc.push(null); }
-    if (doc_titulo_url     === null) { camposDoc.push(`doc_titulo_url     = $${idxDoc++}`); valoresDoc.push(null); }
-    if (doc_cuil_url       === null) { camposDoc.push(`doc_cuil_url       = $${idxDoc++}`); valoresDoc.push(null); }
-
-    if (camposDoc.length > 0) {
-      valoresDoc.push(id);
-      await query(
-        `UPDATE perfiles_abogado SET ${camposDoc.join(', ')} WHERE usuario_id = $${idxDoc}`,
-        valoresDoc
-      );
-    }
-
-    // ── Actualizar perfil profesional ─────────────────────────
-    const updatePerfil = plan_id
-      ? `UPDATE perfiles_abogado SET
-           descripcion      = COALESCE($1, descripcion),
-           anos_experiencia = COALESCE($2, anos_experiencia),
-           ciudad           = COALESCE($3, ciudad),
-           provincia        = COALESCE($4, provincia),
-           matricula        = COALESCE($5, matricula),
-           especialidades   = COALESCE($6, especialidades),
-           plan_id          = $7,
-           perfil_completo  = true
-         WHERE usuario_id = $8`
-      : `UPDATE perfiles_abogado SET
-           descripcion      = COALESCE($1, descripcion),
-           anos_experiencia = COALESCE($2, anos_experiencia),
-           ciudad           = COALESCE($3, ciudad),
-           provincia        = COALESCE($4, provincia),
-           matricula        = COALESCE($5, matricula),
-           especialidades   = COALESCE($6, especialidades),
-           perfil_completo  = true
-         WHERE usuario_id = $7`;
-
-    const valuesPerfil = plan_id
-      ? [descripcion||null, anos_experiencia ? parseInt(anos_experiencia) : null,
-         ciudad||null, provincia||null, matricula||null,
-         especialidades?.length ? especialidades : null, plan_id, id]
-      : [descripcion||null, anos_experiencia ? parseInt(anos_experiencia) : null,
-         ciudad||null, provincia||null, matricula||null,
-         especialidades?.length ? especialidades : null, id];
-
-    await query(updatePerfil, valuesPerfil);
-
-    // ── Actualizar datos personales si se enviaron ────────────
-    const camposPersonales = [];
-    const valoresPersonales = [];
-    let idx = 1;
-
-    if (nombre?.trim())   { camposPersonales.push(`nombre   = $${idx++}`); valoresPersonales.push(nombre.trim()); }
-    if (apellido?.trim()) { camposPersonales.push(`apellido = $${idx++}`); valoresPersonales.push(apellido.trim()); }
-    if (telefono?.trim()) { camposPersonales.push(`telefono = $${idx++}`); valoresPersonales.push(telefono.trim()); }
-
-    if (email?.trim() && email.includes('@')) {
-      const { rows: existe } = await query(
-        'SELECT id FROM usuarios WHERE email = $1 AND id != $2',
-        [email.trim().toLowerCase(), id]
-      );
-      if (existe.length > 0) {
-        return res.status(409).json({ error: 'Ese email ya está registrado por otro usuario.' });
-      }
-      camposPersonales.push(`email = $${idx++}`);
-      valoresPersonales.push(email.trim().toLowerCase());
-    }
-
-    if (camposPersonales.length > 0) {
-      valoresPersonales.push(id);
-      await query(
-        `UPDATE usuarios SET ${camposPersonales.join(', ')} WHERE id = $${idx}`,
-        valoresPersonales
-      );
-
-      // Notificar al usuario
-      const { rows: [usr] } = await query('SELECT nombre, email FROM usuarios WHERE id = $1', [id]);
-      if (usr) {
-        emailService.enviarComunicado({
-          destinatarioEmail:  usr.email,
-          destinatarioNombre: usr.nombre,
-          titulo:  'Tus datos fueron actualizados',
-          mensaje: 'Un administrador actualizó los datos de tu cuenta. Si no reconocés este cambio, contactanos.',
-          link:    null,
-        }).catch(() => {});
-      }
-    }
+    await query(
+      `UPDATE perfiles_abogado SET
+         descripcion      = COALESCE($1, descripcion),
+         anos_experiencia = COALESCE($2, anos_experiencia),
+         ciudad           = COALESCE($3, ciudad),
+         provincia        = COALESCE($4, provincia),
+         matricula        = COALESCE($5, matricula),
+         especialidades   = COALESCE($6, especialidades),
+         perfil_completo  = true
+       WHERE usuario_id = $7`,
+      [
+        descripcion || null,
+        anos_experiencia ? parseInt(anos_experiencia) : null,
+        ciudad || null,
+        provincia || null,
+        matricula || null,
+        especialidades?.length ? especialidades : null,
+        id,
+      ]
+    );
 
     res.json({ mensaje: 'Perfil actualizado correctamente.' });
   } catch (error) { next(error); }
@@ -545,8 +384,7 @@ router.get('/links', async (req, res, next) => {
 
 // GET pública (sin auth) — para mostrar en el dashboard del abogado
 // La registramos también en app.js como ruta pública
-// Función exportada para uso en app.js (ruta pública sin auth)
-const linksPublicos = async (req, res, next) => {
+module.exports.linksPublicos = async (req, res, next) => {
   try {
     const { rows } = await query(
       'SELECT id, titulo, url, descripcion FROM links_interes WHERE activo = true ORDER BY orden ASC'
@@ -703,6 +541,273 @@ router.patch('/usuarios/:id/datos', async (req, res, next) => {
   }
 });
 
-// Exportar el router y funciones auxiliares públicas
-module.exports = router;
-module.exports.linksPublicos = linksPublicos;
+// ============================================================
+// GESTIÓN DEL FORO (Admin)
+// Permite al admin administrar categorías e hilos del foro
+// ============================================================
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/admin/foro/resumen
+// Contadores generales del foro para el panel admin
+// ─────────────────────────────────────────────────────────────
+router.get('/foro/resumen', async (req, res, next) => {
+  try {
+    const { rows: [totales] } = await query(`
+      SELECT
+        (SELECT COUNT(*) FROM foro_categorias)                   AS total_categorias,
+        (SELECT COUNT(*) FROM foro_hilos)                        AS total_hilos,
+        (SELECT COUNT(*) FROM foro_hilos WHERE cerrado = true)   AS hilos_cerrados,
+        (SELECT COUNT(*) FROM foro_hilos WHERE fijado  = true)   AS hilos_fijados,
+        (SELECT COUNT(*) FROM foro_respuestas)                   AS total_respuestas
+    `);
+    res.json({ resumen: totales });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/admin/foro/categorias
+// Lista todas las categorías (activas e inactivas) con conteo de hilos
+// ─────────────────────────────────────────────────────────────
+router.get('/foro/categorias', async (req, res, next) => {
+  try {
+    const { rows } = await query(`
+      SELECT
+        fc.id, fc.nombre, fc.descripcion, fc.icono,
+        fc.orden, fc.activa, fc.creado_en,
+        COUNT(fh.id) AS total_hilos
+      FROM foro_categorias fc
+      LEFT JOIN foro_hilos fh ON fc.id = fh.categoria_id
+      GROUP BY fc.id
+      ORDER BY fc.orden ASC
+    `);
+    res.json({ categorias: rows });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/admin/foro/categorias
+// Crear una nueva categoría del foro
+// ─────────────────────────────────────────────────────────────
+router.post('/foro/categorias', async (req, res, next) => {
+  try {
+    const { nombre, descripcion, icono, orden } = req.body;
+
+    if (!nombre?.trim()) {
+      return res.status(400).json({ error: 'El nombre de la categoría es obligatorio.' });
+    }
+
+    const { rows: [categoria] } = await query(
+      `INSERT INTO foro_categorias (nombre, descripcion, icono, orden)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, nombre, descripcion, icono, orden, activa`,
+      [nombre.trim(), descripcion?.trim() || null, icono?.trim() || '💬', orden || 0]
+    );
+
+    res.status(201).json({ mensaje: 'Categoría creada.', categoria });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PUT /api/admin/foro/categorias/:id
+// Editar una categoría existente
+// ─────────────────────────────────────────────────────────────
+router.put('/foro/categorias/:id', async (req, res, next) => {
+  try {
+    const { nombre, descripcion, icono, orden } = req.body;
+
+    if (!nombre?.trim()) {
+      return res.status(400).json({ error: 'El nombre es obligatorio.' });
+    }
+
+    const { rows: [categoria] } = await query(
+      `UPDATE foro_categorias
+       SET nombre = $1, descripcion = $2, icono = $3, orden = $4
+       WHERE id = $5
+       RETURNING id, nombre, descripcion, icono, orden, activa`,
+      [nombre.trim(), descripcion?.trim() || null, icono?.trim() || '💬', orden || 0, req.params.id]
+    );
+
+    if (!categoria) return res.status(404).json({ error: 'Categoría no encontrada.' });
+    res.json({ mensaje: 'Categoría actualizada.', categoria });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/admin/foro/categorias/:id/pausar
+// Activar o pausar una categoría (los hilos quedan pero no se ven)
+// Body: { activa: true | false }
+// ─────────────────────────────────────────────────────────────
+router.patch('/foro/categorias/:id/pausar', async (req, res, next) => {
+  try {
+    const { activa } = req.body;
+
+    const { rows: [categoria] } = await query(
+      `UPDATE foro_categorias SET activa = $1 WHERE id = $2
+       RETURNING id, nombre, activa`,
+      [activa, req.params.id]
+    );
+
+    if (!categoria) return res.status(404).json({ error: 'Categoría no encontrada.' });
+
+    res.json({
+      mensaje: `Categoría ${activa ? 'activada' : 'pausada'}.`,
+      categoria,
+    });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// DELETE /api/admin/foro/categorias/:id
+// Eliminar una categoría junto con todos sus hilos y respuestas (CASCADE)
+// ─────────────────────────────────────────────────────────────
+router.delete('/foro/categorias/:id', async (req, res, next) => {
+  try {
+    const { rows: [categoria] } = await query(
+      'SELECT id, nombre FROM foro_categorias WHERE id = $1',
+      [req.params.id]
+    );
+
+    if (!categoria) return res.status(404).json({ error: 'Categoría no encontrada.' });
+
+    await query('DELETE FROM foro_categorias WHERE id = $1', [req.params.id]);
+
+    res.json({ mensaje: `Categoría "${categoria.nombre}" eliminada junto con todos sus hilos.` });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/admin/foro/hilos
+// Lista todos los hilos con filtros opcionales y paginación
+// Query params: ?categoria_id=X &cerrado=true &busqueda=texto &pagina=1
+// ─────────────────────────────────────────────────────────────
+router.get('/foro/hilos', async (req, res, next) => {
+  try {
+    const { categoria_id, cerrado, busqueda } = req.query;
+    const pagina  = parseInt(req.query.pagina) || 1;
+    const limite  = 25;
+    const offset  = (pagina - 1) * limite;
+
+    // Construir filtros dinámicamente para evitar SQL injection
+    const condiciones = [];
+    const valores     = [];
+
+    if (categoria_id) {
+      valores.push(categoria_id);
+      condiciones.push(`fh.categoria_id = $${valores.length}`);
+    }
+    if (cerrado !== undefined && cerrado !== '') {
+      valores.push(cerrado === 'true');
+      condiciones.push(`fh.cerrado = $${valores.length}`);
+    }
+    if (busqueda?.trim()) {
+      valores.push(`%${busqueda.trim()}%`);
+      condiciones.push(`fh.titulo ILIKE $${valores.length}`);
+    }
+
+    const where = condiciones.length > 0 ? `WHERE ${condiciones.join(' AND ')}` : '';
+
+    // Total de resultados para paginación
+    const { rows: [{ total }] } = await query(
+      `SELECT COUNT(*) AS total FROM foro_hilos fh ${where}`,
+      valores
+    );
+
+    // Hilos con datos del autor y categoría
+    const valoresPag = [...valores, limite, offset];
+    const { rows: hilos } = await query(
+      `SELECT
+         fh.id, fh.titulo, fh.vistas, fh.fijado, fh.cerrado,
+         fh.creado_en, fh.actualizado_en,
+         fc.nombre AS categoria_nombre, fc.icono AS categoria_icono,
+         u.nombre   AS autor_nombre,
+         u.apellido AS autor_apellido,
+         COUNT(fr.id) AS total_respuestas
+       FROM foro_hilos fh
+       LEFT JOIN foro_categorias fc ON fh.categoria_id = fc.id
+       LEFT JOIN usuarios u         ON fh.autor_id = u.id
+       LEFT JOIN foro_respuestas fr ON fh.id = fr.hilo_id
+       ${where}
+       GROUP BY fh.id, fc.nombre, fc.icono, u.nombre, u.apellido
+       ORDER BY fh.actualizado_en DESC
+       LIMIT $${valoresPag.length - 1} OFFSET $${valoresPag.length}`,
+      valoresPag
+    );
+
+    res.json({
+      hilos,
+      paginacion: {
+        total:   parseInt(total),
+        pagina,
+        limite,
+        paginas: Math.ceil(parseInt(total) / limite),
+      },
+    });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/admin/foro/hilos/:id/cerrar
+// Cerrar o reabrir un hilo (los hilos cerrados no aceptan respuestas)
+// Body: { cerrado: true | false }
+// ─────────────────────────────────────────────────────────────
+router.patch('/foro/hilos/:id/cerrar', async (req, res, next) => {
+  try {
+    const { cerrado } = req.body;
+
+    const { rows: [hilo] } = await query(
+      `UPDATE foro_hilos SET cerrado = $1 WHERE id = $2
+       RETURNING id, titulo, cerrado`,
+      [cerrado, req.params.id]
+    );
+
+    if (!hilo) return res.status(404).json({ error: 'Hilo no encontrado.' });
+
+    res.json({
+      mensaje: `Hilo ${cerrado ? 'cerrado' : 'reabierto'}.`,
+      hilo,
+    });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/admin/foro/hilos/:id/fijar
+// Fijar o desfijar un hilo (los fijados aparecen primero)
+// Body: { fijado: true | false }
+// ─────────────────────────────────────────────────────────────
+router.patch('/foro/hilos/:id/fijar', async (req, res, next) => {
+  try {
+    const { fijado } = req.body;
+
+    const { rows: [hilo] } = await query(
+      `UPDATE foro_hilos SET fijado = $1 WHERE id = $2
+       RETURNING id, titulo, fijado`,
+      [fijado, req.params.id]
+    );
+
+    if (!hilo) return res.status(404).json({ error: 'Hilo no encontrado.' });
+
+    res.json({
+      mensaje: `Hilo ${fijado ? 'fijado' : 'desfijado'}.`,
+      hilo,
+    });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// DELETE /api/admin/foro/hilos/:id
+// Eliminar un hilo y todas sus respuestas (CASCADE en la BD)
+// ─────────────────────────────────────────────────────────────
+router.delete('/foro/hilos/:id', async (req, res, next) => {
+  try {
+    const { rows: [hilo] } = await query(
+      'SELECT id, titulo FROM foro_hilos WHERE id = $1',
+      [req.params.id]
+    );
+
+    if (!hilo) return res.status(404).json({ error: 'Hilo no encontrado.' });
+
+    await query('DELETE FROM foro_hilos WHERE id = $1', [req.params.id]);
+
+    res.json({ mensaje: `Hilo "${hilo.titulo}" eliminado.` });
+  } catch (error) { next(error); }
+});
