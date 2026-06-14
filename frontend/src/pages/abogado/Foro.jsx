@@ -9,6 +9,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import BotonWhatsAppComunidad from '../../components/BotonWhatsAppComunidad';
 
 export default function Foro() {
   const [categorias, setCategorias] = useState([]);
@@ -119,6 +120,11 @@ export default function Foro() {
             ))}
           </div>
         )}
+
+        {/* Botón WhatsApp comunidad */}
+        <div className="mt-6">
+          <BotonWhatsAppComunidad tamano="banner" />
+        </div>
 
         {/* Nota de comunidad */}
         <div

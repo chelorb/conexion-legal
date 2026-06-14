@@ -18,6 +18,7 @@ import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
+import BotonWhatsAppComunidad from '../../components/BotonWhatsAppComunidad';
 
 // ─────────────────────────────────────────────────────────────
 // Sidebar: navegación con submenú desplegable para links
@@ -26,17 +27,15 @@ function Sidebar({ links }) {
   const [linksAbierto, setLinksAbierto] = useState(false);
 
   const MENU = [
-    { href: '/abogado/dashboard',      label: 'Panel',          icono: LayoutDashboard },
-    { href: '/abogado/perfil',         label: 'Mi perfil',      icono: User },
-    { href: '/abogado/consultas',      label: 'Consultas',      icono: Calendar },
-    { href: '/abogado/disponibilidad', label: 'Disponibilidad', icono: Clock },
-    { href: '/abogado/documentos',     label: 'Documentos',     icono: FileText },
-    { href: '/abogado/campus',         label: 'Campus',         icono: BookOpen },
-    { href: '/abogado/agenda',         label: 'Agenda',         icono: Calendar },
-    { href: '/abogado/foro',           label: 'Foro',           icono: MessageSquare },
-    { href: '/abogado/beneficios',     label: 'Beneficios',     icono: Gift },
-    { href: '/abogado/credencial',     label: 'Credencial',     icono: FileText },
-    { href: '/abogado/suscripcion',    label: 'Suscripción',    icono: CreditCard },
+    { href: '/abogado/dashboard',   label: 'Panel',       icono: LayoutDashboard },
+    { href: '/abogado/perfil',      label: 'Mi perfil',   icono: User },
+    { href: '/abogado/consultas',   label: 'Consultas',   icono: Calendar },
+    { href: '/abogado/campus',      label: 'Campus',      icono: BookOpen },
+    { href: '/abogado/agenda',      label: 'Agenda',      icono: Calendar },
+    { href: '/abogado/foro',        label: 'Foro',        icono: MessageSquare },
+    { href: '/abogado/beneficios',  label: 'Beneficios',  icono: Gift },
+    { href: '/abogado/credencial',  label: 'Credencial',  icono: FileText },
+    { href: '/abogado/suscripcion', label: 'Suscripción', icono: CreditCard },
   ];
 
   const actual = window.location.pathname;
@@ -182,6 +181,11 @@ function Sidebar({ links }) {
             )}
           </div>
         </nav>
+
+        {/* Botón para unirse al grupo de WhatsApp de la comunidad */}
+        <div className="mt-3">
+          <BotonWhatsAppComunidad tamano="normal" />
+        </div>
       </div>
     </aside>
   );

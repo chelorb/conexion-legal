@@ -811,3 +811,51 @@ router.delete('/foro/hilos/:id', async (req, res, next) => {
     res.json({ mensaje: `Hilo "${hilo.titulo}" eliminado.` });
   } catch (error) { next(error); }
 });
+
+// ============================================================
+// CONFIGURACIÓN DE LA PLATAFORMA (Admin)
+// Permite al admin gestionar parámetros globales como el
+// número de WhatsApp para grupos de la comunidad
+// ============================================================
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/admin/config
+// Obtener toda la configuración de la plataforma
+// ─────────────────────────────────────────────────────────────
+router.get('/config', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      'SELECT clave, valor, descripcion, actualizado_en FROM config_plataforma ORDER BY clave ASC'
+    );
+    // Convertir a objeto clave-valor para facilidad de uso
+    const config = rows.reduce((acc, row) => {
+      acc[row.clave] = { valor: row.valor, descripcion: row.descripcion, actualizado_en: row.actualizado_en };
+      return acc;
+    }, {});
+    res.json({ config });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PUT /api/admin/config/:clave
+// Actualizar un valor de configuración
+// Body: { valor: '5492984123456' }
+// ─────────────────────────────────────────────────────────────
+router.put('/config/:clave', async (req, res, next) => {
+  try {
+    const { clave } = req.params;
+    const { valor }  = req.body;
+
+    // Upsert: actualiza si existe, inserta si no
+    const { rows: [config] } = await query(
+      `INSERT INTO config_plataforma (clave, valor, actualizado_en)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (clave)
+       DO UPDATE SET valor = $2, actualizado_en = NOW()
+       RETURNING clave, valor, actualizado_en`,
+      [clave, valor ?? '']
+    );
+
+    res.json({ mensaje: 'Configuración actualizada.', config });
+  } catch (error) { next(error); }
+});

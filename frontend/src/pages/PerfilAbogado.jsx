@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import BotonWhatsAppComunidad from '../components/BotonWhatsAppComunidad';
 
 // ─────────────────────────────────────────────────────────────
 // Componente: Estrellas de calificación
@@ -74,7 +75,7 @@ function TarjetaResena({ resena }) {
 export default function PerfilAbogado() {
   const { id }               = useParams();
   const navigate             = useNavigate();
-  const { estaAutenticado, esCliente } = useAuth();
+  const { estaAutenticado, esCliente, esAbogado } = useAuth();
   const [abogado,  setAbogado]  = useState(null);
   const [resenas,  setResenas]  = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -458,6 +459,11 @@ export default function PerfilAbogado() {
                   </div>
                 )}
               </div>
+
+              {/* Botón WhatsApp — solo visible para abogados logueados */}
+              {estaAutenticado && esAbogado && (
+                <BotonWhatsAppComunidad tamano="compacto" />
+              )}
 
               {/* Stats rápidas */}
               <div className="card p-5 space-y-4">
