@@ -9,7 +9,7 @@ const router  = express.Router();
 const { query, getClient } = require('../config/database');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 
-// Todos los endpoints del foro requieren ser abogado autenticado
+// Todos los endpoints del foro requieren ser abogado o admin autenticado
 router.use(verificarToken, requireRol('abogado', 'admin'));
 
 // ─────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ router.post('/categorias/:id/hilos', async (req, res, next) => {
       return res.status(400).json({ error: 'El título no puede superar 255 caracteres.' });
     }
 
-    // Verificar que la categoría existe
+    // Verificar que la categoría existe y está activa
     const { rows: cat } = await query(
       'SELECT id FROM foro_categorias WHERE id = $1 AND activa = true',
       [categoriaId]
@@ -161,7 +161,7 @@ router.get('/hilos/:id', async (req, res, next) => {
     // Todas las respuestas del hilo con datos del autor
     const { rows: respuestas } = await query(
       `SELECT
-         fr.id, fr.contenido, fr.creado_en,
+         fr.id, fr.contenido, fr.creado_en, fr.editado_en,
          u.id AS autor_id, u.nombre AS autor_nombre,
          u.apellido AS autor_apellido, u.avatar_url AS autor_avatar,
          pa.anos_experiencia, pa.especialidades,
@@ -273,7 +273,7 @@ router.delete('/hilos/:id', async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────
 // DELETE /api/foro/respuestas/:id (admin o autor)
-// Eliminar una respuesta propia
+// Eliminar una respuesta propia o cualquiera si es admin
 // ─────────────────────────────────────────────────────────────
 router.delete('/respuestas/:id', async (req, res, next) => {
   try {
@@ -310,6 +310,108 @@ router.patch('/hilos/:id/fijar', requireRol('admin'), async (req, res, next) => 
       [fijado, req.params.id]
     );
     res.json({ mensaje: `Hilo ${fijado ? 'fijado' : 'desfijado'}.` });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/foro/hilos/:id/editar (solo admin)
+// Editar título y/o contenido de un hilo
+// Casos de uso: remover info sensible, corregir datos erróneos
+// ─────────────────────────────────────────────────────────────
+router.patch('/hilos/:id/editar', requireRol('admin'), async (req, res, next) => {
+  try {
+    const { titulo, contenido } = req.body;
+
+    if (!titulo?.trim() && !contenido?.trim()) {
+      return res.status(400).json({ error: 'Debés enviar al menos título o contenido para editar.' });
+    }
+
+    const { rows: [hilo] } = await query(
+      `UPDATE foro_hilos SET
+         titulo         = COALESCE($1, titulo),
+         contenido      = COALESCE($2, contenido),
+         editado_en     = NOW(),
+         editado_por_id = $3
+       WHERE id = $4
+       RETURNING id, titulo, contenido, editado_en`,
+      [
+        titulo?.trim()   || null,
+        contenido?.trim() || null,
+        req.usuario.id,
+        req.params.id,
+      ]
+    );
+
+    if (!hilo) return res.status(404).json({ error: 'Hilo no encontrado.' });
+
+    res.json({ mensaje: 'Hilo editado.', hilo });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/foro/respuestas/:id/editar (solo admin)
+// Editar el contenido de una respuesta
+// Casos de uso: remover info sensible, lenguaje inapropiado
+// ─────────────────────────────────────────────────────────────
+router.patch('/respuestas/:id/editar', requireRol('admin'), async (req, res, next) => {
+  try {
+    const { contenido } = req.body;
+
+    if (!contenido?.trim()) {
+      return res.status(400).json({ error: 'El contenido es obligatorio.' });
+    }
+
+    const { rows: [respuesta] } = await query(
+      `UPDATE foro_respuestas SET
+         contenido      = $1,
+         editado_en     = NOW(),
+         editado_por_id = $2
+       WHERE id = $3
+       RETURNING id, contenido, editado_en`,
+      [contenido.trim(), req.usuario.id, req.params.id]
+    );
+
+    if (!respuesta) return res.status(404).json({ error: 'Respuesta no encontrada.' });
+
+    res.json({ mensaje: 'Respuesta editada.', respuesta });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/foro/hilos/:id/mover (solo admin)
+// Mover un hilo a otra categoría
+// Casos de uso: hilo posteado en categoría incorrecta
+// ─────────────────────────────────────────────────────────────
+router.patch('/hilos/:id/mover', requireRol('admin'), async (req, res, next) => {
+  try {
+    const { categoria_id } = req.body;
+
+    if (!categoria_id) {
+      return res.status(400).json({ error: 'La categoría destino es obligatoria.' });
+    }
+
+    // Verificar que la categoría destino existe
+    const { rows: cat } = await query(
+      'SELECT id, nombre FROM foro_categorias WHERE id = $1',
+      [categoria_id]
+    );
+
+    if (cat.length === 0) {
+      return res.status(404).json({ error: 'Categoría destino no encontrada.' });
+    }
+
+    const { rows: [hilo] } = await query(
+      `UPDATE foro_hilos SET categoria_id = $1 WHERE id = $2
+       RETURNING id, titulo, categoria_id`,
+      [categoria_id, req.params.id]
+    );
+
+    if (!hilo) return res.status(404).json({ error: 'Hilo no encontrado.' });
+
+    res.json({
+      mensaje: `Hilo movido a "${cat[0].nombre}".`,
+      hilo,
+    });
   } catch (error) { next(error); }
 });
 
