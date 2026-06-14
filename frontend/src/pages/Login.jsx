@@ -75,7 +75,7 @@ export default function Login() {
               <Scale size={20} className="text-white" />
             </div>
             <span className="font-display font-bold text-xl" style={{ color: '#1C1B18' }}>
-              Conexión<span style={{ color: '#B86030' }}>Legal</span>
+              IUSTIXIUM
             </span>
           </Link>
         </div>

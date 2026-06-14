@@ -43,14 +43,14 @@ const templateBase = (titulo, contenido) => `
 <body>
   <div class="container">
     <div class="header">
-      <div class="logo">Conexión<span>Legal</span></div>
-      <p class="header-sub">Plataforma de Asesoría Legal Digital</p>
+      <div class="logo">IUSTIXIUM</div>
+      <p class="header-sub">Plataforma Legal Digital</p>
     </div>
     <div class="content">
       ${contenido}
     </div>
     <div class="footer">
-      <p>© ${new Date().getFullYear()} Conexión Legal — Todos los derechos reservados</p>
+      <p>© ${new Date().getFullYear()} IUSTIXIUM — Todos los derechos reservados</p>
       <p style="margin-top:6px;">Si no solicitaste este email, podés ignorarlo con tranquilidad.</p>
     </div>
   </div>
@@ -78,7 +78,7 @@ const enviarEmail = async ({ to, subject, html }) => {
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email: to }] }],
-        from:    { email: from, name: 'Conexión Legal' },
+        from:    { email: from, name: 'IUSTIXIUM' },
         subject,
         content: [{ type: 'text/html', value: html }],
       }),
@@ -110,7 +110,7 @@ const enviarBienvenida = async ({ nombre, email, rol, tokenVerificacion }) => {
   const esAbogado = rol === 'abogado';
 
   const contenido = `
-    <h2>¡Bienvenido/a a Conexión Legal, ${nombre}!</h2>
+    <h2>¡Bienvenido/a a IUSTIXIUM, ${nombre}!</h2>
     <p>Tu cuenta fue creada exitosamente como <strong>${esAbogado ? 'Profesional del Derecho' : 'Cliente'}</strong>.</p>
     <p>Para activar tu cuenta, confirmá tu dirección de email haciendo click en el botón:</p>
     <div class="btn-wrap">
@@ -131,7 +131,7 @@ const enviarBienvenida = async ({ nombre, email, rol, tokenVerificacion }) => {
 
   return enviarEmail({
     to: email,
-    subject: '✅ Verificá tu cuenta en Conexión Legal',
+    subject: '✅ Verificá tu cuenta en IUSTIXIUM',
     html: templateBase('Verificá tu cuenta', contenido),
   });
 };
@@ -142,7 +142,7 @@ const enviarBienvenida = async ({ nombre, email, rol, tokenVerificacion }) => {
 const notificarAbogadoPendiente = async ({ nombre, email }) => {
   const contenido = `
     <h2>Tu registro fue recibido ⏳</h2>
-    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, recibimos tu solicitud de registro en Conexión Legal.</p>
+    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, recibimos tu solicitud de registro en IUSTIXIUM.</p>
     <p>Nuestro equipo está revisando tu perfil y documentación. Este proceso tarda entre <strong>24 y 48 horas hábiles</strong>.</p>
     <div class="info-box">
       <strong>¿Qué pasa ahora?</strong><br>
@@ -156,7 +156,7 @@ const notificarAbogadoPendiente = async ({ nombre, email }) => {
 
   return enviarEmail({
     to: email,
-    subject: '⏳ Tu perfil está siendo revisado — Conexión Legal',
+    subject: '⏳ Tu perfil está siendo revisado — IUSTIXIUM',
     html: templateBase('Perfil en revisión', contenido),
   });
 };
@@ -173,7 +173,7 @@ const notificarAbogadoAprobado = async ({ nombre, email }) => {
     <h2>¡Tu perfil fue aprobado! 🎉</h2>
     <p>Hola <strong>Dr./Dra. ${nombre}</strong>, nuestro equipo revisó tu perfil y documentación.</p>
     <div class="success-box">
-      ✅ Tu perfil está activo y ya aparece en el catálogo de profesionales de Conexión Legal.
+      ✅ Tu perfil está activo y ya aparece en el catálogo de profesionales de IUSTIXIUM.
       Los clientes ya pueden encontrarte y solicitar consultas.
     </div>
     <p>Te recomendamos completar tu perfil con una foto, descripción profesional y tus horarios de disponibilidad para que los clientes tengan toda la información necesaria.</p>
@@ -184,7 +184,7 @@ const notificarAbogadoAprobado = async ({ nombre, email }) => {
 
   return enviarEmail({
     to: email,
-    subject: '🎉 ¡Tu perfil fue aprobado! — Conexión Legal',
+    subject: '🎉 ¡Tu perfil fue aprobado! — IUSTIXIUM',
     html: templateBase('Perfil aprobado', contenido),
   });
 };
@@ -209,7 +209,7 @@ const notificarAbogadoRechazado = async ({ nombre, email, motivo }) => {
 
   return enviarEmail({
     to: email,
-    subject: 'ℹ️ Tu perfil necesita correcciones — Conexión Legal',
+    subject: 'ℹ️ Tu perfil necesita correcciones — IUSTIXIUM',
     html: templateBase('Perfil pendiente de correcciones', contenido),
   });
 };
@@ -243,7 +243,7 @@ const notificarNuevaConsulta = async ({ abogadoEmail, abogadoNombre, clienteNomb
 
   return enviarEmail({
     to: abogadoEmail,
-    subject: '🔔 Nueva solicitud de consulta — Conexión Legal',
+    subject: '🔔 Nueva solicitud de consulta — IUSTIXIUM',
     html: templateBase('Nueva consulta', contenido),
   });
 };
@@ -274,7 +274,7 @@ const enviarConfirmacionTurno = async ({ clienteNombre, clienteEmail, abogadoNom
 
   return enviarEmail({
     to: clienteEmail,
-    subject: '📅 Consulta confirmada — Conexión Legal',
+    subject: '📅 Consulta confirmada — IUSTIXIUM',
     html: templateBase('Consulta confirmada', contenido),
   });
 };
@@ -303,7 +303,7 @@ const enviarResetPassword = async ({ nombre, email, token }) => {
 
   return enviarEmail({
     to: email,
-    subject: '🔒 Restablecé tu contraseña — Conexión Legal',
+    subject: '🔒 Restablecé tu contraseña — IUSTIXIUM',
     html: templateBase('Restablecer contraseña', contenido),
   });
 };
@@ -314,7 +314,7 @@ const enviarResetPassword = async ({ nombre, email, token }) => {
 const notificarCuentaDeshabilitada = async ({ nombre, email }) => {
   const contenido = `
     <h2>Tu cuenta fue deshabilitada</h2>
-    <p>Hola <strong>${nombre}</strong>, tu cuenta en Conexión Legal fue deshabilitada temporalmente por nuestro equipo de administración.</p>
+    <p>Hola <strong>${nombre}</strong>, tu cuenta en IUSTIXIUM fue deshabilitada temporalmente por nuestro equipo de administración.</p>
     <div class="alert-box">
       No podrás acceder a la plataforma mientras tu cuenta esté deshabilitada.
     </div>
@@ -323,7 +323,7 @@ const notificarCuentaDeshabilitada = async ({ nombre, email }) => {
 
   return enviarEmail({
     to: email,
-    subject: 'ℹ️ Tu cuenta fue deshabilitada — Conexión Legal',
+    subject: 'ℹ️ Tu cuenta fue deshabilitada — IUSTIXIUM',
     html: templateBase('Cuenta deshabilitada', contenido),
   });
 };
@@ -334,7 +334,7 @@ const notificarCuentaDeshabilitada = async ({ nombre, email }) => {
 const notificarCuentaRehabilitada = async ({ nombre, email }) => {
   const contenido = `
     <h2>Tu cuenta fue reactivada ✅</h2>
-    <p>Hola <strong>${nombre}</strong>, tu cuenta en Conexión Legal fue reactivada y ya podés acceder normalmente.</p>
+    <p>Hola <strong>${nombre}</strong>, tu cuenta en IUSTIXIUM fue reactivada y ya podés acceder normalmente.</p>
     <div class="success-box">
       ✅ Tu cuenta está activa. Podés iniciar sesión cuando quieras.
     </div>
@@ -345,7 +345,7 @@ const notificarCuentaRehabilitada = async ({ nombre, email }) => {
 
   return enviarEmail({
     to: email,
-    subject: '✅ Tu cuenta fue reactivada — Conexión Legal',
+    subject: '✅ Tu cuenta fue reactivada — IUSTIXIUM',
     html: templateBase('Cuenta reactivada', contenido),
   });
 };
@@ -372,7 +372,7 @@ const notificarAdminNuevoAbogado = async ({ adminEmail, adminNombre, abogadoNomb
 
   return enviarEmail({
     to: adminEmail,
-    subject: '🔔 Nuevo abogado pendiente de aprobación — Conexión Legal',
+    subject: '🔔 Nuevo abogado pendiente de aprobación — IUSTIXIUM',
     html: templateBase('Nuevo abogado pendiente', contenido),
   });
 };
@@ -390,12 +390,12 @@ const enviarComunicado = async ({ destinatarioEmail, destinatarioNombre, titulo,
       <a href="${process.env.FRONTEND_URL}${link}" class="btn">Ver más información</a>
     </div>` : ''}
     <hr class="divider">
-    <p style="font-size:13px;color:#8A8780;">Este es un comunicado oficial de Conexión Legal.</p>
+    <p style="font-size:13px;color:#8A8780;">Este es un comunicado oficial de IUSTIXIUM.</p>
   `;
 
   return enviarEmail({
     to: destinatarioEmail,
-    subject: `📢 ${titulo} — Conexión Legal`,
+    subject: `📢 ${titulo} — IUSTIXIUM`,
     html: templateBase(titulo, contenido),
   });
 };
@@ -422,7 +422,7 @@ const enviarConfirmacionSuscripcion = async ({ nombre, email, plan, fechaFin }) 
 
   return enviarEmail({
     to: email,
-    subject: '🎉 Suscripción activada — Conexión Legal',
+    subject: '🎉 Suscripción activada — IUSTIXIUM',
     html: templateBase('Suscripción activada', contenido),
   });
 };
