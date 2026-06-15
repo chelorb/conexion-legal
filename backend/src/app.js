@@ -4,15 +4,15 @@
 
 require('dotenv').config();
 
-const express    = require('express');
-const cors       = require('cors');
-const helmet     = require('helmet');
-const morgan     = require('morgan');
-// Rate limiting deshabilitado durante fase de prueba
-const path       = require('path');
-const http       = require('http');
-const { Server } = require('socket.io');
-const jwt        = require('jsonwebtoken');
+const express       = require('express');
+const cors          = require('cors');
+const helmet        = require('helmet');
+const morgan        = require('morgan');
+const rateLimit     = require('express-rate-limit');
+const path          = require('path');
+const http          = require('http');
+const { Server }    = require('socket.io');
+const jwt           = require('jsonwebtoken');
 
 require('./config/database');
 
@@ -35,6 +35,7 @@ const app = express();
 
 // ── Seguridad ─────────────────────────────────────────────────
 app.use(helmet());
+// Necesario para que express-rate-limit lea la IP real detrás de Render/Vercel
 app.set('trust proxy', 1);
 
 const origenesPermitidos = [
@@ -44,16 +45,53 @@ const origenesPermitidos = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin:       origenesPermitidos,
-  credentials:  true,
-  methods:      ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  origin:         origenesPermitidos,
+  credentials:    true,
+  methods:        ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// Rate limiting deshabilitado durante fase de prueba
-// TODO: Restaurar antes de producción
-const limiterGlobal = (req, res, next) => next();
-const limiterAuth   = (req, res, next) => next();
+// ── Rate limiting ─────────────────────────────────────────────
+
+// Límite global: 200 requests por IP cada 15 minutos
+// Protege contra scrapers y ataques de fuerza bruta generales
+const limiterGlobal = rateLimit({
+  windowMs:         15 * 60 * 1000, // 15 minutos
+  max:              200,
+  standardHeaders:  true,            // Devuelve headers RateLimit-*
+  legacyHeaders:    false,
+  message: {
+    error: 'Demasiadas solicitudes desde esta IP. Intentá de nuevo en 15 minutos.',
+  },
+  // Saltar en desarrollo para no interferir con pruebas locales
+  skip: () => process.env.NODE_ENV === 'development',
+});
+
+// Límite de login: 5 intentos por IP cada 15 minutos
+// Previene ataques de brute force sobre contraseñas
+const limiterLogin = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message: {
+    error: 'Demasiados intentos de inicio de sesión. Esperá 15 minutos antes de volver a intentarlo.',
+  },
+  skip: () => process.env.NODE_ENV === 'development',
+});
+
+// Límite de registro: 3 registros por IP cada hora
+// Previene creación masiva de cuentas con bots
+const limiterRegistro = rateLimit({
+  windowMs:        60 * 60 * 1000, // 1 hora
+  max:             3,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message: {
+    error: 'Demasiados registros desde esta IP. Esperá una hora antes de volver a intentarlo.',
+  },
+  skip: () => process.env.NODE_ENV === 'development',
+});
 
 app.use(limiterGlobal);
 
@@ -69,21 +107,24 @@ app.get('/health', (req, res) =>
 );
 
 // ── Rutas API ─────────────────────────────────────────────────
-app.use('/api/auth',               limiterAuth, authRoutes);
-app.use('/api/usuarios',           usuariosRoutes);
-app.use('/api/abogados',           abogadosRoutes);
-app.use('/api/consultas',          consultasRoutes);
-app.use('/api/calificaciones',     calificacionesRoutes);
-app.use('/api/campus',             campusRoutes);
-app.use('/api/agenda',             agendaRoutes);
-app.use('/api/foro',               foroRoutes);
-app.use('/api/pagos',              pagosRoutes);
-app.use('/api/beneficios',         beneficiosRoutes);
-app.use('/api/notificaciones',     notificacionesRoutes);
-app.use('/api/admin',              adminRoutes);
+// Login y registro tienen sus propios limitadores más estrictos
+app.use('/api/auth/login',    limiterLogin,    require('./routes/auth.routes'));
+app.use('/api/auth/registro', limiterRegistro, require('./routes/auth.routes'));
+app.use('/api/auth',          authRoutes);
+app.use('/api/usuarios',      usuariosRoutes);
+app.use('/api/abogados',      abogadosRoutes);
+app.use('/api/consultas',     consultasRoutes);
+app.use('/api/calificaciones', calificacionesRoutes);
+app.use('/api/campus',        campusRoutes);
+app.use('/api/agenda',        agendaRoutes);
+app.use('/api/foro',          foroRoutes);
+app.use('/api/pagos',         pagosRoutes);
+app.use('/api/beneficios',    beneficiosRoutes);
+app.use('/api/notificaciones', notificacionesRoutes);
+app.use('/api/admin',         adminRoutes);
 app.use('/api/admin/planes-gestion', planesAdminRoutes);
 
-// Ruta pública de config (solo lectura, sin auth — para el botón de WhatsApp)
+// Ruta pública de config (botón WhatsApp)
 app.get('/api/config/publica', async (req, res, next) => {
   try {
     const { query: dbQuery } = require('./config/database');
@@ -131,7 +172,6 @@ const io = new Server(server, {
     methods:     ['GET', 'POST'],
     credentials: true,
   },
-  // Permitir polling como fallback (importante para Render)
   transports: ['polling', 'websocket'],
 });
 
@@ -154,7 +194,6 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => console.log(`🔌 Desconectado: user_${uid}`));
 });
 
-// Inyectar io en el servicio de notificaciones
 const notifService = require('./services/notificaciones.service');
 notifService.setIO(io);
 
@@ -163,8 +202,9 @@ const PORT = process.env.PORT || 3001;
 const HOST = '0.0.0.0';
 
 server.listen(PORT, HOST, () => {
-  console.log(`\n⚖️  Conexión Legal API — ${HOST}:${PORT}`);
+  console.log(`\n⚖️  IUSTIXIUM API — ${HOST}:${PORT}`);
   console.log(`🔌 Socket.io listo`);
+  console.log(`🛡️  Rate limiting: ${process.env.NODE_ENV === 'development' ? 'DESACTIVADO (dev)' : 'ACTIVO'}`);
   console.log(`✅ Entorno: ${process.env.NODE_ENV || 'development'}\n`);
 });
 
