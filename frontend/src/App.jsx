@@ -53,6 +53,7 @@ import AdminComunicado  from './pages/admin/Comunicado';
 import AdminCampus      from './pages/admin/Campus';
 import AdminLinks       from './pages/admin/Links';
 import AdminForo        from './pages/admin/Foro';   // ← NUEVO
+import NotFound         from './pages/NotFound';      // ← NUEVO
 
 // ─────────────────────────────────────────────────────────────
 // Protección de rutas por autenticación y rol
@@ -280,13 +281,7 @@ function AppRoutes() {
           <Route path="/admin/foro"      element={<RutaProtegida rolesPermitidos={['admin']}><AdminForo /></RutaProtegida>} />  {/* ← NUEVO */}
 
           {/* ── 404 ───────────────────────────────────────── */}
-          <Route path="*" element={
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-              <h1 className="font-display text-6xl font-bold text-navy-900 mb-4">404</h1>
-              <p className="text-slate-500 mb-8">La página que buscás no existe.</p>
-              <a href="/" className="btn-primary">Volver al inicio</a>
-            </div>
-          } />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
       <Footer />
