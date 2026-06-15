@@ -22,6 +22,8 @@ import Registro        from './pages/Registro';
 import VerificarEmail  from './pages/VerificarEmail';
 import ResetPassword   from './pages/ResetPassword';
 import PagoExitoso     from './pages/PagoExitoso';
+import Terminos        from './pages/Terminos';
+import Privacidad      from './pages/Privacidad';
 
 // ── Páginas del abogado (requieren auth + rol abogado) ───────
 import DashboardAbogado from './pages/abogado/Dashboard';
@@ -244,6 +246,8 @@ function AppRoutes() {
           <Route path="/verificar-email"      element={<VerificarEmail />} />
           <Route path="/reset-password"       element={<ResetPassword />} />
           <Route path="/pago/exitoso"         element={<PagoExitoso />} />
+          <Route path="/terminos"             element={<Terminos />} />
+          <Route path="/privacidad"           element={<Privacidad />} />
 
           {/* ── Solo no autenticados ──────────────────────── */}
           <Route path="/login"    element={<RutaPublicaSolo><Login /></RutaPublicaSolo>} />
