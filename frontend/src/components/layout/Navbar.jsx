@@ -94,7 +94,7 @@ export default function Navbar() {
               <Scale size={16} className="text-white" />
             </div>
             <span className="font-display font-bold text-lg" style={{ color: '#1C1B18' }}>
-              Conexión<span style={{ color: '#B86030' }}>Legal</span>
+              IUSTI<span style={{ color: '#B86030' }}>XIUM</span>
             </span>
           </Link>
 
