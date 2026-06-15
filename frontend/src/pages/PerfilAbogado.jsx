@@ -9,16 +9,17 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   MapPin, Star, Shield, Video, Building2,
   Clock, ArrowLeft, Calendar, MessageSquare,
-  ChevronRight, Award
+  ChevronRight, Award, GraduationCap, Hash,
+  BookOpen, Phone
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
 import BotonWhatsAppComunidad from '../components/BotonWhatsAppComunidad';
+import api from '../services/api';
 
 // ─────────────────────────────────────────────────────────────
-// Componente: Estrellas de calificación
+// Estrellas de calificación
 // ─────────────────────────────────────────────────────────────
 function Estrellas({ valor, size = 16 }) {
   return (
@@ -26,7 +27,7 @@ function Estrellas({ valor, size = 16 }) {
       {[1,2,3,4,5].map(i => (
         <Star key={i} size={size}
           style={{
-            fill: i <= Math.round(valor) ? '#B86030' : '#E8E6E3',
+            fill:  i <= Math.round(valor) ? '#B86030' : '#E8E6E3',
             color: i <= Math.round(valor) ? '#B86030' : '#E8E6E3',
           }}
         />
@@ -36,7 +37,7 @@ function Estrellas({ valor, size = 16 }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Componente: Tarjeta de reseña
+// Tarjeta de reseña
 // ─────────────────────────────────────────────────────────────
 function TarjetaResena({ resena }) {
   return (
@@ -73,31 +74,21 @@ function TarjetaResena({ resena }) {
 // Página principal
 // ─────────────────────────────────────────────────────────────
 export default function PerfilAbogado() {
-  const { id }               = useParams();
-  const navigate             = useNavigate();
+  const { id }      = useParams();
+  const navigate    = useNavigate();
   const { estaAutenticado, esCliente, esAbogado } = useAuth();
-  const [abogado,  setAbogado]  = useState(null);
-  const [resenas,  setResenas]  = useState([]);
-  const [cargando, setCargando] = useState(true);
-  const [tabActivo, setTabActivo] = useState('info'); // 'info' | 'resenas'
+  const [abogado,   setAbogado]   = useState(null);
+  const [resenas,   setResenas]   = useState([]);
+  const [cargando,  setCargando]  = useState(true);
+  const [tabActivo, setTabActivo] = useState('info');
 
   useEffect(() => {
     const cargar = async () => {
       try {
-        // Cargar el perfil del abogado (obligatorio)
-        const abogadoRes = await api.get(`/abogados/${id}`);
-        setAbogado(abogadoRes.data.abogado);
-
-        // Cargar calificaciones (opcional — no redirigir si falla)
-        try {
-          const resenasRes = await api.get(`/calificaciones/abogado/${id}`);
-          setResenas(resenasRes.data.calificaciones || []);
-        } catch {
-          setResenas([]);
-        }
-
+        const { data } = await api.get(`/abogados/${id}`);
+        setAbogado(data.abogado);
+        setResenas(data.calificaciones || []);
       } catch {
-        // Solo redirigir si el abogado no existe (404)
         navigate('/clientes');
       } finally {
         setCargando(false);
@@ -106,7 +97,7 @@ export default function PerfilAbogado() {
     cargar();
   }, [id, navigate]);
 
-  // ── Skeleton ─────────────────────────────────────────────────
+  // ── Skeleton ──────────────────────────────────────────────
   if (cargando) return (
     <div className="min-h-screen" style={{ background: '#F0EFED' }}>
       <div className="page-container py-8 max-w-4xl">
@@ -122,7 +113,6 @@ export default function PerfilAbogado() {
           <div className="space-y-3">
             <div className="h-4 rounded" style={{ background: '#E8E6E3' }} />
             <div className="h-4 rounded w-4/5" style={{ background: '#E8E6E3' }} />
-            <div className="h-4 rounded w-3/5" style={{ background: '#E8E6E3' }} />
           </div>
         </div>
       </div>
@@ -136,18 +126,15 @@ export default function PerfilAbogado() {
   return (
     <div className="min-h-screen" style={{ background: '#F0EFED' }}>
 
-      {/* ── Header oscuro con info principal ──────────────── */}
+      {/* ── Header oscuro ────────────────────────────────── */}
       <div style={{ background: 'linear-gradient(135deg, #0A0908 0%, #2C2B27 100%)' }}>
         <div className="page-container py-10 max-w-4xl">
 
-          {/* Volver */}
-          <Link
-            to="/clientes"
+          <Link to="/clientes"
             className="inline-flex items-center gap-2 text-sm font-body mb-8 transition-colors"
             style={{ color: 'rgba(255,255,255,0.45)' }}
             onMouseEnter={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}
-          >
+            onMouseLeave={e => { e.currentTarget.style.color = 'rgba(255,255,255,0.45)'; }}>
             <ArrowLeft size={16} /> Volver al catálogo
           </Link>
 
@@ -156,13 +143,18 @@ export default function PerfilAbogado() {
             {/* Avatar */}
             <div
               className="w-28 h-28 rounded-3xl flex items-center justify-center shrink-0 overflow-hidden"
-              style={{ background: 'rgba(255,255,255,0.1)' }}
+              style={{ background: 'rgba(255,255,255,0.1)', border: '2px solid rgba(255,255,255,0.1)' }}
             >
               {abogado.avatar_url
-                ? <img src={abogado.avatar_url} alt="" className="w-full h-full object-cover" />
-                : <span className="font-display font-bold text-white text-4xl">
-                    {abogado.nombre[0]}{abogado.apellido[0]}
-                  </span>
+                ? <img src={abogado.avatar_url} alt={`${abogado.nombre} ${abogado.apellido}`}
+                    className="w-full h-full object-cover" />
+                : (
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="font-display font-bold text-white text-3xl">
+                      {abogado.nombre[0]}{abogado.apellido[0]}
+                    </span>
+                  </div>
+                )
               }
             </div>
 
@@ -181,14 +173,12 @@ export default function PerfilAbogado() {
                 )}
               </div>
 
-              {/* Especialidades principales */}
               {abogado.especialidades?.length > 0 && (
                 <p className="font-body mb-3" style={{ color: 'rgba(255,255,255,0.6)' }}>
                   {abogado.especialidades.slice(0, 3).join(' · ')}
                 </p>
               )}
 
-              {/* Meta info */}
               <div className="flex flex-wrap gap-4">
                 {abogado.ciudad && (
                   <div className="flex items-center gap-1.5 font-body text-sm"
@@ -207,9 +197,7 @@ export default function PerfilAbogado() {
                 {cal > 0 && (
                   <div className="flex items-center gap-2">
                     <Estrellas valor={cal} size={14} />
-                    <span className="font-body text-sm font-medium text-white">
-                      {cal.toFixed(1)}
-                    </span>
+                    <span className="font-body text-sm font-medium text-white">{cal.toFixed(1)}</span>
                     <span className="font-body text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
                       ({abogado.total_calificaciones} reseñas)
                     </span>
@@ -241,30 +229,27 @@ export default function PerfilAbogado() {
       <div className="page-container py-8 max-w-4xl">
         <div className="grid lg:grid-cols-3 gap-6">
 
-          {/* Columna principal */}
+          {/* ── Columna principal ─────────────────────────── */}
           <div className="lg:col-span-2 space-y-6">
 
             {/* Tabs */}
             <div className="flex gap-2">
               {[
-                { id: 'info',   label: 'Información' },
+                { id: 'info',    label: 'Información' },
                 { id: 'resenas', label: `Reseñas (${resenas.length})` },
               ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setTabActivo(tab.id)}
+                <button key={tab.id} onClick={() => setTabActivo(tab.id)}
                   className="px-5 py-2.5 rounded-xl text-sm font-body font-medium transition-all"
                   style={tabActivo === tab.id
                     ? { background: '#2C2B27', color: '#fff' }
                     : { background: '#fff', color: '#56534A', border: '1px solid #E8E6E3' }
-                  }
-                >
+                  }>
                   {tab.label}
                 </button>
               ))}
             </div>
 
-            {/* Tab: Información */}
+            {/* ── Tab: Información ──────────────────────── */}
             {tabActivo === 'info' && (
               <div className="space-y-5 animate-fade-in">
 
@@ -280,7 +265,7 @@ export default function PerfilAbogado() {
                   </div>
                 )}
 
-                {/* Especialidades completas */}
+                {/* Especialidades */}
                 {abogado.especialidades?.length > 0 && (
                   <div className="card p-6">
                     <h2 className="font-display font-semibold text-lg mb-4" style={{ color: '#1C1B18' }}>
@@ -288,11 +273,8 @@ export default function PerfilAbogado() {
                     </h2>
                     <div className="flex flex-wrap gap-2">
                       {abogado.especialidades.map(esp => (
-                        <span
-                          key={esp}
-                          className="font-body text-sm px-4 py-2 rounded-xl"
-                          style={{ background: '#F0EFED', color: '#3A3832' }}
-                        >
+                        <span key={esp} className="font-body text-sm px-4 py-2 rounded-xl"
+                          style={{ background: '#F0EFED', color: '#3A3832' }}>
                           {esp}
                         </span>
                       ))}
@@ -300,53 +282,112 @@ export default function PerfilAbogado() {
                   </div>
                 )}
 
-                {/* Modalidad de atención */}
-                <div className="card p-6">
-                  <h2 className="font-display font-semibold text-lg mb-4" style={{ color: '#1C1B18' }}>
-                    Modalidad de atención
-                  </h2>
-                  <div className="grid grid-cols-2 gap-3">
-                    {abogado.atiende_online && (
-                      <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: '#F7F6F4' }}>
-                        <Video size={20} style={{ color: '#B86030' }} className="shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>Online</p>
-                          <p className="font-body text-xs mt-0.5" style={{ color: '#8A8780' }}>
-                            Videollamada o chat
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    {abogado.atiende_presencial && (
-                      <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: '#F7F6F4' }}>
-                        <Building2 size={20} style={{ color: '#B86030' }} className="shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>Presencial</p>
-                          <p className="font-body text-xs mt-0.5" style={{ color: '#8A8780' }}>
-                            {abogado.ciudad || 'En su consultorio'}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Matrícula */}
-                {abogado.matricula && (
+                {/* Formación académica */}
+                {(abogado.titulo_universitario || abogado.universidad) && (
                   <div className="card p-6">
-                    <h2 className="font-display font-semibold text-lg mb-3" style={{ color: '#1C1B18' }}>
-                      Matrícula profesional
+                    <h2 className="font-display font-semibold text-lg mb-4" style={{ color: '#1C1B18' }}>
+                      Formación académica
                     </h2>
-                    <div className="flex items-center gap-3">
-                      <div className="px-4 py-2.5 rounded-xl font-mono text-sm font-semibold"
-                        style={{ background: '#F0EFED', color: '#1C1B18' }}>
-                        {abogado.matricula}
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background: 'rgba(184,96,48,0.08)' }}>
+                        <GraduationCap size={18} style={{ color: '#B86030' }} />
                       </div>
-                      {abogado.matricula_verificada && (
-                        <div className="flex items-center gap-1.5 font-body text-sm"
-                          style={{ color: '#B86030' }}>
-                          <Shield size={15} />
-                          Verificada por Conexión Legal
+                      <div>
+                        {abogado.titulo_universitario && (
+                          <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>
+                            {abogado.titulo_universitario}
+                          </p>
+                        )}
+                        {abogado.universidad && (
+                          <p className="font-body text-sm mt-0.5" style={{ color: '#56534A' }}>
+                            {abogado.universidad}
+                          </p>
+                        )}
+                        {abogado.anio_graduacion && (
+                          <p className="font-body text-xs mt-1" style={{ color: '#8A8780' }}>
+                            Graduado/a en {abogado.anio_graduacion}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Modalidad de atención */}
+                {(abogado.atiende_online || abogado.atiende_presencial) && (
+                  <div className="card p-6">
+                    <h2 className="font-display font-semibold text-lg mb-4" style={{ color: '#1C1B18' }}>
+                      Modalidad de atención
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {abogado.atiende_online && (
+                        <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: '#F7F6F4' }}>
+                          <Video size={20} style={{ color: '#B86030' }} className="shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>Online</p>
+                            <p className="font-body text-xs mt-0.5" style={{ color: '#8A8780' }}>
+                              Videollamada o chat
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                      {abogado.atiende_presencial && (
+                        <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: '#F7F6F4' }}>
+                          <Building2 size={20} style={{ color: '#B86030' }} className="shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>Presencial</p>
+                            <p className="font-body text-xs mt-0.5" style={{ color: '#8A8780' }}>
+                              {abogado.direccion_consultorio || abogado.ciudad || 'En su consultorio'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Matrícula e identificación profesional */}
+                {(abogado.matricula || abogado.nro_credencial_letrado) && (
+                  <div className="card p-6">
+                    <h2 className="font-display font-semibold text-lg mb-4" style={{ color: '#1C1B18' }}>
+                      Identificación profesional
+                    </h2>
+                    <div className="space-y-3">
+                      {abogado.matricula && (
+                        <div className="flex items-center justify-between p-3 rounded-xl"
+                          style={{ background: '#F7F6F4' }}>
+                          <div className="flex items-center gap-3">
+                            <BookOpen size={15} style={{ color: '#B86030' }} />
+                            <span className="font-body text-sm" style={{ color: '#56534A' }}>
+                              Matrícula profesional
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-semibold" style={{ color: '#1C1B18' }}>
+                              {abogado.matricula}
+                            </span>
+                            {abogado.matricula_verificada && (
+                              <div className="flex items-center gap-1 text-xs font-body"
+                                style={{ color: '#B86030' }}>
+                                <Shield size={12} /> Verificada por IUSTIXIUM
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {abogado.nro_credencial_letrado && (
+                        <div className="flex items-center justify-between p-3 rounded-xl"
+                          style={{ background: '#F7F6F4' }}>
+                          <div className="flex items-center gap-3">
+                            <Hash size={15} style={{ color: '#B86030' }} />
+                            <span className="font-body text-sm" style={{ color: '#56534A' }}>
+                              Credencial de letrado
+                            </span>
+                          </div>
+                          <span className="font-mono text-sm font-semibold" style={{ color: '#1C1B18' }}>
+                            {abogado.nro_credencial_letrado}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -355,7 +396,7 @@ export default function PerfilAbogado() {
               </div>
             )}
 
-            {/* Tab: Reseñas */}
+            {/* ── Tab: Reseñas ──────────────────────────── */}
             {tabActivo === 'resenas' && (
               <div className="space-y-4 animate-fade-in">
                 {resenas.length === 0 ? (
@@ -382,7 +423,6 @@ export default function PerfilAbogado() {
                             {resenas.length} reseña{resenas.length !== 1 ? 's' : ''}
                           </p>
                         </div>
-                        {/* Distribución por estrella */}
                         <div className="flex-1 space-y-2">
                           {[5,4,3,2,1].map(n => {
                             const count = resenas.filter(r => r.puntaje === n).length;
@@ -401,8 +441,6 @@ export default function PerfilAbogado() {
                         </div>
                       </div>
                     </div>
-
-                    {/* Lista de reseñas */}
                     {resenas.map(r => <TarjetaResena key={r.id} resena={r} />)}
                   </>
                 )}
@@ -410,7 +448,7 @@ export default function PerfilAbogado() {
             )}
           </div>
 
-          {/* Columna lateral: CTA de contacto */}
+          {/* ── Columna lateral ───────────────────────────── */}
           <div className="lg:col-span-1">
             <div className="sticky top-24 space-y-4">
 
@@ -424,13 +462,11 @@ export default function PerfilAbogado() {
                 </p>
 
                 {estaAutenticado && esCliente ? (
-                  <Link
-                    to={`/nueva-consulta/${abogado.id}`}
+                  <Link to={`/nueva-consulta/${abogado.id}`}
                     className="flex items-center justify-center gap-2 w-full px-6 py-3.5 rounded-xl font-body font-medium text-sm text-white transition-colors"
                     style={{ background: '#B86030' }}
                     onMouseEnter={e => { e.currentTarget.style.background = '#8B4A1E'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#B86030'; }}
-                  >
+                    onMouseLeave={e => { e.currentTarget.style.background = '#B86030'; }}>
                     <Calendar size={16} /> Agendar ahora
                   </Link>
                 ) : estaAutenticado ? (
@@ -440,19 +476,16 @@ export default function PerfilAbogado() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <Link
-                      to={`/login?redirect=/abogados/${abogado.id}`}
+                    <Link to={`/login?redirect=/abogados/${abogado.id}`}
                       className="flex items-center justify-center gap-2 w-full px-6 py-3.5 rounded-xl font-body font-medium text-sm text-white transition-colors"
                       style={{ background: '#B86030' }}
                       onMouseEnter={e => { e.currentTarget.style.background = '#8B4A1E'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = '#B86030'; }}
-                    >
+                      onMouseLeave={e => { e.currentTarget.style.background = '#B86030'; }}>
                       <Calendar size={16} /> Agendar consulta
                     </Link>
                     <p className="text-center font-body text-xs" style={{ color: '#8A8780' }}>
                       Necesitás una cuenta de cliente.{' '}
-                      <Link to="/registro?rol=cliente" className="hover:underline"
-                        style={{ color: '#B86030' }}>
+                      <Link to="/registro?rol=cliente" className="hover:underline" style={{ color: '#B86030' }}>
                         Registrate gratis
                       </Link>
                     </p>
@@ -460,7 +493,7 @@ export default function PerfilAbogado() {
                 )}
               </div>
 
-              {/* Botón WhatsApp — solo visible para abogados logueados */}
+              {/* Botón WhatsApp — solo para abogados logueados */}
               {estaAutenticado && esAbogado && (
                 <BotonWhatsAppComunidad tamano="compacto" />
               )}
@@ -487,27 +520,30 @@ export default function PerfilAbogado() {
                       ? abogado.consultas_completadas
                       : 'Nueva en la plataforma',
                   },
+                  {
+                    icono: GraduationCap,
+                    label: 'Universidad',
+                    valor: abogado.universidad || 'No especificada',
+                  },
                 ].map(({ icono: Icono, label, valor }) => (
-                  <div key={label} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div key={label} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <Icono size={15} style={{ color: '#B86030' }} />
                       <span className="font-body text-sm" style={{ color: '#56534A' }}>{label}</span>
                     </div>
-                    <span className="font-body text-sm font-medium" style={{ color: '#1C1B18' }}>
+                    <span className="font-body text-sm font-medium text-right" style={{ color: '#1C1B18' }}>
                       {valor}
                     </span>
                   </div>
                 ))}
               </div>
 
-              {/* Link ver otros abogados */}
-              <Link
-                to="/clientes"
+              {/* Ver otros abogados */}
+              <Link to="/clientes"
                 className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-xl font-body text-sm border transition-colors"
                 style={{ borderColor: '#E8E6E3', color: '#56534A' }}
                 onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = ''; }}
-              >
+                onMouseLeave={e => { e.currentTarget.style.background = ''; }}>
                 Ver otros abogados <ChevronRight size={15} />
               </Link>
             </div>
