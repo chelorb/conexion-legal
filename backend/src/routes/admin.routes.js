@@ -241,8 +241,21 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
     const { id } = req.params;
     const {
       descripcion, anos_experiencia, ciudad, provincia,
-      matricula, especialidades,
+      matricula, especialidades, plan_slug,
     } = req.body;
+
+    // Si viene plan_slug, buscar el plan_id correspondiente
+    let planId = null;
+    if (plan_slug) {
+      const { rows: planRows } = await query(
+        'SELECT id FROM planes_suscripcion WHERE slug = $1 AND activo = true',
+        [plan_slug]
+      );
+      if (planRows.length === 0) {
+        return res.status(400).json({ error: 'Plan no encontrado o inactivo.' });
+      }
+      planId = planRows[0].id;
+    }
 
     await query(
       `UPDATE perfiles_abogado SET
@@ -252,8 +265,9 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
          provincia        = COALESCE($4, provincia),
          matricula        = COALESCE($5, matricula),
          especialidades   = COALESCE($6, especialidades),
+         plan_id          = COALESCE($7, plan_id),
          perfil_completo  = true
-       WHERE usuario_id = $7`,
+       WHERE usuario_id = $8`,
       [
         descripcion || null,
         anos_experiencia ? parseInt(anos_experiencia) : null,
@@ -261,6 +275,7 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
         provincia || null,
         matricula || null,
         especialidades?.length ? especialidades : null,
+        planId,
         id,
       ]
     );
