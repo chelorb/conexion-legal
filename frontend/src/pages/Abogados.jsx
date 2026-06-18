@@ -1,389 +1,689 @@
 // ============================================================
-// src/pages/Abogados.jsx
-// Grilla pública de abogados con filtros, paginación y búsqueda
+// src/pages/admin/Abogados.jsx — Paleta C: Gris carbón + Cobre
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
 import {
-  Search, SlidersHorizontal, MapPin, Star, Shield,
-  Video, Building2, ChevronLeft, ChevronRight, X,
-  Check, Save, Edit2, Trash2, RefreshCw
+  Shield, Check, X, Search, MapPin,
+  RefreshCw, Clock, AlertCircle, Edit2, Save,
+  FileText, ExternalLink, FolderOpen
 } from 'lucide-react';
-import api from '../services/api';
+import toast from 'react-hot-toast';
+import { useForm } from 'react-hook-form';
+import api from '../../services/api';
 
-// ─────────────────────────────────────────────────────────────
-// Componente: Tarjeta de abogado en la grilla
-// ─────────────────────────────────────────────────────────────
-function TarjetaAbogado({ abogado }) {
-  const {
-    id, nombre, apellido, avatar_url, especialidades,
-    descripcion, ciudad, provincia, calificacion_promedio,
-    total_calificaciones, atiende_online, atiende_presencial,
-    matricula_verificada, plan_slug, credencial_activa,
-  } = abogado;
+const ESPECIALIDADES_DISPONIBLES = [
+  'Derecho Civil', 'Derecho Laboral', 'Derecho Penal',
+  'Derecho de Familia', 'Derecho Comercial', 'Derecho Administrativo',
+  'Derecho Tributario', 'Derecho Inmobiliario', 'Derecho de Daños',
+  'Derecho del Consumidor', 'Propiedad Intelectual', 'Derecho Migratorio',
+  'Derecho Societario', 'Derecho Ambiental', 'Mediación',
+];
 
-  // Clases del badge según el plan
-  const badgePlan = {
-    gratuito: 'badge-plan-gratuito',
-    basico:   'badge-plan-basico',
-    premium:  'badge-plan-premium',
-  }[plan_slug] || 'badge-plan-gratuito';
-
+function BadgePlan({ slug }) {
+  const mapa = {
+    basico:    { label: 'Básico',      bg: 'rgba(184,96,48,0.1)', color: '#8B4A1E' },
+    comunidad: { label: '★ Comunidad', bg: '#B86030',             color: '#fff'    },
+  };
+  const cfg = mapa[slug] || { label: slug, bg: '#F0EFED', color: '#56534A' };
   return (
-    <Link to={`/abogados/${id}`} className="card-hover group p-6 flex flex-col gap-4 animate-fade-in">
-
-      {/* Cabecera: avatar + nombre + plan */}
-      <div className="flex items-start gap-4">
-        <div className="relative shrink-0">
-          <div className="w-16 h-16 rounded-2xl bg-navy-100 overflow-hidden">
-            {avatar_url
-              ? <img src={avatar_url} alt={nombre} className="w-full h-full object-cover" />
-              : (
-                <div className="w-full h-full flex items-center justify-center bg-navy-900">
-                  <span className="font-display font-bold text-white text-xl">
-                    {nombre[0]}{apellido[0]}
-                  </span>
-                </div>
-              )
-            }
-          </div>
-          {/* Indicador de matrícula verificada */}
-          {matricula_verificada && (
-            <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-navy-900 rounded-full flex items-center justify-center">
-              <Shield size={10} className="text-white" />
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h3 className="font-display font-semibold text-navy-900 text-base leading-tight group-hover:text-navy-700 transition-colors">
-                Dr./Dra. {nombre} {apellido}
-              </h3>
-              <div className="flex items-center gap-1 mt-1">
-                <MapPin size={12} className="text-slate-400 shrink-0" />
-                <span className="font-body text-xs text-slate-500 truncate">{ciudad}, {provincia}</span>
-              </div>
-            </div>
-            <span className={`${badgePlan} shrink-0`}>
-              {plan_slug === 'premium' ? '★ Premium' : plan_slug === 'basico' ? 'Básico' : 'Gratuito'}
-            </span>
-          </div>
-
-          {/* Calificación */}
-          <div className="flex items-center gap-1.5 mt-2">
-            <div className="flex">
-              {[1,2,3,4,5].map(i => (
-                <Star
-                  key={i}
-                  size={12}
-                  className={i <= Math.round(calificacion_promedio)
-                    ? 'fill-gold-500 text-gold-500'
-                    : 'text-slate-200 fill-slate-200'
-                  }
-                />
-              ))}
-            </div>
-            <span className="font-body text-xs font-medium text-slate-700">
-              {calificacion_promedio > 0 ? calificacion_promedio.toFixed(1) : '—'}
-            </span>
-            {total_calificaciones > 0 && (
-              <span className="font-body text-xs text-slate-400">
-                ({total_calificaciones} {total_calificaciones === 1 ? 'reseña' : 'reseñas'})
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Especialidades */}
-      {especialidades?.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {especialidades.slice(0, 3).map(esp => (
-            <span key={esp} className="px-2.5 py-1 bg-navy-50 text-navy-700 text-xs rounded-full font-body">
-              {esp}
-            </span>
-          ))}
-          {especialidades.length > 3 && (
-            <span className="px-2.5 py-1 bg-slate-100 text-slate-500 text-xs rounded-full font-body">
-              +{especialidades.length - 3}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Descripción */}
-      {descripcion && (
-        <p className="font-body text-sm text-slate-500 leading-relaxed line-clamp-2">
-          {descripcion}
-        </p>
-      )}
-
-      {/* Pie: modalidades */}
-      <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-        <div className="flex gap-3">
-          {atiende_online && (
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-body">
-              <Video size={12} className="text-navy-700" /> Online
-            </div>
-          )}
-          {atiende_presencial && (
-            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-body">
-              <Building2 size={12} className="text-navy-700" /> Presencial
-            </div>
-          )}
-        </div>
-        <span className="text-xs font-medium text-navy-700 font-body group-hover:underline">
-          Ver perfil →
-        </span>
-      </div>
-    </Link>
+    <span className="text-xs font-body font-medium px-2.5 py-1 rounded-full"
+      style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// Página principal
+// Tab de documentos — ver los archivos subidos por el abogado
 // ─────────────────────────────────────────────────────────────
-export default function Abogados() {
-  const [searchParams, setSearchParams] = useSearchParams();
+function TabDocumentos({ abogado }) {
+  const documentos = [
+    {
+      campo: 'doc_titulo_url',
+      label: 'Título universitario',
+      desc:  abogado.titulo_universitario
+        ? `${abogado.titulo_universitario}${abogado.universidad ? ` — ${abogado.universidad}` : ''}`
+        : 'No especificado',
+    },
+    {
+      campo: 'doc_cuil_url',
+      label: 'Constancia de CUIL',
+      desc:  abogado.cuil || 'No especificado',
+    },
+    {
+      campo: 'doc_credencial_url',
+      label: 'Credencial de letrado',
+      desc:  abogado.nro_credencial_letrado
+        ? `Nro. ${abogado.nro_credencial_letrado}`
+        : 'Sin número registrado',
+    },
+  ];
 
-  // Estado de filtros (sincronizado con la URL)
-  const [filtros, setFiltros] = useState({
-    ciudad:       searchParams.get('ciudad')       || '',
-    especialidad: searchParams.get('especialidad') || '',
-    online:       searchParams.get('online')       || '',
-    orden:        searchParams.get('orden')        || 'calificacion',
+  const hayDocumentos = documentos.some(d => abogado[d.campo]);
+
+  if (!hayDocumentos) {
+    return (
+      <div className="py-12 text-center">
+        <FolderOpen size={36} className="mx-auto mb-3" style={{ color: '#D4D2CC' }} />
+        <p className="font-display text-lg mb-1" style={{ color: '#1C1B18' }}>
+          Sin documentos adjuntos
+        </p>
+        <p className="font-body text-sm" style={{ color: '#8A8780' }}>
+          Este abogado no adjuntó documentación al registrarse.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="font-body text-xs px-3 py-2 rounded-lg"
+        style={{ background: 'rgba(184,96,48,0.06)', color: '#B86030' }}>
+        ⚠️ Verificá que la documentación sea auténtica antes de aprobar el perfil.
+      </p>
+
+      {documentos.map(({ campo, label, desc }) => {
+        const url = abogado[campo];
+        return (
+          <div key={campo} className="flex items-center justify-between gap-4 p-4 rounded-xl"
+            style={{ background: '#F7F6F4' }}>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: url ? 'rgba(184,96,48,0.1)' : '#F0EFED' }}>
+                <FileText size={16} style={{ color: url ? '#B86030' : '#B0AEA8' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>{label}</p>
+                <p className="font-body text-xs truncate" style={{ color: '#8A8780' }}>{desc}</p>
+              </div>
+            </div>
+
+            {url ? (
+              <a href={url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-body text-xs font-medium shrink-0 transition-colors text-white"
+                style={{ background: '#2C2B27' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}>
+                <ExternalLink size={12} /> Ver archivo
+              </a>
+            ) : (
+              <span className="font-body text-xs shrink-0 px-3 py-2 rounded-xl"
+                style={{ background: '#F0EFED', color: '#8A8780' }}>
+                No adjuntado
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ModalAbogado({ abogado, onCerrar, onActualizar }) {
+  const [tab,       setTab]       = useState('revision');
+  const [guardando, setGuardando] = useState(false);
+  const [accion,    setAccion]    = useState('');
+  const [motivo,    setMotivo]    = useState('');
+  const [espSel,    setEspSel]    = useState(abogado.especialidades || []);
+  const [planes,    setPlanes]    = useState([]);
+  const [planSel,   setPlanSel]   = useState(abogado.plan_slug || '');
+  const [datos,     setDatos]     = useState({
+    visible:              abogado.visible_en_grilla,
+    matricula_verificada: abogado.matricula_verificada,
   });
 
-  const [abogados,  setAbogados]  = useState([]);
-  const [paginacion, setPaginacion] = useState({ total: 0, pagina: 1, total_paginas: 1 });
-  const [cargando,  setCargando]  = useState(true);
-  const [error,     setError]     = useState(null);
-  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
-  const [especialidades, setEspecialidades]   = useState([]);
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    defaultValues: {
+      descripcion:      abogado.descripcion || '',
+      anos_experiencia: abogado.anos_experiencia || '',
+      ciudad:           abogado.ciudad || '',
+      provincia:        abogado.provincia || '',
+      matricula:        abogado.matricula || '',
+    }
+  });
 
-  // Cargar catálogo de especialidades al montar
+  // Cargar planes al abrir el modal
   useEffect(() => {
-    api.get('/abogados/especialidades')
-      .then(r => setEspecialidades(r.data.especialidades))
+    api.get('/admin/planes')
+      .then(r => setPlanes(r.data.planes || []))
       .catch(() => {});
   }, []);
 
-  // Buscar abogados cuando cambian los filtros o la página
-  const buscar = useCallback(async (pagina = 1) => {
-    setCargando(true);
-    setError(null);
+  const toggleEsp = (esp) =>
+    setEspSel(prev => prev.includes(esp) ? prev.filter(e => e !== esp) : [...prev, esp]);
+
+  const ejecutarAccion = async () => {
+    if (accion === 'rechazar' && !motivo.trim()) { toast.error('Ingresá el motivo del rechazo.'); return; }
+    setGuardando(true);
     try {
-      const params = { pagina, limite: 12, ...filtros };
-      // Limpiar parámetros vacíos
-      Object.keys(params).forEach(k => !params[k] && delete params[k]);
+      await api.patch(`/admin/abogados/${abogado.id}/aprobar`, {
+        accion, motivo: accion === 'rechazar' ? motivo : undefined,
+        matricula_verificada: datos.matricula_verificada,
+      });
+      toast.success(accion === 'aprobar' ? '✅ Perfil aprobado.' : '❌ Perfil rechazado.');
+      onActualizar(); onCerrar();
+    } catch { toast.error('Error al procesar la acción.'); }
+    finally { setGuardando(false); }
+  };
 
-      const { data } = await api.get('/abogados', { params });
-      setAbogados(data.abogados);
-      setPaginacion(data.paginacion);
-
-      // Sincronizar filtros con la URL para que sea compartible
-      setSearchParams(params, { replace: true });
-    } catch {
-      setError('No se pudo cargar el listado de abogados. Intentá nuevamente.');
+  // Permitir que un abogado rechazado pueda volver a registrarse
+  const permitirReregistro = async () => {
+    if (!window.confirm(
+      `¿Permitir que ${abogado.nombre} ${abogado.apellido} se vuelva a registrar?\n\n` +
+      `El email "${abogado.email}" quedará libre para un nuevo registro. ` +
+      `El historial del perfil actual se conserva en la base de datos.`
+    )) return;
+    setGuardando(true);
+    try {
+      await api.patch(`/admin/usuarios/${abogado.id}/permitir-reregistro`);
+      toast.success(`Email liberado. ${abogado.nombre} puede volver a registrarse.`);
+      onActualizar();
+      onCerrar();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al procesar la acción.');
     } finally {
-      setCargando(false);
+      setGuardando(false);
     }
-  }, [filtros, setSearchParams]);
-
-  // Re-buscar cuando cambian los filtros
-  useEffect(() => { buscar(1); }, [filtros]); // eslint-disable-line
-
-  const actualizarFiltro = (campo, valor) => {
-    setFiltros(prev => ({ ...prev, [campo]: valor }));
   };
 
-  const limpiarFiltros = () => {
-    setFiltros({ ciudad: '', especialidad: '', online: '', orden: 'calificacion' });
+  const onSubmitPerfil = async (formDatos) => {
+    setGuardando(true);
+    try {
+      await api.patch(`/admin/abogados/${abogado.id}/aprobar`, {
+        visible: datos.visible, matricula_verificada: datos.matricula_verificada,
+      });
+      await api.put(`/admin/abogados/${abogado.id}/perfil`, {
+        ...formDatos,
+        especialidades: espSel,
+        plan_slug:      planSel,
+      });
+      toast.success('Perfil actualizado correctamente.');
+      onActualizar(); onCerrar();
+    } catch (err) { toast.error(err.response?.data?.error || 'Error al guardar.'); }
+    finally { setGuardando(false); }
   };
 
-  const hayFiltrosActivos = filtros.ciudad || filtros.especialidad || filtros.online;
+  // Pestañas del modal — ahora incluye "Documentos"
+  const tabs = [
+    { id: 'revision',    label: 'Revisión y estado' },
+    { id: 'documentos',  label: 'Documentos'        },
+    { id: 'perfil',      label: 'Editar perfil'     },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+      style={{ background: 'rgba(28,27,24,0.6)', backdropFilter: 'blur(4px)' }}>
+      <div className="card w-full max-w-2xl animate-slide-up max-h-[90vh] flex flex-col">
 
-      {/* ── Header de la sección ──────────────────────────── */}
-      <div className="bg-white border-b border-slate-100">
-        <div className="page-container py-8">
-          <h1 className="section-title mb-1">Abogados disponibles</h1>
-          <p className="section-subtitle">
-            {cargando ? 'Buscando...' : `${paginacion.total} profesional${paginacion.total !== 1 ? 'es' : ''} encontrado${paginacion.total !== 1 ? 's' : ''}`}
-          </p>
-
-          {/* Barra de búsqueda y filtros */}
-          <div className="mt-6 flex flex-col sm:flex-row gap-3">
-
-            {/* Campo ciudad */}
-            <div className="flex-1 relative">
-              <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Ciudad o zona..."
-                value={filtros.ciudad}
-                onChange={e => actualizarFiltro('ciudad', e.target.value)}
-                className="input-field pl-10"
-              />
+        {/* Encabezado */}
+        <div className="flex items-center justify-between p-6 border-b shrink-0" style={{ borderColor: '#F0EFED' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: '#2C2B27' }}>
+              <span className="font-display font-bold text-white">{abogado.nombre[0]}{abogado.apellido[0]}</span>
             </div>
-
-            {/* Selector especialidad */}
-            <select
-              value={filtros.especialidad}
-              onChange={e => actualizarFiltro('especialidad', e.target.value)}
-              className="input-field sm:w-56"
-            >
-              <option value="">Todas las especialidades</option>
-              {especialidades.map(e => (
-                <option key={e.id} value={e.nombre}>{e.icono} {e.nombre}</option>
-              ))}
-            </select>
-
-            {/* Selector orden */}
-            <select
-              value={filtros.orden}
-              onChange={e => actualizarFiltro('orden', e.target.value)}
-              className="input-field sm:w-48"
-            >
-              <option value="calificacion">Mejor calificados</option>
-              <option value="experiencia">Más experiencia</option>
-              <option value="nombre">Por nombre</option>
-            </select>
-
-            {/* Botón filtros extra */}
-            <button
-              onClick={() => setFiltrosAbiertos(!filtrosAbiertos)}
-              className={`btn-secondary gap-2 shrink-0 ${filtrosAbiertos ? 'bg-navy-50 border-navy-200' : ''}`}
-            >
-              <SlidersHorizontal size={16} />
-              Filtros
-              {hayFiltrosActivos && (
-                <span className="w-2 h-2 bg-navy-900 rounded-full" />
-              )}
-            </button>
+            <div>
+              <h3 className="font-display font-bold" style={{ color: '#1C1B18' }}>
+                Dr./Dra. {abogado.nombre} {abogado.apellido}
+              </h3>
+              <p className="font-body text-xs" style={{ color: '#8A8780' }}>{abogado.email}</p>
+            </div>
           </div>
+          <button onClick={onCerrar} className="p-2 rounded-lg transition-colors"
+            onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = ''; }}>
+            <X size={18} style={{ color: '#56534A' }} />
+          </button>
+        </div>
 
-          {/* Filtros expandibles */}
-          {filtrosAbiertos && (
-            <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 flex flex-wrap gap-4 animate-slide-down">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filtros.online === 'true'}
-                  onChange={e => actualizarFiltro('online', e.target.checked ? 'true' : '')}
-                  className="rounded border-slate-300 text-navy-900 focus:ring-navy-900"
-                />
-                <span className="font-body text-sm text-slate-700">Solo atiende online</span>
-              </label>
+        {/* Pestañas */}
+        <div className="flex gap-1 px-6 pt-4 shrink-0">
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="px-4 py-2 rounded-xl text-sm font-body font-medium transition-all"
+              style={tab === t.id ? { background: '#2C2B27', color: '#fff' } : { color: '#56534A' }}
+              onMouseEnter={e => { if (tab !== t.id) e.currentTarget.style.background = '#F0EFED'; }}
+              onMouseLeave={e => { if (tab !== t.id) e.currentTarget.style.background = ''; }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-              {hayFiltrosActivos && (
-                <button onClick={limpiarFiltros} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700 font-body ml-auto">
-                  <X size={14} /> Limpiar filtros
+        <div className="overflow-y-auto flex-1 p-6">
+
+          {/* ── Tab: Revisión ─────────────────────────── */}
+          {tab === 'revision' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Plan',      val: <BadgePlan slug={abogado.plan_slug} /> },
+                  { label: 'Estado',    val: (
+                    <span className="text-xs font-medium px-2.5 py-1 rounded-full"
+                      style={abogado.estado_aprobacion === 'aprobado'
+                        ? { background: 'rgba(22,163,74,0.1)',   color: '#15803d' }
+                        : abogado.estado_aprobacion === 'rechazado'
+                          ? { background: 'rgba(220,38,38,0.1)', color: '#dc2626' }
+                          : { background: 'rgba(245,158,11,0.1)',color: '#b45309' }}>
+                      {abogado.estado_aprobacion}
+                    </span>
+                  )},
+                  { label: 'Ubicación', val: abogado.ciudad || '—'    },
+                  { label: 'Matrícula', val: abogado.matricula || '—' },
+                ].map(({ label, val }) => (
+                  <div key={label} className="rounded-xl p-3" style={{ background: '#F7F6F4' }}>
+                    <p className="font-body text-xs mb-1" style={{ color: '#8A8780' }}>{label}</p>
+                    <div className="font-body text-sm" style={{ color: '#1C1B18' }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+
+              {abogado.descripcion && (
+                <div className="rounded-xl p-4" style={{ background: '#F7F6F4' }}>
+                  <p className="font-body text-xs mb-2" style={{ color: '#8A8780' }}>Descripción</p>
+                  <p className="font-body text-sm leading-relaxed line-clamp-4" style={{ color: '#3A3832' }}>
+                    {abogado.descripcion}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {[
+                  { campo: 'visible',              label: 'Visible en búsqueda',  desc: 'Aparece en el catálogo público'  },
+                  { campo: 'matricula_verificada', label: 'Matrícula verificada', desc: 'Muestra el sello de verificación' },
+                ].map(({ campo, label, desc }) => (
+                  <div key={campo} className="flex items-center justify-between p-4 rounded-xl border-2 transition-all"
+                    style={{ borderColor: datos[campo] ? '#2C2B27' : '#E8E6E3' }}>
+                    <div className="flex items-center gap-3">
+                      <Shield size={16} style={{ color: datos[campo] ? '#2C2B27' : '#B0AEA8' }} />
+                      <div>
+                        <p className="font-body font-medium text-sm" style={{ color: '#1C1B18' }}>{label}</p>
+                        <p className="font-body text-xs" style={{ color: '#8A8780' }}>{desc}</p>
+                      </div>
+                    </div>
+                    <div onClick={() => setDatos(d => ({ ...d, [campo]: !d[campo] }))}
+                      className="relative w-11 h-6 rounded-full cursor-pointer transition-colors"
+                      style={{ background: datos[campo] ? '#2C2B27' : '#E8E6E3' }}>
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${datos[campo] ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {abogado.estado_aprobacion === 'pendiente' && (
+                <div className="space-y-3 pt-2">
+                  {!accion && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button onClick={() => setAccion('aprobar')}
+                        className="flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
+                        style={{ background: 'rgba(22,163,74,0.08)', color: '#15803d', borderColor: 'rgba(22,163,74,0.2)' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#15803d'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(22,163,74,0.2)'; }}>
+                        <Check size={16} /> Aprobar perfil
+                      </button>
+                      <button onClick={() => setAccion('rechazar')}
+                        className="flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
+                        style={{ background: 'rgba(220,38,38,0.06)', color: '#dc2626', borderColor: 'rgba(220,38,38,0.15)' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = '#dc2626'; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.15)'; }}>
+                        <X size={16} /> Rechazar perfil
+                      </button>
+                    </div>
+                  )}
+                  {accion === 'rechazar' && (
+                    <div className="animate-slide-down">
+                      <label className="input-label">Motivo del rechazo</label>
+                      <textarea rows={3} placeholder="Se enviará al abogado por email..."
+                        value={motivo} onChange={e => setMotivo(e.target.value)}
+                        className="input-field resize-none" />
+                    </div>
+                  )}
+                  {accion && (
+                    <div className="flex gap-3">
+                      <button onClick={() => setAccion('')} className="btn-secondary flex-1">Cancelar</button>
+                      <button onClick={ejecutarAccion} disabled={guardando}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm text-white transition-colors"
+                        style={{ background: accion === 'rechazar' ? '#dc2626' : '#16a34a' }}>
+                        {guardando ? 'Procesando...'
+                          : accion === 'aprobar'
+                            ? <><Check size={15} /> Confirmar aprobación</>
+                            : <><X size={15} /> Confirmar rechazo</>
+                        }
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {abogado.estado_aprobacion !== 'pendiente' && (
+                <button onClick={async () => {
+                    setGuardando(true);
+                    try {
+                      await api.patch(`/admin/abogados/${abogado.id}/aprobar`, datos);
+                      toast.success('Estado actualizado.');
+                      onActualizar(); onCerrar();
+                    } catch { toast.error('Error al guardar.'); }
+                    finally { setGuardando(false); }
+                  }}
+                  disabled={guardando} className="btn-primary w-full">
+                  {guardando ? 'Guardando...' : <><Save size={15} /> Guardar cambios</>}
                 </button>
+              )}
+
+              {/* Botón de re-registro — solo visible para abogados rechazados */}
+              {abogado.estado_aprobacion === 'rechazado' && (
+                <div className="pt-2 border-t" style={{ borderColor: '#F0EFED' }}>
+                  <p className="font-body text-xs mb-3" style={{ color: '#8A8780' }}>
+                    Si el abogado corrigió su situación y quiere volver a registrarse:
+                  </p>
+                  <button
+                    onClick={permitirReregistro}
+                    disabled={guardando}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
+                    style={{ borderColor: '#B86030', color: '#B86030', background: 'rgba(184,96,48,0.04)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.1)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.04)'; }}
+                  >
+                    <RefreshCw size={15} /> Permitir re-registro
+                  </button>
+                  <p className="font-body text-xs mt-2 text-center" style={{ color: '#B0AEA8' }}>
+                    El historial del perfil actual se conserva en la base de datos.
+                  </p>
+                </div>
               )}
             </div>
           )}
+
+          {/* ── Tab: Documentos ────────────────────────── */}
+          {tab === 'documentos' && <TabDocumentos abogado={abogado} />}
+
+          {/* ── Tab: Editar perfil ─────────────────────── */}
+          {tab === 'perfil' && (
+            <form onSubmit={handleSubmit(onSubmitPerfil)} className="space-y-5">
+
+              {/* Selector de plan */}
+              <div>
+                <label className="input-label">Plan de suscripción</label>
+                {planes.length === 0 ? (
+                  <div className="input-field animate-pulse" style={{ color: '#8A8780' }}>Cargando planes...</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {planes.filter(p => p.activo).map(plan => {
+                      const sel = planSel === plan.slug;
+                      return (
+                        <button key={plan.id} type="button" onClick={() => setPlanSel(plan.slug)}
+                          className="flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all"
+                          style={sel
+                            ? { borderColor: '#2C2B27', background: 'rgba(44,43,39,0.04)' }
+                            : { borderColor: '#E8E6E3', background: '#fff' }}>
+                          <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
+                            style={{ borderColor: sel ? '#2C2B27' : '#D4D2CC' }}>
+                            {sel && <div className="w-2 h-2 rounded-full" style={{ background: '#2C2B27' }} />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-body font-semibold text-sm truncate" style={{ color: '#1C1B18' }}>{plan.nombre}</p>
+                            <p className="font-body text-xs" style={{ color: '#8A8780' }}>
+                              ${parseFloat(plan.precio_mensual).toLocaleString('es-AR')}/mes
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {planSel !== abogado.plan_slug && (
+                  <p className="font-body text-xs mt-2 px-3 py-2 rounded-lg"
+                    style={{ background: 'rgba(184,96,48,0.08)', color: '#B86030' }}>
+                    ⚠️ Cambiarás el plan de <strong>{abogado.plan_nombre || abogado.plan_slug}</strong> a <strong>{planes.find(p => p.slug === planSel)?.nombre || planSel}</strong>.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="input-label">Descripción profesional</label>
+                <textarea rows={4} placeholder="Bio del abogado..." className="input-field resize-none"
+                  {...register('descripcion', { maxLength: { value: 2000, message: 'Máximo 2000 caracteres' } })} />
+                {errors.descripcion && <p className="input-error">{errors.descripcion.message}</p>}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="input-label">Matrícula</label>
+                  <input type="text" placeholder="T-12345" className="input-field" {...register('matricula')} />
+                </div>
+                <div>
+                  <label className="input-label">Años de experiencia</label>
+                  <input type="number" min="0" max="70" className="input-field" {...register('anos_experiencia')} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="input-label">Ciudad</label>
+                  <input type="text" className="input-field" {...register('ciudad')} />
+                </div>
+                <div>
+                  <label className="input-label">Provincia</label>
+                  <input type="text" className="input-field" {...register('provincia')} />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="input-label mb-0">Especialidades</label>
+                  <span className="font-body text-xs" style={{ color: '#8A8780' }}>{espSel.length} seleccionadas</span>
+                </div>
+                <div className="flex flex-wrap gap-2 p-4 rounded-xl" style={{ background: '#F7F6F4' }}>
+                  {ESPECIALIDADES_DISPONIBLES.map(esp => {
+                    const sel = espSel.includes(esp);
+                    return (
+                      <button key={esp} type="button" onClick={() => toggleEsp(esp)}
+                        className="px-3 py-1.5 rounded-xl text-xs font-body font-medium border-2 transition-all"
+                        style={sel
+                          ? { borderColor: '#2C2B27', background: '#2C2B27', color: '#fff' }
+                          : { borderColor: '#E8E6E3', background: '#fff', color: '#56534A' }}>
+                        {sel && <Check size={10} className="inline mr-1" />}{esp}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={onCerrar} className="btn-secondary flex-1">Cancelar</button>
+                <button type="submit" disabled={guardando} className="btn-primary flex-1">
+                  {guardando ? 'Guardando...' : <><Save size={15} /> Guardar perfil</>}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function AdminAbogados() {
+  const [abogados,   setAbogados]   = useState([]);
+  const [cargando,   setCargando]   = useState(true);
+  const [tabActivo,  setTabActivo]  = useState('pendiente');
+  const [busqueda,   setBusqueda]   = useState('');
+  const [abogadoSel, setAbogadoSel] = useState(null);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    try {
+      const { data } = await api.get('/admin/abogados');
+      setAbogados(data.abogados || []);
+    } catch { toast.error('No se pudieron cargar los abogados.'); }
+    finally { setCargando(false); }
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  const abogadosFiltrados = abogados.filter(a => {
+    const coincideTab      = a.estado_aprobacion === tabActivo;
+    const texto            = `${a.nombre} ${a.apellido} ${a.email}`.toLowerCase();
+    const coincideBusqueda = !busqueda || texto.includes(busqueda.toLowerCase());
+    return coincideTab && coincideBusqueda;
+  });
+
+  const conteos = {
+    pendiente: abogados.filter(a => a.estado_aprobacion === 'pendiente').length,
+    aprobado:  abogados.filter(a => a.estado_aprobacion === 'aprobado').length,
+    rechazado: abogados.filter(a => a.estado_aprobacion === 'rechazado').length,
+  };
+
+  const TABS = [
+    { valor: 'pendiente', label: 'Pendientes' },
+    { valor: 'aprobado',  label: 'Aprobados'  },
+    { valor: 'rechazado', label: 'Rechazados' },
+  ];
+
+  const coloresBadge = {
+    pendiente: { bg: 'rgba(245,158,11,0.12)', color: '#b45309' },
+    aprobado:  { bg: 'rgba(22,163,74,0.12)',  color: '#15803d' },
+    rechazado: { bg: 'rgba(220,38,38,0.12)',  color: '#dc2626' },
+  };
+
+  return (
+    <div className="min-h-screen" style={{ background: '#F0EFED' }}>
+      <div className="page-container py-8">
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 className="section-title">Gestión de abogados</h1>
+            <p className="section-subtitle">Revisá, aprobá y editá los perfiles de los profesionales.</p>
+          </div>
+          <button onClick={cargar} disabled={cargando} className="btn-secondary gap-2 shrink-0">
+            <RefreshCw size={16} className={cargando ? 'animate-spin' : ''} /> Actualizar
+          </button>
+        </div>
+
+        {conteos.pendiente > 0 && (
+          <div className="rounded-2xl p-4 mb-6 flex items-center gap-3"
+            style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+            <AlertCircle size={18} style={{ color: '#b45309' }} className="shrink-0" />
+            <p className="font-body text-sm" style={{ color: '#92400e' }}>
+              Hay <strong>{conteos.pendiente}</strong> abogado{conteos.pendiente > 1 ? 's' : ''} esperando revisión.
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-2 flex-wrap mb-6">
+          {TABS.map(tab => (
+            <button key={tab.valor} onClick={() => setTabActivo(tab.valor)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-body font-medium transition-all"
+              style={tabActivo === tab.valor
+                ? { background: '#2C2B27', color: '#fff' }
+                : { background: '#fff', border: '1px solid #E8E6E3', color: '#56534A' }}>
+              {tab.label}
+              <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                style={tabActivo === tab.valor
+                  ? { background: 'rgba(255,255,255,0.2)', color: '#fff' }
+                  : coloresBadge[tab.valor]}>
+                {conteos[tab.valor]}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative mb-6">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#8A8780' }} />
+          <input type="text" placeholder="Buscar por nombre o email..."
+            value={busqueda} onChange={e => setBusqueda(e.target.value)}
+            className="input-field pl-10" />
+        </div>
+
+        <div className="card overflow-hidden">
+          {cargando && (
+            <div>
+              {[1,2,3].map(i => (
+                <div key={i} className="px-6 py-4 flex gap-4 animate-pulse" style={{ borderBottom: '1px solid #F7F6F4' }}>
+                  <div className="w-12 h-12 rounded-xl shrink-0" style={{ background: '#E8E6E3' }} />
+                  <div className="flex-1 space-y-2 py-1">
+                    <div className="h-4 rounded w-1/3" style={{ background: '#E8E6E3' }} />
+                    <div className="h-3 rounded w-1/4" style={{ background: '#E8E6E3' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!cargando && abogadosFiltrados.length === 0 && (
+            <div className="py-16 text-center">
+              <Check size={36} className="mx-auto mb-3" style={{ color: '#D4D2CC' }} />
+              <p className="font-display text-xl mb-1" style={{ color: '#1C1B18' }}>
+                {tabActivo === 'pendiente' ? '¡Todo al día!' : 'Sin resultados'}
+              </p>
+              <p className="font-body text-sm" style={{ color: '#8A8780' }}>
+                {tabActivo === 'pendiente' ? 'No hay abogados pendientes de revisión.' : 'Probá otro filtro.'}
+              </p>
+            </div>
+          )}
+
+          {!cargando && abogadosFiltrados.map((a, idx) => (
+            <div key={a.id}
+              className="flex items-start gap-4 px-6 py-5 transition-colors"
+              style={{ borderBottom: idx < abogadosFiltrados.length - 1 ? '1px solid #F7F6F4' : 'none' }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = ''; }}>
+
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: '#2C2B27' }}>
+                <span className="font-display font-bold text-white text-sm">
+                  {a.nombre[0]}{a.apellido[0]}
+                </span>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div>
+                    <p className="font-body font-semibold" style={{ color: '#1C1B18' }}>
+                      Dr./Dra. {a.nombre} {a.apellido}
+                    </p>
+                    <p className="font-body text-xs mt-0.5" style={{ color: '#8A8780' }}>{a.email}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <BadgePlan slug={a.plan_slug} />
+                      {a.ciudad && (
+                        <span className="flex items-center gap-1 text-xs font-body" style={{ color: '#8A8780' }}>
+                          <MapPin size={11} /> {a.ciudad}
+                        </span>
+                      )}
+                      {a.especialidades?.length > 0 && (
+                        <span className="text-xs font-body" style={{ color: '#B0AEA8' }}>
+                          {a.especialidades.slice(0, 2).join(', ')}
+                          {a.especialidades.length > 2 && ` +${a.especialidades.length - 2}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 text-xs font-body px-2.5 py-1.5 rounded-full"
+                      style={coloresBadge[tabActivo]}>
+                      {tabActivo === 'pendiente' && <Clock size={11} />}
+                      {tabActivo === 'aprobado'  && <Check size={11} />}
+                      {tabActivo === 'rechazado' && <X size={11} />}
+                      {tabActivo === 'pendiente' ? 'Pendiente' : tabActivo === 'aprobado' ? 'Aprobado' : 'Rechazado'}
+                    </div>
+                    <button onClick={() => setAbogadoSel(a)}
+                      className="flex items-center gap-1.5 text-xs px-4 py-2 rounded-xl font-body font-medium text-white transition-colors"
+                      style={{ background: tabActivo === 'pendiente' ? '#B86030' : '#2C2B27' }}
+                      onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; }}
+                      onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
+                      {tabActivo === 'pendiente' ? 'Revisar' : <><Edit2 size={12} /> Editar</>}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ── Grilla de abogados ────────────────────────────── */}
-      <div className="page-container py-8">
-
-        {/* Estado de carga */}
-        {cargando && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="card p-6 h-56 animate-pulse">
-                <div className="flex gap-4 mb-4">
-                  <div className="w-16 h-16 bg-slate-200 rounded-2xl" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-slate-200 rounded w-3/4" />
-                    <div className="h-3 bg-slate-200 rounded w-1/2" />
-                    <div className="h-3 bg-slate-200 rounded w-1/3" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="h-3 bg-slate-200 rounded" />
-                  <div className="h-3 bg-slate-200 rounded w-5/6" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Error */}
-        {error && !cargando && (
-          <div className="text-center py-16">
-            <p className="text-slate-500 mb-4">{error}</p>
-            <button onClick={() => buscar(1)} className="btn-primary">Reintentar</button>
-          </div>
-        )}
-
-        {/* Sin resultados */}
-        {!cargando && !error && abogados.length === 0 && (
-          <div className="text-center py-16">
-            <p className="font-display text-xl text-navy-900 mb-2">Sin resultados</p>
-            <p className="text-slate-500 mb-6">No encontramos abogados con esos criterios.</p>
-            <button onClick={limpiarFiltros} className="btn-secondary">Limpiar filtros</button>
-          </div>
-        )}
-
-        {/* Resultados */}
-        {!cargando && !error && abogados.length > 0 && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {abogados.map(abogado => (
-                <TarjetaAbogado key={abogado.id} abogado={abogado} />
-              ))}
-            </div>
-
-            {/* Paginación */}
-            {paginacion.total_paginas > 1 && (
-              <div className="flex items-center justify-center gap-3 mt-12">
-                <button
-                  onClick={() => buscar(paginacion.pagina - 1)}
-                  disabled={paginacion.pagina === 1}
-                  className="btn-secondary p-2.5 disabled:opacity-40"
-                >
-                  <ChevronLeft size={18} />
-                </button>
-
-                <div className="flex gap-2">
-                  {Array.from({ length: paginacion.total_paginas }, (_, i) => i + 1)
-                    .filter(p => Math.abs(p - paginacion.pagina) <= 2)
-                    .map(p => (
-                      <button
-                        key={p}
-                        onClick={() => buscar(p)}
-                        className={`w-10 h-10 rounded-xl text-sm font-body font-medium transition-all ${
-                          p === paginacion.pagina
-                            ? 'bg-navy-900 text-white'
-                            : 'bg-white border border-slate-200 text-slate-600 hover:border-navy-300'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))
-                  }
-                </div>
-
-                <button
-                  onClick={() => buscar(paginacion.pagina + 1)}
-                  disabled={paginacion.pagina === paginacion.total_paginas}
-                  className="btn-secondary p-2.5 disabled:opacity-40"
-                >
-                  <ChevronRight size={18} />
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+      {abogadoSel && (
+        <ModalAbogado abogado={abogadoSel}
+          onCerrar={() => setAbogadoSel(null)}
+          onActualizar={cargar} />
+      )}
     </div>
   );
 }

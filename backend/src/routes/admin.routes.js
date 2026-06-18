@@ -874,4 +874,61 @@ router.put('/config/:clave', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/admin/usuarios/:id/permitir-reregistro
+// Permite que un abogado rechazado pueda volver a registrarse
+// con el mismo email. Estrategia: anonimizar el email actual
+// agregando un sufijo único, para liberar el email pero
+// conservar el historial completo del usuario en la BD.
+// ─────────────────────────────────────────────────────────────
+router.patch('/usuarios/:id/permitir-reregistro', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Verificar que el usuario existe y es un abogado rechazado
+    const { rows: [usuario] } = await query(
+      `SELECT u.id, u.email, u.nombre, u.apellido, r.nombre AS rol,
+              pa.estado_aprobacion
+       FROM usuarios u
+       JOIN roles r ON u.rol_id = r.id
+       LEFT JOIN perfiles_abogado pa ON u.id = pa.usuario_id
+       WHERE u.id = $1`,
+      [id]
+    );
+
+    if (!usuario) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    if (usuario.rol !== 'abogado') {
+      return res.status(400).json({ error: 'Esta acción solo aplica para abogados.' });
+    }
+
+    if (usuario.estado_aprobacion !== 'rechazado') {
+      return res.status(400).json({
+        error: 'Solo se puede permitir el re-registro de abogados rechazados.',
+      });
+    }
+
+    // Anonimizar el email con un sufijo único basado en timestamp
+    // Ej: juan@email.com → juan@email.com__rechazado_1718000000000
+    const emailAnonimizado = `${usuario.email}__rechazado_${Date.now()}`;
+
+    await query(
+      `UPDATE usuarios SET
+         email              = $1,
+         activo             = false,
+         token_verificacion = NULL,
+         token_reset_pass   = NULL
+       WHERE id = $2`,
+      [emailAnonimizado, id]
+    );
+
+    res.json({
+      mensaje: `El email "${usuario.email}" fue liberado. El abogado puede volver a registrarse con ese email.`,
+      email_liberado: usuario.email,
+    });
+  } catch (error) { next(error); }
+});
+
 module.exports = router;

@@ -1,11 +1,12 @@
 // ============================================================
 // src/pages/admin/Usuarios.jsx — Paleta C: Gris carbón + Cobre
 // ============================================================
-// v2 - con eliminación de usuarios
-// ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { Search, UserCheck, UserX, Shield, RefreshCw, Mail, User, Briefcase, Crown, X, Filter } from 'lucide-react';
+import {
+  Search, UserCheck, UserX, Shield, RefreshCw,
+  Mail, User, Briefcase, Crown, X, Filter
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -13,7 +14,7 @@ import api from '../../services/api';
 
 function BadgeRol({ rol }) {
   const mapa = {
-    admin:   { icono: <Crown size={11} />,    label: 'Admin',   bg: 'rgba(124,58,237,0.08)', color: '#6d28d9' },
+    admin:   { icono: <Crown size={11} />,     label: 'Admin',   bg: 'rgba(124,58,237,0.08)', color: '#6d28d9' },
     abogado: { icono: <Briefcase size={11} />, label: 'Abogado', bg: 'rgba(44,43,39,0.08)',   color: '#2C2B27' },
     cliente: { icono: <User size={11} />,      label: 'Cliente', bg: '#F0EFED',               color: '#56534A' },
   };
@@ -28,7 +29,6 @@ function BadgeRol({ rol }) {
 
 function ModalUsuario({ usuario, onCerrar, onActualizar }) {
   const [procesando, setProcesando] = useState(false);
-  const [confirmaElim, setConfirmaElim] = useState(null); // null | 'suave' | 'definitivo'
 
   const toggleEstado = async () => {
     const nuevoEstado = !usuario.activo;
@@ -43,23 +43,28 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
     finally { setProcesando(false); }
   };
 
-  const eliminar = async (tipo) => {
+  // Permitir re-registro — solo para abogados rechazados
+  const permitirReregistro = async () => {
+    if (!window.confirm(
+      `¿Permitir que ${usuario.nombre} ${usuario.apellido} se vuelva a registrar?\n\n` +
+      `El email "${usuario.email}" quedará libre para un nuevo registro. ` +
+      `El historial del perfil actual se conserva en la base de datos.`
+    )) return;
     setProcesando(true);
     try {
-      await api.delete(`/admin/usuarios/${usuario.id}`, { data: { tipo } });
-      toast.success(tipo === 'definitivo'
-        ? 'Cuenta eliminada definitivamente.'
-        : 'Cuenta eliminada (puede recuperarse).'
-      );
+      await api.patch(`/admin/usuarios/${usuario.id}/permitir-reregistro`);
+      toast.success(`Email liberado. ${usuario.nombre} puede volver a registrarse.`);
       onActualizar();
       onCerrar();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al eliminar.');
+      toast.error(err.response?.data?.error || 'Error al procesar la acción.');
     } finally {
       setProcesando(false);
-      setConfirmaElim(null);
     }
   };
+
+  // Mostrar el botón de re-registro si es abogado rechazado
+  const esAbogadoRechazado = usuario.rol === 'abogado' && usuario.estado_aprobacion === 'rechazado';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
@@ -96,6 +101,18 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
                 }>
                 {usuario.activo ? 'Activo' : 'Deshabilitado'}
               </span>
+              {/* Badge de estado de aprobación para abogados */}
+              {usuario.rol === 'abogado' && usuario.estado_aprobacion && (
+                <span className="text-xs font-body px-2 py-0.5 rounded-full"
+                  style={usuario.estado_aprobacion === 'aprobado'
+                    ? { background: 'rgba(22,163,74,0.08)',   color: '#16a34a' }
+                    : usuario.estado_aprobacion === 'rechazado'
+                      ? { background: 'rgba(220,38,38,0.08)', color: '#dc2626' }
+                      : { background: 'rgba(245,158,11,0.08)',color: '#b45309' }
+                  }>
+                  {usuario.estado_aprobacion}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -119,87 +136,42 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
         </div>
 
         <div className="space-y-3">
+          {/* Habilitar / Deshabilitar — no para admins */}
           {usuario.rol !== 'admin' && (
-            <>
-              {/* Habilitar / Deshabilitar */}
-              <button onClick={toggleEstado} disabled={procesando}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm transition-colors"
-                style={usuario.activo
-                  ? { background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }
-                  : { background: 'rgba(22,163,74,0.08)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.2)' }
-                }>
-                {procesando
-                  ? <div className="w-4 h-4 border-2 border-current/40 border-t-current rounded-full animate-spin" />
-                  : usuario.activo
-                    ? <><UserX size={16} /> Deshabilitar cuenta</>
-                    : <><UserCheck size={16} /> Habilitar cuenta</>
-                }
-              </button>
-
-              {/* Separador */}
-              <div className="border-t pt-3" style={{ borderColor: '#F0EFED' }}>
-                <p className="font-body text-xs font-semibold mb-2" style={{ color: '#8A8780' }}>
-                  Zona de eliminación
-                </p>
-
-                {/* Panel de confirmación */}
-                {confirmaElim ? (
-                  <div className="rounded-xl p-4 animate-slide-down"
-                    style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)' }}>
-                    <p className="font-body text-sm font-semibold mb-1" style={{ color: '#dc2626' }}>
-                      {confirmaElim === 'definitivo'
-                        ? '⚠️ Esta acción es IRREVERSIBLE'
-                        : '¿Confirmás la eliminación?'}
-                    </p>
-                    <p className="font-body text-xs mb-3" style={{ color: '#7f1d1d' }}>
-                      {confirmaElim === 'definitivo'
-                        ? `Se borrarán todos los datos de ${usuario.nombre} ${usuario.apellido} de la base de datos. No hay vuelta atrás.`
-                        : `La cuenta de ${usuario.nombre} ${usuario.apellido} se desactivará y podrá recuperarse si es necesario.`
-                      }
-                    </p>
-                    <div className="flex gap-2">
-                      <button onClick={() => setConfirmaElim(null)}
-                        className="flex-1 py-2 rounded-xl font-body text-sm border transition-colors"
-                        style={{ borderColor: '#E8E6E3', color: '#56534A' }}>
-                        Cancelar
-                      </button>
-                      <button
-                        onClick={() => eliminar(confirmaElim)}
-                        disabled={procesando}
-                        className="flex-1 py-2 rounded-xl font-body text-sm font-medium text-white transition-colors"
-                        style={{ background: '#dc2626' }}>
-                        {procesando
-                          ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin mx-auto" />
-                          : 'Confirmar eliminación'
-                        }
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setConfirmaElim('suave')}
-                      className="py-2.5 px-3 rounded-xl font-body text-xs font-medium border transition-colors text-center"
-                      style={{ borderColor: '#E8E6E3', color: '#56534A' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = ''; }}
-                    >
-                      🗂 Eliminación suave
-                    </button>
-                    <button
-                      onClick={() => setConfirmaElim('definitivo')}
-                      className="py-2.5 px-3 rounded-xl font-body text-xs font-medium border transition-colors text-center"
-                      style={{ borderColor: 'rgba(220,38,38,0.3)', color: '#dc2626' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.06)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = ''; }}
-                    >
-                      🗑 Eliminar definitivo
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
+            <button onClick={toggleEstado} disabled={procesando}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm transition-colors"
+              style={usuario.activo
+                ? { background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }
+                : { background: 'rgba(22,163,74,0.08)', color: '#16a34a', border: '1px solid rgba(22,163,74,0.2)' }
+              }>
+              {procesando
+                ? <div className="w-4 h-4 border-2 border-current/40 border-t-current rounded-full animate-spin" />
+                : usuario.activo
+                  ? <><UserX size={16} /> Deshabilitar cuenta</>
+                  : <><UserCheck size={16} /> Habilitar cuenta</>
+              }
+            </button>
           )}
+
+          {/* Permitir re-registro — solo para abogados rechazados */}
+          {esAbogadoRechazado && (
+            <div className="pt-1">
+              <button
+                onClick={permitirReregistro}
+                disabled={procesando}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
+                style={{ borderColor: '#B86030', color: '#B86030', background: 'rgba(184,96,48,0.04)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.1)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.04)'; }}
+              >
+                <RefreshCw size={15} /> Permitir re-registro
+              </button>
+              <p className="font-body text-xs mt-2 text-center" style={{ color: '#B0AEA8' }}>
+                El historial del perfil actual se conserva en la base de datos.
+              </p>
+            </div>
+          )}
+
           <button onClick={onCerrar} className="btn-secondary w-full">Cerrar</button>
         </div>
       </div>
@@ -234,9 +206,9 @@ export default function AdminUsuarios() {
   });
 
   const conteos = {
-    total: usuarios.length,
-    abogado: usuarios.filter(u => u.rol === 'abogado').length,
-    cliente: usuarios.filter(u => u.rol === 'cliente').length,
+    total:     usuarios.length,
+    abogado:   usuarios.filter(u => u.rol === 'abogado').length,
+    cliente:   usuarios.filter(u => u.rol === 'cliente').length,
     inactivos: usuarios.filter(u => !u.activo).length,
   };
 
@@ -350,6 +322,13 @@ export default function AdminUsuarios() {
                     <span className="font-body text-xs" style={{ color: '#8A8780' }}>
                       {u.email_verificado ? 'Verificado' : 'Pendiente'}
                     </span>
+                    {/* Indicador de abogado rechazado */}
+                    {u.rol === 'abogado' && u.estado_aprobacion === 'rechazado' && (
+                      <span className="font-body text-xs ml-1 px-1.5 py-0.5 rounded"
+                        style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>
+                        rechazado
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
