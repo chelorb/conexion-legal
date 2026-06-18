@@ -25,12 +25,14 @@ export default function Navbar() {
   const location  = useLocation();
 
   const linksAbogado = [
-    { href: '/abogado/dashboard',   label: 'Panel' },
-    { href: '/abogado/consultas',   label: 'Consultas' },
-    { href: '/abogado/campus',      label: 'Campus' },
-    { href: '/abogado/agenda',      label: 'Agenda' },
-    { href: '/abogado/foro',        label: 'Foro' },
-    { href: '/abogado/beneficios',  label: 'Beneficios' },
+    { href: '/abogado/dashboard',      label: 'Panel'          },
+    { href: '/abogado/consultas',      label: 'Consultas'      },
+    { href: '/abogado/campus',         label: 'Campus'         },
+    { href: '/abogado/agenda',         label: 'Agenda'         },
+    { href: '/abogado/disponibilidad', label: 'Disponibilidad' },
+    { href: '/abogado/documentos',     label: 'Documentos'     },
+    { href: '/abogado/foro',           label: 'Foro'           },
+    { href: '/abogado/beneficios',     label: 'Beneficios'     },
   ];
 
   const linksCliente = [

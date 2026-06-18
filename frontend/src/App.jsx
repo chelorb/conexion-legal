@@ -38,6 +38,8 @@ import ForoHilo         from './pages/abogado/ForoHilo';
 import Beneficios       from './pages/abogado/Beneficios';
 import Credencial       from './pages/abogado/Credencial';
 import Suscripcion      from './pages/abogado/Suscripcion';
+import Disponibilidad   from './pages/abogado/Disponibilidad'; // ← Fix: faltaba importar
+import Documentos       from './pages/abogado/Documentos';     // ← Fix: faltaba importar
 
 // ── Páginas del cliente (requieren auth + rol cliente) ───────
 import DashboardCliente from './pages/cliente/Dashboard';
@@ -266,6 +268,8 @@ function AppRoutes() {
           <Route path="/abogado/beneficios"  element={<RutaProtegida rolesPermitidos={['abogado']}><Beneficios /></RutaProtegida>} />
           <Route path="/abogado/credencial"  element={<RutaProtegida rolesPermitidos={['abogado']}><Credencial /></RutaProtegida>} />
           <Route path="/abogado/suscripcion" element={<RutaProtegida rolesPermitidos={['abogado']}><Suscripcion /></RutaProtegida>} />
+          <Route path="/abogado/disponibilidad" element={<RutaProtegida rolesPermitidos={['abogado']}><Disponibilidad /></RutaProtegida>} />
+          <Route path="/abogado/documentos"     element={<RutaProtegida rolesPermitidos={['abogado']}><Documentos /></RutaProtegida>} />
 
           {/* ── Cliente ───────────────────────────────────── */}
           <Route path="/cliente/dashboard"        element={<RutaProtegida rolesPermitidos={['cliente']}><DashboardCliente /></RutaProtegida>} />

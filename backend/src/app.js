@@ -17,19 +17,21 @@ const jwt           = require('jsonwebtoken');
 require('./config/database');
 
 // ── Rutas ─────────────────────────────────────────────────────
-const authRoutes           = require('./routes/auth.routes');
-const usuariosRoutes       = require('./routes/usuarios.routes');
-const abogadosRoutes       = require('./routes/abogados.routes');
-const consultasRoutes      = require('./routes/consultas.routes');
-const calificacionesRoutes = require('./routes/calificaciones.routes');
-const campusRoutes         = require('./routes/campus.routes');
-const agendaRoutes         = require('./routes/agenda.routes');
-const foroRoutes           = require('./routes/foro.routes');
-const pagosRoutes          = require('./routes/pagos.routes');
-const beneficiosRoutes     = require('./routes/beneficios.routes');
-const notificacionesRoutes = require('./routes/notificaciones.routes');
-const adminRoutes          = require('./routes/admin.routes');
-const planesAdminRoutes    = require('./routes/planes.admin.routes');
+const authRoutes              = require('./routes/auth.routes');
+const usuariosRoutes          = require('./routes/usuarios.routes');
+const abogadosRoutes          = require('./routes/abogados.routes');
+const consultasRoutes         = require('./routes/consultas.routes');
+const calificacionesRoutes    = require('./routes/calificaciones.routes');
+const campusRoutes            = require('./routes/campus.routes');
+const agendaRoutes            = require('./routes/agenda.routes');
+const foroRoutes              = require('./routes/foro.routes');
+const pagosRoutes             = require('./routes/pagos.routes');
+const beneficiosRoutes        = require('./routes/beneficios.routes');
+const notificacionesRoutes    = require('./routes/notificaciones.routes');
+const adminRoutes             = require('./routes/admin.routes');
+const planesAdminRoutes       = require('./routes/planes.admin.routes');
+const disponibilidadRoutes    = require('./routes/disponibilidad.routes'); // ← Fix: faltaba registrar
+const documentosRoutes        = require('./routes/documentos.routes');     // ← Fix: faltaba registrar
 
 const app = express();
 
@@ -56,42 +58,18 @@ app.use(cors({
 // Límite global: 200 requests por IP cada 15 minutos
 // Protege contra scrapers y ataques de fuerza bruta generales
 const limiterGlobal = rateLimit({
-  windowMs:         15 * 60 * 1000, // 15 minutos
+  windowMs:         15 * 60 * 1000,
   max:              200,
-  standardHeaders:  true,            // Devuelve headers RateLimit-*
+  standardHeaders:  true,
   legacyHeaders:    false,
   message: {
     error: 'Demasiadas solicitudes desde esta IP. Intentá de nuevo en 15 minutos.',
   },
-  // Saltar en desarrollo para no interferir con pruebas locales
   skip: () => process.env.NODE_ENV === 'development',
 });
 
-// Límite de login: 5 intentos por IP cada 15 minutos
-// Previene ataques de brute force sobre contraseñas
-const limiterLogin = rateLimit({
-  windowMs:        15 * 60 * 1000,
-  max:             5,
-  standardHeaders: true,
-  legacyHeaders:   false,
-  message: {
-    error: 'Demasiados intentos de inicio de sesión. Esperá 15 minutos antes de volver a intentarlo.',
-  },
-  skip: () => process.env.NODE_ENV === 'development',
-});
-
-// Límite de registro: 3 registros por IP cada hora
-// Previene creación masiva de cuentas con bots
-const limiterRegistro = rateLimit({
-  windowMs:        60 * 60 * 1000, // 1 hora
-  max:             3,
-  standardHeaders: true,
-  legacyHeaders:   false,
-  message: {
-    error: 'Demasiados registros desde esta IP. Esperá una hora antes de volver a intentarlo.',
-  },
-  skip: () => process.env.NODE_ENV === 'development',
-});
+// Nota: limiterLogin y limiterRegistro viven en auth.routes.js
+// aplicados directamente sobre cada endpoint específico
 
 app.use(limiterGlobal);
 
@@ -109,18 +87,20 @@ app.get('/health', (req, res) =>
 // ── Rutas API ─────────────────────────────────────────────────
 // El rate limiting se aplica como middleware específico solo en login y registro
 // auth.routes maneja internamente cuáles rutas son cuáles
-app.use('/api/auth',          authRoutes);
-app.use('/api/usuarios',      usuariosRoutes);
-app.use('/api/abogados',      abogadosRoutes);
-app.use('/api/consultas',     consultasRoutes);
-app.use('/api/calificaciones', calificacionesRoutes);
-app.use('/api/campus',        campusRoutes);
-app.use('/api/agenda',        agendaRoutes);
-app.use('/api/foro',          foroRoutes);
-app.use('/api/pagos',         pagosRoutes);
-app.use('/api/beneficios',    beneficiosRoutes);
-app.use('/api/notificaciones', notificacionesRoutes);
-app.use('/api/admin',         adminRoutes);
+app.use('/api/auth',               authRoutes);
+app.use('/api/usuarios',           usuariosRoutes);
+app.use('/api/abogados',           abogadosRoutes);
+app.use('/api/consultas',          consultasRoutes);
+app.use('/api/calificaciones',     calificacionesRoutes);
+app.use('/api/campus',             campusRoutes);
+app.use('/api/agenda',             agendaRoutes);
+app.use('/api/foro',               foroRoutes);
+app.use('/api/pagos',              pagosRoutes);
+app.use('/api/beneficios',         beneficiosRoutes);
+app.use('/api/notificaciones',     notificacionesRoutes);
+app.use('/api/disponibilidad',     disponibilidadRoutes); // ← Fix: ahora registrada
+app.use('/api/documentos',         documentosRoutes);     // ← Fix: ahora registrada
+app.use('/api/admin',              adminRoutes);
 app.use('/api/admin/planes-gestion', planesAdminRoutes);
 
 // Ruta pública de config (botón WhatsApp)

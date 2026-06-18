@@ -6,6 +6,7 @@ const router  = express.Router();
 const ctrl    = require('../controllers/abogados.controller');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 const { validarPerfilAbogado } = require('../middleware/validacion.middleware');
+const { query } = require('../config/database'); // necesario para rutas de notificaciones-plan
 
 // Rutas públicas
 router.get('/',                ctrl.listarAbogados);
