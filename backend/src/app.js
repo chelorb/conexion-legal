@@ -107,9 +107,8 @@ app.get('/health', (req, res) =>
 );
 
 // ── Rutas API ─────────────────────────────────────────────────
-// Login y registro tienen sus propios limitadores más estrictos
-app.use('/api/auth/login',    limiterLogin,    require('./routes/auth.routes'));
-app.use('/api/auth/registro', limiterRegistro, require('./routes/auth.routes'));
+// El rate limiting se aplica como middleware específico solo en login y registro
+// auth.routes maneja internamente cuáles rutas son cuáles
 app.use('/api/auth',          authRoutes);
 app.use('/api/usuarios',      usuariosRoutes);
 app.use('/api/abogados',      abogadosRoutes);

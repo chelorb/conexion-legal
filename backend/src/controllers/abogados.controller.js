@@ -17,39 +17,52 @@ const listarAbogados = async (req, res, next) => {
       especialidad,
       ciudad,
       provincia,
-      online,
-      plan,
-      orden = 'calificacion',
+      online,          // 'true' o 'false'
+      plan,            // 'gratuito', 'basico', 'premium'
+      orden = 'calificacion', // 'calificacion' | 'experiencia' | 'nombre'
       pagina = 1,
       limite = 12,
     } = req.query;
 
+    // Construir la query dinámicamente según los filtros recibidos
     const condiciones = ['pa.visible_en_grilla = true', 'u.activo = true'];
     const parametros  = [];
     let paramIndex    = 1;
 
     if (especialidad) {
+      // Busca en el array de especialidades del perfil
       condiciones.push(`$${paramIndex} = ANY(pa.especialidades)`);
       parametros.push(especialidad);
       paramIndex++;
     }
+
     if (ciudad) {
       condiciones.push(`LOWER(pa.ciudad) LIKE LOWER($${paramIndex})`);
       parametros.push(`%${ciudad}%`);
       paramIndex++;
     }
+
     if (provincia) {
       condiciones.push(`LOWER(pa.provincia) LIKE LOWER($${paramIndex})`);
       parametros.push(`%${provincia}%`);
       paramIndex++;
     }
+
     if (online === 'true') {
       condiciones.push('pa.atiende_online = true');
     }
+
     if (plan) {
       condiciones.push(`ps.slug = $${paramIndex}`);
       parametros.push(plan);
       paramIndex++;
+    }
+
+    // Mapear opciones de ordenamiento
+    // Validar que el parámetro orden sea uno de los valores permitidos
+    const ordenesValidos = ['calificacion', 'experiencia', 'nombre'];
+    if (orden && !ordenesValidos.includes(orden)) {
+      return res.status(400).json({ error: 'Parámetro de orden inválido.' });
     }
 
     const ordenMap = {
@@ -57,59 +70,80 @@ const listarAbogados = async (req, res, next) => {
       experiencia:  'pa.anos_experiencia DESC NULLS LAST',
       nombre:       'u.apellido ASC, u.nombre ASC',
     };
-    const ordenSQL     = ordenMap[orden] || ordenMap.calificacion;
-    const offset       = (parseInt(pagina) - 1) * parseInt(limite);
-    const limiteParsed = Math.min(parseInt(limite), 50);
-    const whereClause  = condiciones.join(' AND ');
+    const ordenSQL = ordenMap[orden] || ordenMap.calificacion;
 
-    const { rows: abogados } = await query(
-      `SELECT
-         u.id, u.nombre, u.apellido, u.avatar_url,
-         pa.especialidades, pa.descripcion,
-         CAST(pa.anos_experiencia AS INT) AS anos_experiencia,
-         pa.ciudad, pa.provincia,
-         pa.atiende_online, pa.atiende_presencial,
-         CAST(pa.calificacion_promedio AS FLOAT) AS calificacion_promedio,
-         CAST(pa.total_calificaciones AS INT) AS total_calificaciones,
-         CAST(pa.consultas_completadas AS INT) AS consultas_completadas,
-         pa.matricula_verificada, pa.credencial_activa,
-         ps.nombre AS plan_nombre, ps.slug AS plan_slug,
-         ps.difusion_profesional
-       FROM usuarios u
-       JOIN perfiles_abogado pa ON u.id = pa.usuario_id
-       JOIN planes_suscripcion ps ON pa.plan_id = ps.id
-       WHERE ${whereClause}
-       ORDER BY ps.difusion_profesional DESC, ${ordenSQL}
-       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
-      [...parametros, limiteParsed, offset]
-    );
+    // Paginación
+    const offset = (parseInt(pagina) - 1) * parseInt(limite);
+    const limiteParsed = Math.min(parseInt(limite), 50); // Máximo 50 por página
 
+    const whereClause = condiciones.join(' AND ');
+
+    // Query principal con todos los datos necesarios para la tarjeta del abogado
+    const sql = `
+      SELECT
+        u.id,
+        u.nombre,
+        u.apellido,
+        u.avatar_url,
+        pa.especialidades,
+        pa.descripcion,
+        CAST(pa.anos_experiencia AS INT) AS anos_experiencia,
+        pa.ciudad,
+        pa.provincia,
+        pa.atiende_online,
+        pa.atiende_presencial,
+        CAST(pa.calificacion_promedio AS FLOAT) AS calificacion_promedio,
+        CAST(pa.total_calificaciones AS INT) AS total_calificaciones,
+        CAST(pa.consultas_completadas AS INT) AS consultas_completadas,
+        pa.matricula_verificada,
+        pa.credencial_activa,
+        ps.nombre  AS plan_nombre,
+        ps.slug    AS plan_slug,
+        ps.difusion_profesional
+      FROM usuarios u
+      JOIN perfiles_abogado pa ON u.id = pa.usuario_id
+      JOIN planes_suscripcion ps ON pa.plan_id = ps.id
+      WHERE ${whereClause}
+      ORDER BY
+        ps.difusion_profesional DESC, -- Los premium aparecen primero
+        ${ordenSQL}
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    parametros.push(limiteParsed, offset);
+
+    const { rows: abogados } = await query(sql, parametros);
+
+    // Contar el total para la paginación del frontend
     const { rows: conteo } = await query(
       `SELECT COUNT(*) AS total
        FROM usuarios u
        JOIN perfiles_abogado pa ON u.id = pa.usuario_id
        JOIN planes_suscripcion ps ON pa.plan_id = ps.id
        WHERE ${whereClause}`,
-      parametros
+      parametros.slice(0, -2) // Sin el LIMIT y OFFSET
     );
+
+    const total = parseInt(conteo[0].total);
 
     res.json({
       abogados,
       paginacion: {
-        total:         parseInt(conteo[0].total),
-        pagina:        parseInt(pagina),
-        limite:        limiteParsed,
-        total_paginas: Math.ceil(parseInt(conteo[0].total) / limiteParsed),
+        total,
+        pagina:      parseInt(pagina),
+        limite:      limiteParsed,
+        total_paginas: Math.ceil(total / limiteParsed),
       }
     });
-  } catch (error) { next(error); }
+
+  } catch (error) {
+    next(error);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/abogados/:id
 // Perfil público completo de un abogado
-// FIX: se agregaron matricula, universidad, titulo_universitario,
-//      anio_graduacion y nro_credencial_letrado al SELECT
 // ─────────────────────────────────────────────────────────────
 const obtenerAbogado = async (req, res, next) => {
   try {
@@ -118,23 +152,13 @@ const obtenerAbogado = async (req, res, next) => {
     const { rows } = await query(
       `SELECT
          u.id, u.nombre, u.apellido, u.avatar_url,
-         -- Datos académicos y matrícula
-         pa.matricula, pa.matricula_verificada,
-         pa.titulo_universitario, pa.universidad, pa.anio_graduacion,
-         pa.nro_credencial_letrado,
-         -- Datos profesionales
-         pa.especialidades, pa.descripcion,
-         CAST(pa.anos_experiencia AS INT) AS anos_experiencia,
-         -- Ubicación y modalidad
+         pa.especialidades, pa.descripcion, CAST(pa.anos_experiencia AS INT) AS anos_experiencia,
          pa.ciudad, pa.provincia, pa.direccion_consultorio,
          pa.atiende_online, pa.atiende_presencial,
-         -- Métricas
-         CAST(pa.calificacion_promedio AS FLOAT) AS calificacion_promedio,
-         CAST(pa.total_calificaciones AS INT) AS total_calificaciones,
-         CAST(pa.consultas_completadas AS INT) AS consultas_completadas,
-         -- Plan y credencial
+         CAST(pa.calificacion_promedio AS FLOAT) AS calificacion_promedio, CAST(pa.total_calificaciones AS INT) AS total_calificaciones,
+         CAST(pa.consultas_completadas AS INT) AS consultas_completadas, pa.matricula_verificada,
          pa.credencial_activa,
-         ps.nombre AS plan_nombre, ps.slug AS plan_slug
+         ps.nombre AS plan_nombre
        FROM usuarios u
        JOIN perfiles_abogado pa ON u.id = pa.usuario_id
        JOIN planes_suscripcion ps ON pa.plan_id = ps.id
@@ -146,7 +170,7 @@ const obtenerAbogado = async (req, res, next) => {
       return res.status(404).json({ error: 'Abogado no encontrado.' });
     }
 
-    // Calificaciones públicas
+    // Obtener las últimas calificaciones públicas
     const { rows: calificaciones } = await query(
       `SELECT c.puntaje, c.comentario, c.creado_en,
               u.nombre AS cliente_nombre
@@ -158,8 +182,14 @@ const obtenerAbogado = async (req, res, next) => {
       [id]
     );
 
-    res.json({ abogado: rows[0], calificaciones });
-  } catch (error) { next(error); }
+    res.json({
+      abogado: rows[0],
+      calificaciones,
+    });
+
+  } catch (error) {
+    next(error);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -175,18 +205,24 @@ const actualizarPerfil = async (req, res, next) => {
       atiende_online, atiende_presencial,
     } = req.body;
 
-    // Actualizar nombre/apellido/teléfono si vienen
+    // También actualizar nombre y teléfono en la tabla usuarios si vienen
     if (req.body.nombre || req.body.apellido || req.body.telefono) {
       const campos = [];
       const vals   = [];
       let idx = 1;
+
       if (req.body.nombre)   { campos.push(`nombre = $${idx++}`);   vals.push(req.body.nombre); }
       if (req.body.apellido) { campos.push(`apellido = $${idx++}`); vals.push(req.body.apellido); }
       if (req.body.telefono) { campos.push(`telefono = $${idx++}`); vals.push(req.body.telefono); }
+
       vals.push(usuarioId);
-      await query(`UPDATE usuarios SET ${campos.join(', ')} WHERE id = $${idx}`, vals);
+      await query(
+        `UPDATE usuarios SET ${campos.join(', ')} WHERE id = $${idx}`,
+        vals
+      );
     }
 
+    // Actualizar perfil del abogado
     const { rows } = await query(
       `UPDATE perfiles_abogado SET
          matricula             = COALESCE($1, matricula),
@@ -209,10 +245,18 @@ const actualizarPerfil = async (req, res, next) => {
       ]
     );
 
-    if (rows.length === 0) return res.status(404).json({ error: 'Perfil no encontrado.' });
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Perfil no encontrado.' });
+    }
 
-    res.json({ mensaje: 'Perfil actualizado correctamente.', perfil: rows[0] });
-  } catch (error) { next(error); }
+    res.json({
+      mensaje: 'Perfil actualizado correctamente.',
+      perfil: rows[0],
+    });
+
+  } catch (error) {
+    next(error);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -223,57 +267,67 @@ const obtenerDashboard = async (req, res, next) => {
   try {
     const usuarioId = req.usuario.id;
 
-    const [stats, proximas, perfil, notifs] = await Promise.all([
-      query(
-        `SELECT
-           COUNT(*) FILTER (WHERE estado = 'pendiente')  AS consultas_pendientes,
-           COUNT(*) FILTER (WHERE estado = 'confirmada') AS consultas_confirmadas,
-           COUNT(*) FILTER (WHERE estado = 'completada'
-             AND DATE_TRUNC('month', fecha_hora) = DATE_TRUNC('month', NOW())) AS completadas_este_mes,
-           COUNT(*) FILTER (WHERE estado = 'cancelada')  AS canceladas_total
-         FROM consultas WHERE abogado_id = $1`,
-        [usuarioId]
-      ),
-      query(
-        `SELECT c.id, c.tipo, c.fecha_hora, c.estado, c.especialidad,
-                u.nombre AS cliente_nombre, u.apellido AS cliente_apellido,
-                u.telefono AS cliente_telefono
-         FROM consultas c
-         JOIN usuarios u ON c.cliente_id = u.id
-         WHERE c.abogado_id = $1
-           AND c.estado IN ('pendiente', 'confirmada')
-           AND c.fecha_hora >= NOW()
-         ORDER BY c.fecha_hora ASC LIMIT 5`,
-        [usuarioId]
-      ),
-      query(
-        `SELECT CAST(pa.calificacion_promedio AS FLOAT) AS calificacion_promedio,
-                CAST(pa.total_calificaciones AS INT) AS total_calificaciones,
-                pa.suscripcion_activa, pa.suscripcion_fin,
-                pa.visible_en_grilla, pa.perfil_completo,
-                ps.nombre AS plan_nombre, ps.slug AS plan_slug
-         FROM perfiles_abogado pa
-         JOIN planes_suscripcion ps ON pa.plan_id = ps.id
-         WHERE pa.usuario_id = $1`,
-        [usuarioId]
-      ),
-      query(
-        'SELECT COUNT(*) AS no_leidas FROM notificaciones WHERE usuario_id = $1 AND leida = false',
-        [usuarioId]
-      ),
-    ]);
+    // Estadísticas del mes actual
+    const { rows: stats } = await query(
+      `SELECT
+         COUNT(*) FILTER (WHERE estado = 'pendiente')   AS consultas_pendientes,
+         COUNT(*) FILTER (WHERE estado = 'confirmada')  AS consultas_confirmadas,
+         COUNT(*) FILTER (WHERE estado = 'completada'
+           AND DATE_TRUNC('month', fecha_hora) = DATE_TRUNC('month', NOW())) AS completadas_este_mes,
+         COUNT(*) FILTER (WHERE estado = 'cancelada')   AS canceladas_total
+       FROM consultas
+       WHERE abogado_id = $1`,
+      [usuarioId]
+    );
+
+    // Próximas consultas
+    const { rows: proximas } = await query(
+      `SELECT c.id, c.tipo, c.fecha_hora, c.estado, c.especialidad,
+              u.nombre AS cliente_nombre, u.apellido AS cliente_apellido,
+              u.telefono AS cliente_telefono
+       FROM consultas c
+       JOIN usuarios u ON c.cliente_id = u.id
+       WHERE c.abogado_id = $1
+         AND c.estado IN ('pendiente', 'confirmada')
+         AND c.fecha_hora >= NOW()
+       ORDER BY c.fecha_hora ASC
+       LIMIT 5`,
+      [usuarioId]
+    );
+
+    // Datos del perfil y plan
+    const { rows: perfil } = await query(
+      `SELECT CAST(pa.calificacion_promedio AS FLOAT) AS calificacion_promedio, CAST(pa.total_calificaciones AS INT) AS total_calificaciones,
+              pa.suscripcion_activa, pa.suscripcion_fin,
+              pa.visible_en_grilla, pa.perfil_completo,
+              ps.nombre AS plan_nombre, ps.slug AS plan_slug
+       FROM perfiles_abogado pa
+       JOIN planes_suscripcion ps ON pa.plan_id = ps.id
+       WHERE pa.usuario_id = $1`,
+      [usuarioId]
+    );
+
+    // Notificaciones no leídas
+    const { rows: notifs } = await query(
+      'SELECT COUNT(*) AS no_leidas FROM notificaciones WHERE usuario_id = $1 AND leida = false',
+      [usuarioId]
+    );
 
     res.json({
-      estadisticas:             stats.rows[0],
-      proximas_consultas:       proximas.rows,
-      perfil:                   perfil.rows[0],
-      notificaciones_no_leidas: parseInt(notifs.rows[0].no_leidas),
+      estadisticas:    stats[0],
+      proximas_consultas: proximas,
+      perfil:          perfil[0],
+      notificaciones_no_leidas: parseInt(notifs[0].no_leidas),
     });
-  } catch (error) { next(error); }
+
+  } catch (error) {
+    next(error);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/abogados/especialidades
+// Lista de especialidades disponibles para filtros
 // ─────────────────────────────────────────────────────────────
 const listarEspecialidades = async (req, res, next) => {
   try {
@@ -281,16 +335,22 @@ const listarEspecialidades = async (req, res, next) => {
       'SELECT id, nombre, icono FROM especialidades_catalogo WHERE activa = true ORDER BY nombre'
     );
     res.json({ especialidades: rows });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-// Helper: normaliza tipos numéricos
+
+// ─────────────────────────────────────────────────────────────
+// Helper: convierte campos numéricos que Neon devuelve como strings
+// Neon (y algunos drivers de pg) retornan DECIMAL como string
+// ─────────────────────────────────────────────────────────────
 const parsearAbogado = (a) => ({
   ...a,
-  calificacion_promedio: parseFloat(a.calificacion_promedio || 0),
-  total_calificaciones:  parseInt(a.total_calificaciones    || 0),
-  consultas_completadas: parseInt(a.consultas_completadas   || 0),
-  anos_experiencia:      parseInt(a.anos_experiencia        || 0),
+  calificacion_promedio:  parseFloat(a.calificacion_promedio  || 0),
+  total_calificaciones:   parseInt(a.total_calificaciones     || 0),
+  consultas_completadas:  parseInt(a.consultas_completadas    || 0),
+  anos_experiencia:       parseInt(a.anos_experiencia         || 0),
 });
 
 module.exports = {

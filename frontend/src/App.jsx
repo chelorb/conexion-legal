@@ -42,7 +42,7 @@ import Suscripcion      from './pages/abogado/Suscripcion';
 // ── Páginas del cliente (requieren auth + rol cliente) ───────
 import DashboardCliente from './pages/cliente/Dashboard';
 import MisConsultas            from './pages/cliente/MisConsultas';
-import DetalleConsultaCliente  from './pages/cliente/DetalleConsulta';
+import DetalleConsultaCliente  from './pages/cliente/DetalleConsultaCliente';
 import NuevaConsulta    from './pages/cliente/NuevaConsulta';
 
 // ── Panel admin (requiere auth + rol admin) ──────────────────
@@ -196,7 +196,7 @@ function RutaProtegida({ children, rolesPermitidos }) {
   if (!estaAutenticado) return <Navigate to="/login" replace />;
 
   if (rolesPermitidos && !rolesPermitidos.includes(usuario.rol)) {
-    const destinos = { abogado: '/abogado/dashboard', cliente: '/mis-consultas', admin: '/admin/dashboard' };
+    const destinos = { abogado: '/abogado/dashboard', cliente: '/cliente/dashboard', admin: '/admin/dashboard' };
     return <Navigate to={destinos[usuario.rol] || '/'} replace />;
   }
 

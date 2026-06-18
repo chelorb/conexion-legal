@@ -7,10 +7,32 @@ const router   = express.Router();
 const multer   = require('multer');
 const path     = require('path');
 const fs       = require('fs');
+const rateLimit = require('express-rate-limit');
 const ctrl     = require('../controllers/auth.controller');
 const { verificarToken }    = require('../middleware/auth.middleware');
 const { validarRegistro, validarLogin } = require('../middleware/validacion.middleware');
 const { verificarHCaptcha } = require('../middleware/hcaptcha.middleware');
+
+// ─────────────────────────────────────────────────────────────
+// Rate limiting específico para auth
+// ─────────────────────────────────────────────────────────────
+const limiterLogin = rateLimit({
+  windowMs:        15 * 60 * 1000, // 15 minutos
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message: { error: 'Demasiados intentos de inicio de sesión. Esperá 15 minutos antes de volver a intentarlo.' },
+  skip: () => process.env.NODE_ENV === 'development',
+});
+
+const limiterRegistro = rateLimit({
+  windowMs:        60 * 60 * 1000, // 1 hora
+  max:             3,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message: { error: 'Demasiados registros desde esta IP. Esperá una hora antes de volver a intentarlo.' },
+  skip: () => process.env.NODE_ENV === 'development',
+});
 
 // ─────────────────────────────────────────────────────────────
 // Configuración de Multer para documentos del registro
@@ -53,12 +75,11 @@ const camposDocumentos = uploadDocumentos.fields([
 // Rutas
 // ─────────────────────────────────────────────────────────────
 
-// Registro: multer primero (para parsear multipart/form-data),
-// luego captcha, luego validación, luego el controlador
-router.post('/registro', camposDocumentos, verificarHCaptcha, validarRegistro, ctrl.registro);
+// Registro: rate limit, multer (multipart), captcha, validación, controlador
+router.post('/registro', limiterRegistro, camposDocumentos, verificarHCaptcha, validarRegistro, ctrl.registro);
 
-// Login: solo validación (rate limiting aplicado en app.js)
-router.post('/login',    validarLogin, ctrl.login);
+// Login: rate limit, validación, controlador
+router.post('/login', limiterLogin, validarLogin, ctrl.login);
 
 router.get('/verificar-email',           ctrl.verificarEmail);
 router.post('/solicitar-reset-password', ctrl.solicitarResetPassword);

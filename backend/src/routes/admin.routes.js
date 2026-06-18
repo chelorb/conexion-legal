@@ -230,7 +230,6 @@ router.patch('/usuarios/:id/estado', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
-module.exports = router;
 
 // ─────────────────────────────────────────────────────────────
 // PUT /api/admin/abogados/:id/perfil
@@ -874,3 +873,5 @@ router.put('/config/:clave', async (req, res, next) => {
     res.json({ mensaje: 'Configuración actualizada.', config });
   } catch (error) { next(error); }
 });
+
+module.exports = router;
