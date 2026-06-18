@@ -8,9 +8,7 @@ const bcrypt    = require('bcryptjs');
 const jwt       = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { query, getClient } = require('../config/database');
-const emailService  = require('../services/email.service');
-const cloudSvc      = require('../services/cloudinary.service');
-const notifService  = require('../services/notificaciones.service');
+const emailService = require('../services/email.service');
 
 // ─────────────────────────────────────────────────────────────
 // Genera un JWT firmado con los datos del usuario
@@ -37,7 +35,7 @@ const registro = async (req, res, next) => {
       nombre, apellido, email, password,
       rol = 'cliente', telefono,
       // Campos extra para abogados
-      dni_cuit, cuil, titulo_universitario, universidad,
+      cuil, titulo_universitario, universidad,
       anio_graduacion, nro_credencial_letrado,
     } = req.body;
 
@@ -78,7 +76,6 @@ const registro = async (req, res, next) => {
       [nombre, apellido, email, passwordHash, rolId, telefono || null, tokenVerificacion]
     );
 
-    const nuevoUsuarioId = usuario.id;
     // ── Si es abogado: crear perfil con datos de documentación ──
     if (rol === 'abogado') {
       const planDefault = await client.query(
@@ -89,39 +86,22 @@ const registro = async (req, res, next) => {
       if (!planId) throw new Error('No hay planes disponibles en el sistema.');
 
       // URLs de archivos subidos (si los hay)
-      // Subir documentos a Cloudinary (almacenamiento permanente y seguro)
-      const subirDoc = async (file, tipo) => {
-        if (!file) return null;
-        try {
-          const resultado = await cloudSvc.subirArchivo(file.buffer, {
-            folder:        `conexion-legal/abogados/${nuevoUsuarioId}`,
-            public_id:     `${tipo}_${Date.now()}`,
-            resource_type: file.mimetype === 'application/pdf' ? 'raw' : 'image',
-          });
-          return resultado.url;
-        } catch (err) {
-          console.warn(`⚠️  Cloudinary: No se pudo subir ${tipo}:`, err.message);
-          return null;
-        }
-      };
-
-      const [docCredencialUrl, docTituloUrl, docCuilUrl] = await Promise.all([
-        subirDoc(req.files?.doc_credencial?.[0], 'credencial'),
-        subirDoc(req.files?.doc_titulo?.[0],     'titulo'),
-        subirDoc(req.files?.doc_cuil?.[0],       'cuil'),
-      ]);
+      // URLs de documentos subidos a Cloudinary por el middleware procesarDocumentos
+      // Si Cloudinary no está configurado o falló la subida, quedan en null
+      const docCredencialUrl = req.documentosUrls?.doc_credencial || null;
+      const docTituloUrl     = req.documentosUrls?.doc_titulo     || null;
+      const docCuilUrl       = req.documentosUrls?.doc_cuil       || null;
 
       await client.query(
         `INSERT INTO perfiles_abogado (
            usuario_id, plan_id, suscripcion_activa, visible_en_grilla,
            estado_aprobacion,
-           dni_cuit, cuil, titulo_universitario, universidad, anio_graduacion,
+           cuil, titulo_universitario, universidad, anio_graduacion,
            nro_credencial_letrado,
            doc_credencial_url, doc_titulo_url, doc_cuil_url
-         ) VALUES ($1,$2,true,false,'pendiente',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+         ) VALUES ($1,$2,true,false,'pendiente',$3,$4,$5,$6,$7,$8,$9,$10)`,
         [
           usuario.id, planId,
-          dni_cuit?.trim() || null,
           cuil?.trim() || null,
           titulo_universitario?.trim() || null,
           universidad?.trim() || null,
@@ -138,6 +118,7 @@ const registro = async (req, res, next) => {
       }).catch(err => console.warn('⚠️  No se pudo notificar al admin:', err.message));
 
       // Notificación real-time al admin
+      const notifService = require('../services/notificaciones.service');
       notifService.nuevoAbogadoRegistrado({
         abogadoNombre: `${nombre} ${apellido}`,
         abogadoEmail: email,
@@ -145,14 +126,7 @@ const registro = async (req, res, next) => {
     }
 
     await client.query('COMMIT');
-
-    // Email de bienvenida + verificación (todos los roles)
     emailService.enviarBienvenida({ nombre, email, rol, tokenVerificacion });
-
-    // Email adicional para abogados: aviso de que el perfil está en revisión
-    if (rol === 'abogado') {
-      emailService.notificarAbogadoPendiente({ nombre, email }).catch(() => {});
-    }
 
     const mensajeRespuesta = rol === 'abogado'
       ? '¡Registro exitoso! Revisá tu email para verificar tu cuenta. Tu perfil será revisado por nuestro equipo.'
@@ -250,15 +224,11 @@ const login = async (req, res, next) => {
       return res.status(401).json({ error: 'Email o contraseña incorrectos.' });
     }
 
-    // ── SEGURIDAD: Bloquear acceso si el email no fue verificado ──
-    if (!usuario.email_verificado) {
-      return res.status(403).json({
-        error: 'Debés verificar tu email antes de iniciar sesión. Revisá tu bandeja de entrada.',
-        codigo: 'EMAIL_NO_VERIFICADO',
-      });
-    }
-
+    // Advertencias (email sin verificar, etc.)
     const advertencias = [];
+    if (!usuario.email_verificado) {
+      advertencias.push('Tu email aún no fue verificado. Revisá tu bandeja de entrada.');
+    }
 
     // Actualizar fecha de último login
     await query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1', [usuario.id]);
@@ -323,34 +293,17 @@ const verificarEmail = async (req, res, next) => {
     const { rows, rowCount } = await query(
       `UPDATE usuarios
        SET email_verificado = true, token_verificacion = NULL
-       WHERE token_verificacion = $1
-         AND email_verificado  = false
-         AND creado_en         > NOW() - INTERVAL '24 hours'
+       WHERE token_verificacion = $1 AND email_verificado = false
        RETURNING nombre, email`,
       [token]
     );
 
     if (rowCount === 0) {
-      // Verificar si el token existe pero expiró
-      const { rows: tokenExpirado } = await query(
-        `SELECT id FROM usuarios
-         WHERE token_verificacion = $1 AND email_verificado = false`,
-        [token]
-      );
-      if (tokenExpirado.length > 0) {
-        return res.status(400).json({
-          error: 'El enlace de verificación expiró (24 horas). Solicitá uno nuevo.',
-          codigo: 'TOKEN_EXPIRADO',
-        });
-      }
-      return res.status(400).json({
-        error: 'Enlace inválido o email ya verificado.',
-        codigo: 'TOKEN_INVALIDO',
-      });
+      return res.status(400).json({ error: 'Token inválido o email ya verificado.' });
     }
 
     res.json({
-      mensaje: `¡Email verificado correctamente! Ya podés iniciar sesión, ${rows[0].nombre}.`,
+      mensaje: `¡Email verificado exitosamente! Ya podés iniciar sesión, ${rows[0].nombre}.`
     });
   } catch (error) {
     next(error);
@@ -467,54 +420,10 @@ const obtenerPerfil = async (req, res, next) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────
-// POST /api/auth/reenviar-verificacion
-// Reenvía el email de verificación si el token expiró
-// ─────────────────────────────────────────────────────────────
-const reenviarVerificacion = async (req, res, next) => {
-  try {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ error: 'El email es obligatorio.' });
-
-    const { rows } = await query(
-      `SELECT id, nombre, email, email_verificado
-       FROM usuarios WHERE email = $1 AND activo = true`,
-      [email.toLowerCase().trim()]
-    );
-
-    // Respuesta genérica para no revelar si el email existe o no
-    if (rows.length === 0 || rows[0].email_verificado) {
-      return res.json({ mensaje: 'Si el email está registrado y sin verificar, recibirás un nuevo enlace.' });
-    }
-
-    const usuario = rows[0];
-
-    // Generar nuevo token y actualizar
-    const nuevoToken = uuidv4();
-    await query(
-      `UPDATE usuarios SET token_verificacion = $1, creado_en = NOW() WHERE id = $2`,
-      [nuevoToken, usuario.id]
-    );
-
-    // Enviar email
-    emailService.enviarBienvenida({
-      nombre:            usuario.nombre,
-      email:             usuario.email,
-      rol:               'cliente',
-      tokenVerificacion: nuevoToken,
-    });
-
-    res.json({ mensaje: 'Si el email está registrado y sin verificar, recibirás un nuevo enlace.' });
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   registro,
   login,
   verificarEmail,
-  reenviarVerificacion,
   solicitarResetPassword,
   resetPassword,
   obtenerPerfil,
