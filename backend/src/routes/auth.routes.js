@@ -146,3 +146,53 @@ router.post('/reset-password',           ctrl.resetPassword);
 router.get('/me', verificarToken,        ctrl.obtenerPerfil);
 
 module.exports = router;
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/auth/reenviar-verificacion
+// Reenvía el email de verificación si el usuario no lo recibió
+// ─────────────────────────────────────────────────────────────
+router.post('/reenviar-verificacion', async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email?.trim()) {
+      return res.status(400).json({ error: 'El email es obligatorio.' });
+    }
+
+    const { query: dbQuery } = require('../config/database');
+    const { rows } = await dbQuery(
+      `SELECT id, nombre, email, rol, email_verificado, token_verificacion
+       FROM usuarios
+       WHERE email = $1 AND activo = true`,
+      [email.toLowerCase().trim()]
+    );
+
+    // Respuesta genérica para no revelar si el email existe
+    if (rows.length === 0 || rows[0].email_verificado) {
+      return res.json({
+        mensaje: 'Si el email existe y no está verificado, te enviaremos el enlace.',
+      });
+    }
+
+    const usuario = rows[0];
+    const { v4: uuidv4 } = require('uuid');
+
+    // Generar nuevo token si no tiene
+    const token = usuario.token_verificacion || uuidv4();
+    if (!usuario.token_verificacion) {
+      await dbQuery(
+        'UPDATE usuarios SET token_verificacion = $1 WHERE id = $2',
+        [token, usuario.id]
+      );
+    }
+
+    const emailService = require('../services/email.service');
+    await emailService.enviarBienvenida({
+      nombre:           usuario.nombre,
+      email:            usuario.email,
+      rol:              usuario.rol,
+      tokenVerificacion: token,
+    });
+
+    res.json({ mensaje: 'Si el email existe y no está verificado, te enviaremos el enlace.' });
+  } catch (error) { next(error); }
+});
