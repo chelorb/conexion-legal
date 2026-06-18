@@ -5,7 +5,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Check, X, Search, MapPin,
-  RefreshCw, Clock, AlertCircle, Edit2, Save
+  RefreshCw, Clock, AlertCircle, Edit2, Save,
+  FileText, ExternalLink, FolderOpen
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
@@ -31,14 +32,100 @@ function BadgePlan({ slug }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Tab de documentos — ver los archivos subidos por el abogado
+// ─────────────────────────────────────────────────────────────
+function TabDocumentos({ abogado }) {
+  const documentos = [
+    {
+      campo: 'doc_titulo_url',
+      label: 'Título universitario',
+      desc:  abogado.titulo_universitario
+        ? `${abogado.titulo_universitario}${abogado.universidad ? ` — ${abogado.universidad}` : ''}`
+        : 'No especificado',
+    },
+    {
+      campo: 'doc_cuil_url',
+      label: 'Constancia de CUIL',
+      desc:  abogado.cuil || 'No especificado',
+    },
+    {
+      campo: 'doc_credencial_url',
+      label: 'Credencial de letrado',
+      desc:  abogado.nro_credencial_letrado
+        ? `Nro. ${abogado.nro_credencial_letrado}`
+        : 'Sin número registrado',
+    },
+  ];
+
+  const hayDocumentos = documentos.some(d => abogado[d.campo]);
+
+  if (!hayDocumentos) {
+    return (
+      <div className="py-12 text-center">
+        <FolderOpen size={36} className="mx-auto mb-3" style={{ color: '#D4D2CC' }} />
+        <p className="font-display text-lg mb-1" style={{ color: '#1C1B18' }}>
+          Sin documentos adjuntos
+        </p>
+        <p className="font-body text-sm" style={{ color: '#8A8780' }}>
+          Este abogado no adjuntó documentación al registrarse.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="font-body text-xs px-3 py-2 rounded-lg"
+        style={{ background: 'rgba(184,96,48,0.06)', color: '#B86030' }}>
+        ⚠️ Verificá que la documentación sea auténtica antes de aprobar el perfil.
+      </p>
+
+      {documentos.map(({ campo, label, desc }) => {
+        const url = abogado[campo];
+        return (
+          <div key={campo} className="flex items-center justify-between gap-4 p-4 rounded-xl"
+            style={{ background: '#F7F6F4' }}>
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: url ? 'rgba(184,96,48,0.1)' : '#F0EFED' }}>
+                <FileText size={16} style={{ color: url ? '#B86030' : '#B0AEA8' }} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>{label}</p>
+                <p className="font-body text-xs truncate" style={{ color: '#8A8780' }}>{desc}</p>
+              </div>
+            </div>
+
+            {url ? (
+              <a href={url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-body text-xs font-medium shrink-0 transition-colors text-white"
+                style={{ background: '#2C2B27' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}>
+                <ExternalLink size={12} /> Ver archivo
+              </a>
+            ) : (
+              <span className="font-body text-xs shrink-0 px-3 py-2 rounded-xl"
+                style={{ background: '#F0EFED', color: '#8A8780' }}>
+                No adjuntado
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ModalAbogado({ abogado, onCerrar, onActualizar }) {
   const [tab,       setTab]       = useState('revision');
   const [guardando, setGuardando] = useState(false);
   const [accion,    setAccion]    = useState('');
   const [motivo,    setMotivo]    = useState('');
   const [espSel,    setEspSel]    = useState(abogado.especialidades || []);
-  const [planes,    setPlanes]    = useState([]);   // ← lista de planes disponibles
-  const [planSel,   setPlanSel]   = useState(abogado.plan_slug || ''); // ← plan seleccionado
+  const [planes,    setPlanes]    = useState([]);
+  const [planSel,   setPlanSel]   = useState(abogado.plan_slug || '');
   const [datos,     setDatos]     = useState({
     visible:              abogado.visible_en_grilla,
     matricula_verificada: abogado.matricula_verificada,
@@ -54,7 +141,7 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
     }
   });
 
-  // Cargar planes al abrir el modal (para el selector)
+  // Cargar planes al abrir el modal
   useEffect(() => {
     api.get('/admin/planes')
       .then(r => setPlanes(r.data.planes || []))
@@ -81,27 +168,26 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
   const onSubmitPerfil = async (formDatos) => {
     setGuardando(true);
     try {
-      // Actualizar visibilidad y matrícula
       await api.patch(`/admin/abogados/${abogado.id}/aprobar`, {
         visible: datos.visible, matricula_verificada: datos.matricula_verificada,
       });
-
-      // Actualizar perfil — ahora incluye plan_slug para cambiar el plan
       await api.put(`/admin/abogados/${abogado.id}/perfil`, {
         ...formDatos,
         especialidades: espSel,
-        plan_slug:      planSel,   // ← NUEVO: enviar el plan seleccionado
+        plan_slug:      planSel,
       });
-
       toast.success('Perfil actualizado correctamente.');
-      onActualizar();
-      onCerrar();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al guardar.');
-    } finally {
-      setGuardando(false);
-    }
+      onActualizar(); onCerrar();
+    } catch (err) { toast.error(err.response?.data?.error || 'Error al guardar.'); }
+    finally { setGuardando(false); }
   };
+
+  // Pestañas del modal — ahora incluye "Documentos"
+  const tabs = [
+    { id: 'revision',    label: 'Revisión y estado' },
+    { id: 'documentos',  label: 'Documentos'        },
+    { id: 'perfil',      label: 'Editar perfil'     },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
@@ -130,7 +216,7 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
 
         {/* Pestañas */}
         <div className="flex gap-1 px-6 pt-4 shrink-0">
-          {[{ id: 'revision', label: 'Revisión y estado' }, { id: 'perfil', label: 'Editar perfil' }].map(t => (
+          {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className="px-4 py-2 rounded-xl text-sm font-body font-medium transition-all"
               style={tab === t.id ? { background: '#2C2B27', color: '#fff' } : { color: '#56534A' }}
@@ -143,23 +229,23 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
 
         <div className="overflow-y-auto flex-1 p-6">
 
-          {/* ── Tab: Revisión ─────────────────────────────── */}
+          {/* ── Tab: Revisión ─────────────────────────── */}
           {tab === 'revision' && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Plan', val: <BadgePlan slug={abogado.plan_slug} /> },
-                  { label: 'Estado', val: (
+                  { label: 'Plan',      val: <BadgePlan slug={abogado.plan_slug} /> },
+                  { label: 'Estado',    val: (
                     <span className="text-xs font-medium px-2.5 py-1 rounded-full"
                       style={abogado.estado_aprobacion === 'aprobado'
-                        ? { background: 'rgba(22,163,74,0.1)', color: '#15803d' }
+                        ? { background: 'rgba(22,163,74,0.1)',   color: '#15803d' }
                         : abogado.estado_aprobacion === 'rechazado'
                           ? { background: 'rgba(220,38,38,0.1)', color: '#dc2626' }
-                          : { background: 'rgba(245,158,11,0.1)', color: '#b45309' }}>
+                          : { background: 'rgba(245,158,11,0.1)',color: '#b45309' }}>
                       {abogado.estado_aprobacion}
                     </span>
                   )},
-                  { label: 'Ubicación', val: abogado.ciudad || '—' },
+                  { label: 'Ubicación', val: abogado.ciudad || '—'    },
                   { label: 'Matrícula', val: abogado.matricula || '—' },
                 ].map(({ label, val }) => (
                   <div key={label} className="rounded-xl p-3" style={{ background: '#F7F6F4' }}>
@@ -263,43 +349,34 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
             </div>
           )}
 
-          {/* ── Tab: Editar perfil ────────────────────────── */}
+          {/* ── Tab: Documentos ────────────────────────── */}
+          {tab === 'documentos' && <TabDocumentos abogado={abogado} />}
+
+          {/* ── Tab: Editar perfil ─────────────────────── */}
           {tab === 'perfil' && (
             <form onSubmit={handleSubmit(onSubmitPerfil)} className="space-y-5">
 
-              {/* ── SELECTOR DE PLAN (nuevo) ─────────────── */}
+              {/* Selector de plan */}
               <div>
                 <label className="input-label">Plan de suscripción</label>
                 {planes.length === 0 ? (
-                  <div className="input-field animate-pulse" style={{ color: '#8A8780' }}>
-                    Cargando planes...
-                  </div>
+                  <div className="input-field animate-pulse" style={{ color: '#8A8780' }}>Cargando planes...</div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {planes.filter(p => p.activo).map(plan => {
-                      const seleccionado = planSel === plan.slug;
+                      const sel = planSel === plan.slug;
                       return (
-                        <button
-                          key={plan.id}
-                          type="button"
-                          onClick={() => setPlanSel(plan.slug)}
+                        <button key={plan.id} type="button" onClick={() => setPlanSel(plan.slug)}
                           className="flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all"
-                          style={seleccionado
+                          style={sel
                             ? { borderColor: '#2C2B27', background: 'rgba(44,43,39,0.04)' }
-                            : { borderColor: '#E8E6E3', background: '#fff' }
-                          }
-                        >
-                          {/* Radio visual */}
-                          <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors"
-                            style={{ borderColor: seleccionado ? '#2C2B27' : '#D4D2CC' }}>
-                            {seleccionado && (
-                              <div className="w-2 h-2 rounded-full" style={{ background: '#2C2B27' }} />
-                            )}
+                            : { borderColor: '#E8E6E3', background: '#fff' }}>
+                          <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
+                            style={{ borderColor: sel ? '#2C2B27' : '#D4D2CC' }}>
+                            {sel && <div className="w-2 h-2 rounded-full" style={{ background: '#2C2B27' }} />}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-body font-semibold text-sm truncate" style={{ color: '#1C1B18' }}>
-                              {plan.nombre}
-                            </p>
+                            <p className="font-body font-semibold text-sm truncate" style={{ color: '#1C1B18' }}>{plan.nombre}</p>
                             <p className="font-body text-xs" style={{ color: '#8A8780' }}>
                               ${parseFloat(plan.precio_mensual).toLocaleString('es-AR')}/mes
                             </p>
@@ -309,7 +386,6 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                     })}
                   </div>
                 )}
-                {/* Aviso de plan actual */}
                 {planSel !== abogado.plan_slug && (
                   <p className="font-body text-xs mt-2 px-3 py-2 rounded-lg"
                     style={{ background: 'rgba(184,96,48,0.08)', color: '#B86030' }}>
