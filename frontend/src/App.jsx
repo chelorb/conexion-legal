@@ -42,7 +42,7 @@ import Suscripcion      from './pages/abogado/Suscripcion';
 // ── Páginas del cliente (requieren auth + rol cliente) ───────
 import DashboardCliente from './pages/cliente/Dashboard';
 import MisConsultas            from './pages/cliente/MisConsultas';
-import DetalleConsultaCliente  from './pages/cliente/DetalleConsultaCliente';
+import DetalleConsultaCliente  from './pages/cliente/DetalleConsulta';
 import NuevaConsulta    from './pages/cliente/NuevaConsulta';
 
 // ── Panel admin (requiere auth + rol admin) ──────────────────
