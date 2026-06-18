@@ -34,35 +34,18 @@ async function notificarAbogados(planId, tipo, titulo, mensaje) {
          VALUES ($1, $2, $3, $4, $5)`,
         [ab.id, planId, tipo, titulo, mensaje]
       );
-      // Email (si hay servicio configurado)
+      // Email via SendGrid (reemplaza nodemailer que no funciona en Render)
       try {
-        const nodemailer = require('nodemailer');
-        if (process.env.EMAIL_HOST && process.env.EMAIL_USER) {
-          const transporter = nodemailer.createTransport({
-            host: process.env.EMAIL_HOST,
-            port: parseInt(process.env.EMAIL_PORT || '587'),
-            auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-          });
-          await transporter.sendMail({
-            from: `"Conexión Legal" <${process.env.EMAIL_USER}>`,
-            to: ab.email,
-            subject: titulo,
-            html: `
-              <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px">
-                <h1 style="font-size:22px;color:#1C1B18;margin-bottom:12px">${titulo}</h1>
-                <p style="color:#56534A;line-height:1.6">${mensaje}</p>
-                <p style="color:#56534A;line-height:1.6;margin-top:16px">
-                  Ingresá a tu panel para ver todos los detalles:
-                  <a href="${process.env.FRONTEND_URL}/abogado/suscripcion"
-                     style="color:#B86030;font-weight:600">Ver mi suscripción</a>
-                </p>
-                <p style="color:#B0AEA8;font-size:12px;margin-top:32px">Conexión Legal · Plataforma Legal Digital</p>
-              </div>
-            `,
-          });
-        }
+        const emailService = require('../services/email.service');
+        await emailService.enviarComunicado({
+          destinatarioEmail:  ab.email,
+          destinatarioNombre: `${ab.nombre} ${ab.apellido}`,
+          titulo,
+          mensaje,
+          link: '/abogado/suscripcion',
+        });
       } catch (emailErr) {
-        console.warn('Email no enviado (SMTP no configurado):', emailErr.message);
+        console.warn('Email no enviado:', emailErr.message);
       }
     }
 
