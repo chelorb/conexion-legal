@@ -1,116 +1,73 @@
 // ============================================================
 // src/pages/admin/Abogados.jsx — Paleta C: Gris carbón + Cobre
+// Vista especializada de abogados — enfocada en aprobación
+// Las acciones completas (deshabilitar, eliminar, editar plan)
+// se realizan desde Admin → Usuarios para evitar duplicación
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Check, X, Search, MapPin,
-  RefreshCw, Clock, AlertCircle, Edit2, Save,
-  FileText, ExternalLink, FolderOpen, Trash2
+  RefreshCw, Clock, AlertCircle, ExternalLink,
+  FileText, FolderOpen, ChevronRight
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { useForm } from 'react-hook-form';
 import api from '../../services/api';
-
-const ESPECIALIDADES_DISPONIBLES = [
-  'Derecho Civil', 'Derecho Laboral', 'Derecho Penal',
-  'Derecho de Familia', 'Derecho Comercial', 'Derecho Administrativo',
-  'Derecho Tributario', 'Derecho Inmobiliario', 'Derecho de Daños',
-  'Derecho del Consumidor', 'Propiedad Intelectual', 'Derecho Migratorio',
-  'Derecho Societario', 'Derecho Ambiental', 'Mediación',
-];
 
 function BadgePlan({ slug }) {
   const mapa = {
     basico:    { label: 'Básico',      bg: 'rgba(184,96,48,0.1)', color: '#8B4A1E' },
     comunidad: { label: '★ Comunidad', bg: '#B86030',             color: '#fff'    },
   };
-  const cfg = mapa[slug] || { label: slug, bg: '#F0EFED', color: '#56534A' };
+  const cfg = mapa[slug] || { label: slug || '—', bg: '#F0EFED', color: '#56534A' };
   return (
     <span className="text-xs font-body font-medium px-2.5 py-1 rounded-full"
       style={{ background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Tab de documentos — ver los archivos subidos por el abogado
-// ─────────────────────────────────────────────────────────────
 function TabDocumentos({ abogado }) {
-  const documentos = [
-    {
-      campo: 'doc_titulo_url',
-      label: 'Título universitario',
-      desc:  abogado.titulo_universitario
-        ? `${abogado.titulo_universitario}${abogado.universidad ? ` — ${abogado.universidad}` : ''}`
-        : 'No especificado',
-    },
-    {
-      campo: 'doc_cuil_url',
-      label: 'Constancia de CUIL',
-      desc:  abogado.cuil || 'No especificado',
-    },
-    {
-      campo: 'doc_credencial_url',
-      label: 'Credencial de letrado',
-      desc:  abogado.nro_credencial_letrado
-        ? `Nro. ${abogado.nro_credencial_letrado}`
-        : 'Sin número registrado',
-    },
+  const docs = [
+    { campo: 'doc_titulo_url',     label: 'Título universitario', desc: abogado.titulo_universitario || 'No especificado' },
+    { campo: 'doc_cuil_url',       label: 'Constancia de CUIL',   desc: abogado.cuil || 'No especificado' },
+    { campo: 'doc_credencial_url', label: 'Credencial de letrado', desc: abogado.nro_credencial_letrado ? `Nro. ${abogado.nro_credencial_letrado}` : 'Sin número' },
   ];
+  const hay = docs.some(d => abogado[d.campo]);
 
-  const hayDocumentos = documentos.some(d => abogado[d.campo]);
-
-  if (!hayDocumentos) {
-    return (
-      <div className="py-12 text-center">
-        <FolderOpen size={36} className="mx-auto mb-3" style={{ color: '#D4D2CC' }} />
-        <p className="font-display text-lg mb-1" style={{ color: '#1C1B18' }}>
-          Sin documentos adjuntos
-        </p>
-        <p className="font-body text-sm" style={{ color: '#8A8780' }}>
-          Este abogado no adjuntó documentación al registrarse.
-        </p>
-      </div>
-    );
-  }
+  if (!hay) return (
+    <div className="py-10 text-center">
+      <FolderOpen size={32} className="mx-auto mb-2" style={{ color: '#D4D2CC' }} />
+      <p className="font-body text-sm" style={{ color: '#8A8780' }}>Sin documentos adjuntos</p>
+    </div>
+  );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2 pt-2">
       <p className="font-body text-xs px-3 py-2 rounded-lg"
         style={{ background: 'rgba(184,96,48,0.06)', color: '#B86030' }}>
-        ⚠️ Verificá que la documentación sea auténtica antes de aprobar el perfil.
+        ⚠️ Verificá la autenticidad antes de aprobar el perfil.
       </p>
-
-      {documentos.map(({ campo, label, desc }) => {
+      {docs.map(({ campo, label, desc }) => {
         const url = abogado[campo];
         return (
-          <div key={campo} className="flex items-center justify-between gap-4 p-4 rounded-xl"
+          <div key={campo} className="flex items-center justify-between gap-3 p-3 rounded-xl"
             style={{ background: '#F7F6F4' }}>
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-                style={{ background: url ? 'rgba(184,96,48,0.1)' : '#F0EFED' }}>
-                <FileText size={16} style={{ color: url ? '#B86030' : '#B0AEA8' }} />
-              </div>
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText size={14} style={{ color: url ? '#B86030' : '#B0AEA8' }} className="shrink-0" />
               <div className="min-w-0">
-                <p className="font-body font-semibold text-sm" style={{ color: '#1C1B18' }}>{label}</p>
+                <p className="font-body font-semibold text-xs" style={{ color: '#1C1B18' }}>{label}</p>
                 <p className="font-body text-xs truncate" style={{ color: '#8A8780' }}>{desc}</p>
               </div>
             </div>
-
-            {url ? (
-              <a href={url} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-body text-xs font-medium shrink-0 transition-colors text-white"
-                style={{ background: '#2C2B27' }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}>
-                <ExternalLink size={12} /> Ver archivo
-              </a>
-            ) : (
-              <span className="font-body text-xs shrink-0 px-3 py-2 rounded-xl"
-                style={{ background: '#F0EFED', color: '#8A8780' }}>
-                No adjuntado
-              </span>
-            )}
+            {url
+              ? <a href={url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-body text-xs font-medium text-white shrink-0"
+                  style={{ background: '#2C2B27' }}>
+                  <ExternalLink size={11} /> Ver
+                </a>
+              : <span className="font-body text-xs shrink-0" style={{ color: '#B0AEA8' }}>No adjunto</span>
+            }
           </div>
         );
       })}
@@ -118,46 +75,23 @@ function TabDocumentos({ abogado }) {
   );
 }
 
-function ModalAbogado({ abogado, onCerrar, onActualizar }) {
+function ModalRevision({ abogado, onCerrar, onActualizar }) {
   const [tab,       setTab]       = useState('revision');
   const [guardando, setGuardando] = useState(false);
   const [accion,    setAccion]    = useState('');
   const [motivo,    setMotivo]    = useState('');
-  const [espSel,    setEspSel]    = useState(abogado.especialidades || []);
-  const [planes,    setPlanes]    = useState([]);
-  const [planSel,   setPlanSel]   = useState(abogado.plan_slug || '');
-  const [datos,     setDatos]     = useState({
-    visible:              abogado.visible_en_grilla,
-    matricula_verificada: abogado.matricula_verificada,
-  });
-
-  const { register, handleSubmit, formState: { errors } } = useForm({
-    defaultValues: {
-      descripcion:      abogado.descripcion || '',
-      anos_experiencia: abogado.anos_experiencia || '',
-      ciudad:           abogado.ciudad || '',
-      provincia:        abogado.provincia || '',
-      matricula:        abogado.matricula || '',
-    }
-  });
-
-  // Cargar planes al abrir el modal
-  useEffect(() => {
-    api.get('/admin/planes')
-      .then(r => setPlanes(r.data.planes || []))
-      .catch(() => {});
-  }, []);
-
-  const toggleEsp = (esp) =>
-    setEspSel(prev => prev.includes(esp) ? prev.filter(e => e !== esp) : [...prev, esp]);
+  const [toggleVis, setToggleVis] = useState(abogado.visible_en_grilla ?? false);
+  const [toggleMat, setToggleMat] = useState(abogado.matricula_verificada ?? false);
 
   const ejecutarAccion = async () => {
     if (accion === 'rechazar' && !motivo.trim()) { toast.error('Ingresá el motivo del rechazo.'); return; }
     setGuardando(true);
     try {
       await api.patch(`/admin/abogados/${abogado.id}/aprobar`, {
-        accion, motivo: accion === 'rechazar' ? motivo : undefined,
-        matricula_verificada: datos.matricula_verificada,
+        accion,
+        motivo: accion === 'rechazar' ? motivo : undefined,
+        visible: toggleVis,
+        matricula_verificada: toggleMat,
       });
       toast.success(accion === 'aprobar' ? '✅ Perfil aprobado.' : '❌ Perfil rechazado.');
       onActualizar(); onCerrar();
@@ -165,55 +99,22 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
     finally { setGuardando(false); }
   };
 
-  // Eliminar definitivamente al abogado de la base de datos
-  const eliminarDefinitivamente = async () => {
-    if (!window.confirm(
-      `⚠️ ELIMINAR DEFINITIVAMENTE\n\n` +
-      `¿Eliminás la cuenta de ${abogado.nombre} ${abogado.apellido}?\n\n` +
-      `Se borrarán su perfil, documentos y todos sus datos. Esta acción NO se puede deshacer.`
-    )) return;
-    if (!window.confirm(`Última confirmación: ¿eliminar a ${abogado.nombre} ${abogado.apellido}?`)) return;
-    setGuardando(true);
-    try {
-      await api.delete(`/admin/usuarios/${abogado.id}`);
-      toast.success(`Cuenta de ${abogado.nombre} ${abogado.apellido} eliminada definitivamente.`);
-      onActualizar();
-      onCerrar();
-    } catch (err) {
-      toast.error(err.response?.data?.error || 'Error al eliminar.');
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  const onSubmitPerfil = async (formDatos) => {
+  const guardarCambios = async () => {
     setGuardando(true);
     try {
       await api.patch(`/admin/abogados/${abogado.id}/aprobar`, {
-        visible: datos.visible, matricula_verificada: datos.matricula_verificada,
+        visible: toggleVis, matricula_verificada: toggleMat,
       });
-      await api.put(`/admin/abogados/${abogado.id}/perfil`, {
-        ...formDatos,
-        especialidades: espSel,
-        plan_slug:      planSel,
-      });
-      toast.success('Perfil actualizado correctamente.');
+      toast.success('Cambios guardados.');
       onActualizar(); onCerrar();
-    } catch (err) { toast.error(err.response?.data?.error || 'Error al guardar.'); }
+    } catch { toast.error('Error al guardar.'); }
     finally { setGuardando(false); }
   };
-
-  // Pestañas del modal — ahora incluye "Documentos"
-  const tabs = [
-    { id: 'revision',    label: 'Revisión y estado' },
-    { id: 'documentos',  label: 'Documentos'        },
-    { id: 'perfil',      label: 'Editar perfil'     },
-  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(28,27,24,0.6)', backdropFilter: 'blur(4px)' }}>
-      <div className="card w-full max-w-2xl animate-slide-up max-h-[90vh] flex flex-col">
+      <div className="card w-full max-w-xl animate-slide-up max-h-[90vh] flex flex-col">
 
         {/* Encabezado */}
         <div className="flex items-center justify-between p-6 border-b shrink-0" style={{ borderColor: '#F0EFED' }}>
@@ -225,7 +126,10 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
               <h3 className="font-display font-bold" style={{ color: '#1C1B18' }}>
                 Dr./Dra. {abogado.nombre} {abogado.apellido}
               </h3>
-              <p className="font-body text-xs" style={{ color: '#8A8780' }}>{abogado.email}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="font-body text-xs" style={{ color: '#8A8780' }}>{abogado.email}</p>
+                <BadgePlan slug={abogado.plan_slug} />
+              </div>
             </div>
           </div>
           <button onClick={onCerrar} className="p-2 rounded-lg transition-colors"
@@ -237,7 +141,7 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
 
         {/* Pestañas */}
         <div className="flex gap-1 px-6 pt-4 shrink-0">
-          {tabs.map(t => (
+          {[{ id: 'revision', label: 'Revisión' }, { id: 'documentos', label: 'Documentos' }].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className="px-4 py-2 rounded-xl text-sm font-body font-medium transition-all"
               style={tab === t.id ? { background: '#2C2B27', color: '#fff' } : { color: '#56534A' }}
@@ -248,26 +152,27 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
           ))}
         </div>
 
-        <div className="overflow-y-auto flex-1 p-6">
+        <div className="overflow-y-auto flex-1 p-6 space-y-4">
 
           {/* ── Tab: Revisión ─────────────────────────── */}
           {tab === 'revision' && (
-            <div className="space-y-4">
+            <>
+              {/* Datos del perfil */}
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Plan',      val: <BadgePlan slug={abogado.plan_slug} /> },
-                  { label: 'Estado',    val: (
+                  { label: 'Estado',     val: (
                     <span className="text-xs font-medium px-2.5 py-1 rounded-full"
                       style={abogado.estado_aprobacion === 'aprobado'
-                        ? { background: 'rgba(22,163,74,0.1)',   color: '#15803d' }
+                        ? { background: 'rgba(22,163,74,0.1)',  color: '#15803d' }
                         : abogado.estado_aprobacion === 'rechazado'
                           ? { background: 'rgba(220,38,38,0.1)', color: '#dc2626' }
                           : { background: 'rgba(245,158,11,0.1)',color: '#b45309' }}>
                       {abogado.estado_aprobacion}
                     </span>
                   )},
-                  { label: 'Ubicación', val: abogado.ciudad || '—'    },
+                  { label: 'Ubicación', val: abogado.ciudad || '—' },
                   { label: 'Matrícula', val: abogado.matricula || '—' },
+                  { label: 'Años exp.', val: abogado.anos_experiencia ? `${abogado.anos_experiencia} años` : '—' },
                 ].map(({ label, val }) => (
                   <div key={label} className="rounded-xl p-3" style={{ background: '#F7F6F4' }}>
                     <p className="font-body text-xs mb-1" style={{ color: '#8A8780' }}>{label}</p>
@@ -285,31 +190,33 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                 </div>
               )}
 
+              {/* Toggles */}
               <div className="space-y-3">
                 {[
-                  { campo: 'visible',              label: 'Visible en búsqueda',  desc: 'Aparece en el catálogo público'  },
-                  { campo: 'matricula_verificada', label: 'Matrícula verificada', desc: 'Muestra el sello de verificación' },
-                ].map(({ campo, label, desc }) => (
-                  <div key={campo} className="flex items-center justify-between p-4 rounded-xl border-2 transition-all"
-                    style={{ borderColor: datos[campo] ? '#2C2B27' : '#E8E6E3' }}>
+                  { val: toggleVis, set: setToggleVis, label: 'Visible en búsqueda',  desc: 'Aparece en el catálogo público' },
+                  { val: toggleMat, set: setToggleMat, label: 'Matrícula verificada', desc: 'Muestra el sello de verificación' },
+                ].map(({ val, set, label, desc }) => (
+                  <div key={label} className="flex items-center justify-between p-4 rounded-xl border-2 transition-all"
+                    style={{ borderColor: val ? '#2C2B27' : '#E8E6E3' }}>
                     <div className="flex items-center gap-3">
-                      <Shield size={16} style={{ color: datos[campo] ? '#2C2B27' : '#B0AEA8' }} />
+                      <Shield size={15} style={{ color: val ? '#2C2B27' : '#B0AEA8' }} />
                       <div>
                         <p className="font-body font-medium text-sm" style={{ color: '#1C1B18' }}>{label}</p>
                         <p className="font-body text-xs" style={{ color: '#8A8780' }}>{desc}</p>
                       </div>
                     </div>
-                    <div onClick={() => setDatos(d => ({ ...d, [campo]: !d[campo] }))}
+                    <div onClick={() => set(!val)}
                       className="relative w-11 h-6 rounded-full cursor-pointer transition-colors"
-                      style={{ background: datos[campo] ? '#2C2B27' : '#E8E6E3' }}>
-                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${datos[campo] ? 'translate-x-6' : 'translate-x-1'}`} />
+                      style={{ background: val ? '#2C2B27' : '#E8E6E3' }}>
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${val ? 'translate-x-6' : 'translate-x-1'}`} />
                     </div>
                   </div>
                 ))}
               </div>
 
+              {/* Botones de aprobación — solo si está pendiente */}
               {abogado.estado_aprobacion === 'pendiente' && (
-                <div className="space-y-3 pt-2">
+                <div className="space-y-3">
                   {!accion && (
                     <div className="grid grid-cols-2 gap-3">
                       <button onClick={() => setAccion('aprobar')}
@@ -317,19 +224,19 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                         style={{ background: 'rgba(22,163,74,0.08)', color: '#15803d', borderColor: 'rgba(22,163,74,0.2)' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#15803d'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(22,163,74,0.2)'; }}>
-                        <Check size={16} /> Aprobar perfil
+                        <Check size={15} /> Aprobar perfil
                       </button>
                       <button onClick={() => setAccion('rechazar')}
                         className="flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
                         style={{ background: 'rgba(220,38,38,0.06)', color: '#dc2626', borderColor: 'rgba(220,38,38,0.15)' }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#dc2626'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(220,38,38,0.15)'; }}>
-                        <X size={16} /> Rechazar perfil
+                        <X size={15} /> Rechazar perfil
                       </button>
                     </div>
                   )}
                   {accion === 'rechazar' && (
-                    <div className="animate-slide-down">
+                    <div>
                       <label className="input-label">Motivo del rechazo</label>
                       <textarea rows={3} placeholder="Se enviará al abogado por email..."
                         value={motivo} onChange={e => setMotivo(e.target.value)}
@@ -340,12 +247,12 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                     <div className="flex gap-3">
                       <button onClick={() => setAccion('')} className="btn-secondary flex-1">Cancelar</button>
                       <button onClick={ejecutarAccion} disabled={guardando}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm text-white transition-colors"
+                        className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm text-white"
                         style={{ background: accion === 'rechazar' ? '#dc2626' : '#16a34a' }}>
                         {guardando ? 'Procesando...'
                           : accion === 'aprobar'
-                            ? <><Check size={15} /> Confirmar aprobación</>
-                            : <><X size={15} /> Confirmar rechazo</>
+                            ? <><Check size={14} /> Confirmar aprobación</>
+                            : <><X size={14} /> Confirmar rechazo</>
                         }
                       </button>
                     </div>
@@ -353,149 +260,36 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                 </div>
               )}
 
+              {/* Guardar cambios de visibilidad (para no pendientes) */}
               {abogado.estado_aprobacion !== 'pendiente' && (
-                <button onClick={async () => {
-                    setGuardando(true);
-                    try {
-                      await api.patch(`/admin/abogados/${abogado.id}/aprobar`, datos);
-                      toast.success('Estado actualizado.');
-                      onActualizar(); onCerrar();
-                    } catch { toast.error('Error al guardar.'); }
-                    finally { setGuardando(false); }
-                  }}
-                  disabled={guardando} className="btn-primary w-full">
-                  {guardando ? 'Guardando...' : <><Save size={15} /> Guardar cambios</>}
+                <button onClick={guardarCambios} disabled={guardando} className="btn-primary w-full">
+                  {guardando ? 'Guardando...' : <><Check size={14} /> Guardar cambios</>}
                 </button>
               )}
 
-              {/* Botón eliminar definitivamente — siempre visible salvo para admins */}
-              <div className="pt-2 border-t" style={{ borderColor: '#F0EFED' }}>
-                <button
-                  onClick={eliminarDefinitivamente}
-                  disabled={guardando}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
-                  style={{ borderColor: 'rgba(220,38,38,0.3)', color: '#dc2626', background: 'rgba(220,38,38,0.04)' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.1)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.04)'; }}
-                >
-                  <Trash2 size={15} /> Eliminar cuenta definitivamente
-                </button>
-                <p className="font-body text-xs mt-2 text-center" style={{ color: '#B0AEA8' }}>
-                  Elimina al usuario y todos sus datos de forma permanente.
-                </p>
-              </div>
-            </div>
+              {/* Link a Usuarios para acciones avanzadas */}
+              <Link to="/admin/usuarios"
+                className="flex items-center justify-between p-3 rounded-xl font-body text-sm transition-colors"
+                style={{ background: '#F7F6F4', color: '#56534A' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#F0EFED'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#F7F6F4'; }}>
+                <span>Otras acciones (deshabilitar, cambiar plan, eliminar)</span>
+                <ChevronRight size={15} style={{ color: '#B0AEA8' }} />
+              </Link>
+            </>
           )}
 
           {/* ── Tab: Documentos ────────────────────────── */}
           {tab === 'documentos' && <TabDocumentos abogado={abogado} />}
-
-          {/* ── Tab: Editar perfil ─────────────────────── */}
-          {tab === 'perfil' && (
-            <form onSubmit={handleSubmit(onSubmitPerfil)} className="space-y-5">
-
-              {/* Selector de plan */}
-              <div>
-                <label className="input-label">Plan de suscripción</label>
-                {planes.length === 0 ? (
-                  <div className="input-field animate-pulse" style={{ color: '#8A8780' }}>Cargando planes...</div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    {planes.filter(p => p.activo).map(plan => {
-                      const sel = planSel === plan.slug;
-                      return (
-                        <button key={plan.id} type="button" onClick={() => setPlanSel(plan.slug)}
-                          className="flex items-center gap-3 p-3 rounded-xl border-2 text-left transition-all"
-                          style={sel
-                            ? { borderColor: '#2C2B27', background: 'rgba(44,43,39,0.04)' }
-                            : { borderColor: '#E8E6E3', background: '#fff' }}>
-                          <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0"
-                            style={{ borderColor: sel ? '#2C2B27' : '#D4D2CC' }}>
-                            {sel && <div className="w-2 h-2 rounded-full" style={{ background: '#2C2B27' }} />}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-body font-semibold text-sm truncate" style={{ color: '#1C1B18' }}>{plan.nombre}</p>
-                            <p className="font-body text-xs" style={{ color: '#8A8780' }}>
-                              ${parseFloat(plan.precio_mensual).toLocaleString('es-AR')}/mes
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                {planSel !== abogado.plan_slug && (
-                  <p className="font-body text-xs mt-2 px-3 py-2 rounded-lg"
-                    style={{ background: 'rgba(184,96,48,0.08)', color: '#B86030' }}>
-                    ⚠️ Cambiarás el plan de <strong>{abogado.plan_nombre || abogado.plan_slug}</strong> a <strong>{planes.find(p => p.slug === planSel)?.nombre || planSel}</strong>.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="input-label">Descripción profesional</label>
-                <textarea rows={4} placeholder="Bio del abogado..." className="input-field resize-none"
-                  {...register('descripcion', { maxLength: { value: 2000, message: 'Máximo 2000 caracteres' } })} />
-                {errors.descripcion && <p className="input-error">{errors.descripcion.message}</p>}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="input-label">Matrícula</label>
-                  <input type="text" placeholder="T-12345" className="input-field" {...register('matricula')} />
-                </div>
-                <div>
-                  <label className="input-label">Años de experiencia</label>
-                  <input type="number" min="0" max="70" className="input-field" {...register('anos_experiencia')} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="input-label">Ciudad</label>
-                  <input type="text" className="input-field" {...register('ciudad')} />
-                </div>
-                <div>
-                  <label className="input-label">Provincia</label>
-                  <input type="text" className="input-field" {...register('provincia')} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="input-label mb-0">Especialidades</label>
-                  <span className="font-body text-xs" style={{ color: '#8A8780' }}>{espSel.length} seleccionadas</span>
-                </div>
-                <div className="flex flex-wrap gap-2 p-4 rounded-xl" style={{ background: '#F7F6F4' }}>
-                  {ESPECIALIDADES_DISPONIBLES.map(esp => {
-                    const sel = espSel.includes(esp);
-                    return (
-                      <button key={esp} type="button" onClick={() => toggleEsp(esp)}
-                        className="px-3 py-1.5 rounded-xl text-xs font-body font-medium border-2 transition-all"
-                        style={sel
-                          ? { borderColor: '#2C2B27', background: '#2C2B27', color: '#fff' }
-                          : { borderColor: '#E8E6E3', background: '#fff', color: '#56534A' }}>
-                        {sel && <Check size={10} className="inline mr-1" />}{esp}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={onCerrar} className="btn-secondary flex-1">Cancelar</button>
-                <button type="submit" disabled={guardando} className="btn-primary flex-1">
-                  {guardando ? 'Guardando...' : <><Save size={15} /> Guardar perfil</>}
-                </button>
-              </div>
-            </form>
-          )}
         </div>
       </div>
     </div>
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// Página principal
+// ─────────────────────────────────────────────────────────────
 export default function AdminAbogados() {
   const [abogados,   setAbogados]   = useState([]);
   const [cargando,   setCargando]   = useState(true);
@@ -514,11 +308,10 @@ export default function AdminAbogados() {
 
   useEffect(() => { cargar(); }, [cargar]);
 
-  const abogadosFiltrados = abogados.filter(a => {
-    const coincideTab      = a.estado_aprobacion === tabActivo;
-    const texto            = `${a.nombre} ${a.apellido} ${a.email}`.toLowerCase();
-    const coincideBusqueda = !busqueda || texto.includes(busqueda.toLowerCase());
-    return coincideTab && coincideBusqueda;
+  const filtrados = abogados.filter(a => {
+    const coincideTab = a.estado_aprobacion === tabActivo;
+    const texto       = `${a.nombre} ${a.apellido} ${a.email}`.toLowerCase();
+    return coincideTab && (!busqueda || texto.includes(busqueda.toLowerCase()));
   });
 
   const conteos = {
@@ -527,17 +320,17 @@ export default function AdminAbogados() {
     rechazado: abogados.filter(a => a.estado_aprobacion === 'rechazado').length,
   };
 
-  const TABS = [
-    { valor: 'pendiente', label: 'Pendientes' },
-    { valor: 'aprobado',  label: 'Aprobados'  },
-    { valor: 'rechazado', label: 'Rechazados' },
-  ];
-
   const coloresBadge = {
     pendiente: { bg: 'rgba(245,158,11,0.12)', color: '#b45309' },
     aprobado:  { bg: 'rgba(22,163,74,0.12)',  color: '#15803d' },
     rechazado: { bg: 'rgba(220,38,38,0.12)',  color: '#dc2626' },
   };
+
+  const TABS = [
+    { valor: 'pendiente', label: 'Pendientes' },
+    { valor: 'aprobado',  label: 'Aprobados'  },
+    { valor: 'rechazado', label: 'Rechazados' },
+  ];
 
   return (
     <div className="min-h-screen" style={{ background: '#F0EFED' }}>
@@ -546,7 +339,7 @@ export default function AdminAbogados() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="section-title">Gestión de abogados</h1>
-            <p className="section-subtitle">Revisá, aprobá y editá los perfiles de los profesionales.</p>
+            <p className="section-subtitle">Revisá y aprobá los perfiles de los profesionales.</p>
           </div>
           <button onClick={cargar} disabled={cargando} className="btn-secondary gap-2 shrink-0">
             <RefreshCw size={16} className={cargando ? 'animate-spin' : ''} /> Actualizar
@@ -563,6 +356,23 @@ export default function AdminAbogados() {
           </div>
         )}
 
+        {/* Aviso de dónde hacer las otras acciones */}
+        <div className="rounded-2xl p-4 mb-6 flex items-center justify-between gap-3"
+          style={{ background: '#F7F6F4', border: '1px solid #E8E6E3' }}>
+          <p className="font-body text-sm" style={{ color: '#56534A' }}>
+            Para deshabilitar, cambiar plan o eliminar un abogado, usá el panel de{' '}
+            <strong>Usuarios</strong>.
+          </p>
+          <Link to="/admin/usuarios"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-body text-sm font-medium shrink-0 transition-colors text-white"
+            style={{ background: '#2C2B27' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}>
+            Ir a Usuarios <ChevronRight size={14} />
+          </Link>
+        </div>
+
+        {/* Tabs */}
         <div className="flex gap-2 flex-wrap mb-6">
           {TABS.map(tab => (
             <button key={tab.valor} onClick={() => setTabActivo(tab.valor)}
@@ -603,7 +413,7 @@ export default function AdminAbogados() {
             </div>
           )}
 
-          {!cargando && abogadosFiltrados.length === 0 && (
+          {!cargando && filtrados.length === 0 && (
             <div className="py-16 text-center">
               <Check size={36} className="mx-auto mb-3" style={{ color: '#D4D2CC' }} />
               <p className="font-display text-xl mb-1" style={{ color: '#1C1B18' }}>
@@ -615,15 +425,15 @@ export default function AdminAbogados() {
             </div>
           )}
 
-          {!cargando && abogadosFiltrados.map((a, idx) => (
+          {!cargando && filtrados.map((a, idx) => (
             <div key={a.id}
               className="flex items-start gap-4 px-6 py-5 transition-colors"
-              style={{ borderBottom: idx < abogadosFiltrados.length - 1 ? '1px solid #F7F6F4' : 'none' }}
+              style={{ borderBottom: idx < filtrados.length - 1 ? '1px solid #F7F6F4' : 'none' }}
               onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
               onMouseLeave={e => { e.currentTarget.style.background = ''; }}>
 
               <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: '#2C2B27' }}>
+                style={{ background: a.activo !== false ? '#2C2B27' : '#D4D2CC' }}>
                 <span className="font-display font-bold text-white text-sm">
                   {a.nombre[0]}{a.apellido[0]}
                 </span>
@@ -665,7 +475,7 @@ export default function AdminAbogados() {
                       style={{ background: tabActivo === 'pendiente' ? '#B86030' : '#2C2B27' }}
                       onMouseEnter={e => { e.currentTarget.style.opacity = '0.85'; }}
                       onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}>
-                      {tabActivo === 'pendiente' ? 'Revisar' : <><Edit2 size={12} /> Editar</>}
+                      {tabActivo === 'pendiente' ? 'Revisar' : 'Ver'}
                     </button>
                   </div>
                 </div>
@@ -676,7 +486,7 @@ export default function AdminAbogados() {
       </div>
 
       {abogadoSel && (
-        <ModalAbogado abogado={abogadoSel}
+        <ModalRevision abogado={abogadoSel}
           onCerrar={() => setAbogadoSel(null)}
           onActualizar={cargar} />
       )}
