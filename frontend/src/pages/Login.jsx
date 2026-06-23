@@ -23,10 +23,12 @@ export default function Login() {
   const { register, handleSubmit, watch, formState: { errors } } = useForm();
 
   // ── Detectar motivo de redirección ──────────────────────────
-  // sesion_expirada=1  → el JWT venció (detectado por el interceptor de axios)
-  // sesion_cerrada=inactividad → cerrada automáticamente por inactividad
-  const sesionExpirada    = searchParams.get('sesion_expirada') === '1';
+  // sesion_expirada=1         → el JWT venció (interceptor de axios)
+  // sesion_cerrada=inactividad → cerrada automáticamente por inactividad (AuthContext)
+  // sesion_cerrada=otro_dispositivo → alguien inició sesión desde otro lugar
+  const sesionExpirada        = searchParams.get('sesion_expirada') === '1';
   const cerradaPorInactividad = searchParams.get('sesion_cerrada') === 'inactividad';
+  const cerradaOtroDispositivo = searchParams.get('sesion_cerrada') === 'otro_dispositivo';
 
   const reenviarVerificacion = async () => {
     setReenviando(true);
@@ -97,9 +99,29 @@ export default function Login() {
             </Link>
           </p>
 
+          {/* ── Aviso: sesión iniciada en otro dispositivo ────────
+              Tono rojo/error — es una alerta de seguridad importante.
+              El usuario debe saber que alguien más usó sus credenciales.
+          ──────────────────────────────────────────────────── */}
+          {cerradaOtroDispositivo && (
+            <div
+              className="rounded-xl p-4 mb-5 flex items-start gap-3"
+              style={{ background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)' }}
+            >
+              <AlertCircle size={16} className="shrink-0 mt-0.5" style={{ color: '#dc2626' }} />
+              <div>
+                <p className="font-body text-sm font-semibold" style={{ color: '#b91c1c' }}>
+                  Sesión cerrada por acceso desde otro dispositivo
+                </p>
+                <p className="font-body text-xs mt-0.5" style={{ color: '#dc2626' }}>
+                  Tu cuenta fue abierta en otro lugar y tu sesión anterior fue cerrada automáticamente.
+                  Si no fuiste vos, cambiá tu contraseña de inmediato.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ── Aviso: sesión cerrada por inactividad ────────────
-              Se muestra cuando el AuthContext cerró la sesión
-              automáticamente después de 30 min sin actividad.
               Tono amarillo/ámbar — es un aviso de seguridad, no un error.
           ──────────────────────────────────────────────────── */}
           {cerradaPorInactividad && (
@@ -114,17 +136,15 @@ export default function Login() {
                 </p>
                 <p className="font-body text-xs mt-0.5" style={{ color: '#b45309' }}>
                   Por seguridad, cerramos tu sesión automáticamente tras 30 minutos sin actividad.
-                  Iniciá sesión nuevamente para continuar.
                 </p>
               </div>
             </div>
           )}
 
           {/* ── Aviso: JWT expirado ───────────────────────────────
-              Se muestra cuando el token venció (interceptor de axios
-              detecta el 401 del backend y redirige con ?sesion_expirada=1).
+              Solo se muestra si no hay un motivo más específico.
           ──────────────────────────────────────────────────── */}
-          {sesionExpirada && !cerradaPorInactividad && (
+          {sesionExpirada && !cerradaPorInactividad && !cerradaOtroDispositivo && (
             <div
               className="rounded-xl p-4 mb-5 flex items-start gap-3"
               style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}

@@ -2,6 +2,12 @@
 // src/controllers/auth.controller.js
 // Maneja registro, login, verificación de email y reset de contraseña
 // Incluye el flujo de aprobación para abogados nuevos
+//
+// SEGURIDAD — Sesión única por usuario:
+//   Cada login genera un nuevo session_token (UUID) que se guarda
+//   en la DB y se embebe en el JWT. El middleware verifica que ambos
+//   coincidan. Si el mismo usuario inicia sesión desde otro lugar,
+//   el session_token anterior queda inválido automáticamente.
 // ============================================================
 
 const bcrypt    = require('bcryptjs');
@@ -12,12 +18,18 @@ const emailService = require('../services/email.service');
 
 // ─────────────────────────────────────────────────────────────
 // Genera un JWT firmado con los datos del usuario
+// Incluye el session_token para validar sesión única
 // ─────────────────────────────────────────────────────────────
-const generarToken = (usuario) => {
+const generarToken = (usuario, sessionToken) => {
   return jwt.sign(
-    { id: usuario.id, email: usuario.email, rol: usuario.rol },
+    {
+      id:            usuario.id,
+      email:         usuario.email,
+      rol:           usuario.rol,
+      session_token: sessionToken, // UUID único de esta sesión
+    },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
   );
 };
 
@@ -64,7 +76,7 @@ const registro = async (req, res, next) => {
     }
     const rolId = rolResult.rows[0].id;
 
-    const passwordHash     = await bcrypt.hash(password, 12);
+    const passwordHash      = await bcrypt.hash(password, 12);
     const tokenVerificacion = uuidv4();
 
     // Crear el usuario
@@ -85,7 +97,6 @@ const registro = async (req, res, next) => {
       const planId = planDefault.rows[0]?.id;
       if (!planId) throw new Error('No hay planes disponibles en el sistema.');
 
-      // URLs de archivos subidos (si los hay)
       // URLs de documentos subidos a Cloudinary por el middleware procesarDocumentos
       // Si Cloudinary no está configurado o falló la subida, quedan en null
       const docCredencialUrl = req.documentosUrls?.doc_credencial || null;
@@ -191,6 +202,10 @@ const notificarAdminNuevoAbogado = async ({ abogadoNombre, abogadoApellido, abog
 // ─────────────────────────────────────────────────────────────
 // POST /api/auth/login
 // Autentica un usuario y devuelve un JWT
+//
+// SESIÓN ÚNICA: genera un nuevo session_token en cada login y
+// lo guarda en la DB. El token anterior queda automáticamente
+// inválido — si había otra sesión abierta, se invalida al instante.
 // ─────────────────────────────────────────────────────────────
 const login = async (req, res, next) => {
   try {
@@ -230,10 +245,16 @@ const login = async (req, res, next) => {
       advertencias.push('Tu email aún no fue verificado. Revisá tu bandeja de entrada.');
     }
 
-    // Actualizar fecha de último login
-    await query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1', [usuario.id]);
+    // ── Sesión única: generar un nuevo session_token y guardarlo en la DB ──
+    // Esto invalida automáticamente cualquier sesión anterior del mismo usuario
+    const sessionToken = uuidv4();
+    await query(
+      'UPDATE usuarios SET session_token = $1, ultimo_login = NOW() WHERE id = $2',
+      [sessionToken, usuario.id]
+    );
 
-    const token = generarToken(usuario);
+    // El session_token se embebe en el JWT para que el middleware pueda compararlo
+    const token = generarToken(usuario, sessionToken);
 
     // Si es abogado, incluir datos del perfil y estado de aprobación
     let perfilAbogado = null;
@@ -326,8 +347,8 @@ const solicitarResetPassword = async (req, res, next) => {
       return res.json({ mensaje: 'Si el email está registrado, recibirás un enlace para restablecer tu contraseña.' });
     }
 
-    const usuario  = rows[0];
-    const token    = uuidv4();
+    const usuario   = rows[0];
+    const token     = uuidv4();
     const expiracion = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
 
     await query(
@@ -345,6 +366,8 @@ const solicitarResetPassword = async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/auth/reset-password
+// Al cambiar la contraseña también se invalida la sesión activa
+// (por si alguien más tenía acceso con el token anterior)
 // ─────────────────────────────────────────────────────────────
 const resetPassword = async (req, res, next) => {
   try {
@@ -366,9 +389,12 @@ const resetPassword = async (req, res, next) => {
 
     const passwordHash = await bcrypt.hash(nuevaPassword, 12);
 
+    // Al resetear la contraseña, también se limpia el session_token activo
+    // para forzar un nuevo login con la nueva contraseña
     await query(
       `UPDATE usuarios
-       SET password_hash = $1, token_reset_pass = NULL, token_reset_expira = NULL
+       SET password_hash = $1, token_reset_pass = NULL,
+           token_reset_expira = NULL, session_token = NULL
        WHERE id = $2`,
       [passwordHash, rows[0].id]
     );

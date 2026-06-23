@@ -29,17 +29,31 @@ api.interceptors.request.use(
 );
 
 // ─── Interceptor de RESPONSE ─────────────────────────────────
-// Maneja errores de autenticación de forma global
+// Maneja errores de autenticación de forma global.
+// Distingue entre dos tipos de cierre de sesión para mostrar
+// el mensaje correcto en la pantalla de login:
+//
+//   SESSION_INVALIDADA → el usuario inició sesión en otro dispositivo
+//   (cualquier otro 401) → el JWT expiró o es inválido
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Si el servidor devuelve 401 (no autorizado), cerrar sesión automáticamente
     if (error.response?.status === 401) {
+      // Limpiar storage en cualquier caso de 401
       localStorage.removeItem('cl_token');
       localStorage.removeItem('cl_usuario');
-      // Redirigir al login si no estamos ya ahí
+
+      // Solo redirigir si no estamos ya en login (evitar loops)
       if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login?sesion_expirada=true';
+        const codigo = error.response?.data?.codigo;
+
+        if (codigo === 'SESSION_INVALIDADA') {
+          // El mismo usuario inició sesión desde otro dispositivo
+          window.location.href = '/login?sesion_cerrada=otro_dispositivo';
+        } else {
+          // JWT expirado normalmente
+          window.location.href = '/login?sesion_expirada=1';
+        }
       }
     }
 

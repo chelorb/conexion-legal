@@ -2,6 +2,12 @@
 // src/middleware/auth.middleware.js
 // Verifica que el usuario esté autenticado y tiene permisos
 // Se usa como middleware en las rutas protegidas
+//
+// SEGURIDAD — Validación de sesión única:
+//   Además de verificar la firma del JWT, compara el session_token
+//   del JWT con el guardado en la DB. Si no coinciden, significa
+//   que el usuario inició sesión desde otro lugar y esta sesión
+//   quedó inválida. Se devuelve 401 con código SESSION_INVALIDADA.
 // ============================================================
 
 const jwt = require('jsonwebtoken');
@@ -9,7 +15,8 @@ const { query } = require('../config/database');
 
 /**
  * Verifica que el request tenga un JWT válido en el header Authorization
- * Si es válido, agrega el usuario al objeto req para usarlo en los controllers
+ * y que el session_token del JWT coincida con el de la DB (sesión única).
+ * Si es válido, agrega el usuario al objeto req para usarlo en los controllers.
  * Uso: router.get('/ruta', verificarToken, controller)
  */
 const verificarToken = async (req, res, next) => {
@@ -30,8 +37,10 @@ const verificarToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     // Buscar el usuario en la DB para confirmar que sigue activo
+    // e incluir el session_token actual para comparar
     const { rows } = await query(
       `SELECT u.id, u.email, u.nombre, u.apellido, u.activo,
+              u.session_token,
               r.nombre AS rol
        FROM usuarios u
        JOIN roles r ON u.rol_id = r.id
@@ -49,6 +58,17 @@ const verificarToken = async (req, res, next) => {
     if (!usuario.activo) {
       return res.status(403).json({
         error: 'Tu cuenta está deshabilitada. Contactá al soporte.'
+      });
+    }
+
+    // ── Validación de sesión única ────────────────────────────
+    // El session_token del JWT debe coincidir con el de la DB.
+    // Si alguien inició sesión desde otro lugar, el session_token
+    // de la DB cambió y este token ya no es válido.
+    if (usuario.session_token && decoded.session_token !== usuario.session_token) {
+      return res.status(401).json({
+        error: 'Tu sesión fue iniciada en otro dispositivo. Iniciá sesión nuevamente.',
+        codigo: 'SESSION_INVALIDADA',
       });
     }
 
