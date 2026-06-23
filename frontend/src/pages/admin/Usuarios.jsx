@@ -66,6 +66,27 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
   // Mostrar el botón de re-registro si es abogado rechazado
   const esAbogadoRechazado = usuario.rol === 'abogado' && usuario.estado_aprobacion === 'rechazado';
 
+  // Eliminar definitivamente el usuario
+  const eliminarDefinitivamente = async () => {
+    if (!window.confirm(
+      `⚠️ ELIMINAR DEFINITIVAMENTE\n\n` +
+      `¿Eliminás la cuenta de ${usuario.nombre} ${usuario.apellido}?\n\n` +
+      `Se borrarán todos sus datos de forma permanente. Esta acción NO se puede deshacer.`
+    )) return;
+    if (!window.confirm(`Última confirmación: ¿eliminar a ${usuario.nombre} ${usuario.apellido}?`)) return;
+    setProcesando(true);
+    try {
+      await api.delete(`/admin/usuarios/${usuario.id}`);
+      toast.success(`Cuenta de ${usuario.nombre} ${usuario.apellido} eliminada definitivamente.`);
+      onActualizar();
+      onCerrar();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al eliminar.');
+    } finally {
+      setProcesando(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
       style={{ background: 'rgba(28,27,24,0.6)', backdropFilter: 'blur(4px)' }}>
@@ -173,6 +194,25 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
           )}
 
           <button onClick={onCerrar} className="btn-secondary w-full">Cerrar</button>
+
+          {/* Eliminar definitivamente — no disponible para admins */}
+          {usuario.rol !== 'admin' && (
+            <div className="pt-1 border-t" style={{ borderColor: '#F0EFED' }}>
+              <button
+                onClick={eliminarDefinitivamente}
+                disabled={procesando}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-body font-medium text-sm border-2 transition-colors"
+                style={{ borderColor: 'rgba(220,38,38,0.3)', color: '#dc2626', background: 'rgba(220,38,38,0.04)' }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.1)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.04)'; }}
+              >
+                <UserX size={15} /> Eliminar cuenta definitivamente
+              </button>
+              <p className="font-body text-xs mt-1.5 text-center" style={{ color: '#B0AEA8' }}>
+                Elimina al usuario y todos sus datos de forma permanente.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

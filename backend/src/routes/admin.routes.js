@@ -230,6 +230,48 @@ router.patch('/usuarios/:id/estado', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+// ─────────────────────────────────────────────────────────────
+// DELETE /api/admin/usuarios/:id
+// Eliminar definitivamente un usuario y todos sus datos
+// Solo funciona con clientes y abogados — los admins no se pueden eliminar
+// Los datos eliminados NO se pueden recuperar
+// ─────────────────────────────────────────────────────────────
+router.delete('/usuarios/:id', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // No permitir que el admin se elimine a sí mismo
+    if (id === req.usuario.id) {
+      return res.status(400).json({ error: 'No podés eliminar tu propia cuenta.' });
+    }
+
+    // Verificar que el usuario existe y no es admin
+    const { rows: [usuario] } = await query(
+      `SELECT u.id, u.nombre, u.apellido, u.email, r.nombre AS rol
+       FROM usuarios u
+       JOIN roles r ON u.rol_id = r.id
+       WHERE u.id = $1`,
+      [id]
+    );
+
+    if (!usuario) {
+      return res.status(404).json({ error: 'Usuario no encontrado.' });
+    }
+
+    if (usuario.rol === 'admin') {
+      return res.status(403).json({ error: 'No se puede eliminar una cuenta de administrador.' });
+    }
+
+    // Eliminar el usuario — el CASCADE en la BD elimina todo lo relacionado:
+    // perfiles_abogado, consultas, calificaciones, notificaciones, etc.
+    await query('DELETE FROM usuarios WHERE id = $1', [id]);
+
+    res.json({
+      mensaje: `Usuario ${usuario.nombre} ${usuario.apellido} eliminado definitivamente.`,
+    });
+  } catch (error) { next(error); }
+});
+
 
 // ─────────────────────────────────────────────────────────────
 // PUT /api/admin/abogados/:id/perfil

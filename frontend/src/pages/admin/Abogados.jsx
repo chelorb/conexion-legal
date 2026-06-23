@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Check, X, Search, MapPin,
   RefreshCw, Clock, AlertCircle, Edit2, Save,
-  FileText, ExternalLink, FolderOpen
+  FileText, ExternalLink, FolderOpen, Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
@@ -163,6 +163,27 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
       onActualizar(); onCerrar();
     } catch { toast.error('Error al procesar la acción.'); }
     finally { setGuardando(false); }
+  };
+
+  // Eliminar definitivamente al abogado de la base de datos
+  const eliminarDefinitivamente = async () => {
+    if (!window.confirm(
+      `⚠️ ELIMINAR DEFINITIVAMENTE\n\n` +
+      `¿Eliminás la cuenta de ${abogado.nombre} ${abogado.apellido}?\n\n` +
+      `Se borrarán su perfil, documentos y todos sus datos. Esta acción NO se puede deshacer.`
+    )) return;
+    if (!window.confirm(`Última confirmación: ¿eliminar a ${abogado.nombre} ${abogado.apellido}?`)) return;
+    setGuardando(true);
+    try {
+      await api.delete(`/admin/usuarios/${abogado.id}`);
+      toast.success(`Cuenta de ${abogado.nombre} ${abogado.apellido} eliminada definitivamente.`);
+      onActualizar();
+      onCerrar();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al eliminar.');
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const onSubmitPerfil = async (formDatos) => {
@@ -346,6 +367,23 @@ function ModalAbogado({ abogado, onCerrar, onActualizar }) {
                   {guardando ? 'Guardando...' : <><Save size={15} /> Guardar cambios</>}
                 </button>
               )}
+
+              {/* Botón eliminar definitivamente — siempre visible salvo para admins */}
+              <div className="pt-2 border-t" style={{ borderColor: '#F0EFED' }}>
+                <button
+                  onClick={eliminarDefinitivamente}
+                  disabled={guardando}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
+                  style={{ borderColor: 'rgba(220,38,38,0.3)', color: '#dc2626', background: 'rgba(220,38,38,0.04)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.1)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.04)'; }}
+                >
+                  <Trash2 size={15} /> Eliminar cuenta definitivamente
+                </button>
+                <p className="font-body text-xs mt-2 text-center" style={{ color: '#B0AEA8' }}>
+                  Elimina al usuario y todos sus datos de forma permanente.
+                </p>
+              </div>
             </div>
           )}
 
