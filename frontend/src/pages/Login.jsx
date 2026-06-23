@@ -22,6 +22,12 @@ export default function Login() {
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm();
 
+  // ── Detectar motivo de redirección ──────────────────────────
+  // sesion_expirada=1  → el JWT venció (detectado por el interceptor de axios)
+  // sesion_cerrada=inactividad → cerrada automáticamente por inactividad
+  const sesionExpirada    = searchParams.get('sesion_expirada') === '1';
+  const cerradaPorInactividad = searchParams.get('sesion_cerrada') === 'inactividad';
+
   const reenviarVerificacion = async () => {
     setReenviando(true);
     try {
@@ -91,10 +97,38 @@ export default function Login() {
             </Link>
           </p>
 
-          {/* Aviso sesión expirada */}
-          {searchParams.get('sesion_expirada') && (
-            <div className="rounded-xl p-4 mb-5 flex items-start gap-3"
-              style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+          {/* ── Aviso: sesión cerrada por inactividad ────────────
+              Se muestra cuando el AuthContext cerró la sesión
+              automáticamente después de 30 min sin actividad.
+              Tono amarillo/ámbar — es un aviso de seguridad, no un error.
+          ──────────────────────────────────────────────────── */}
+          {cerradaPorInactividad && (
+            <div
+              className="rounded-xl p-4 mb-5 flex items-start gap-3"
+              style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}
+            >
+              <AlertCircle size={16} className="shrink-0 mt-0.5" style={{ color: '#b45309' }} />
+              <div>
+                <p className="font-body text-sm font-semibold" style={{ color: '#92400e' }}>
+                  Sesión cerrada por inactividad
+                </p>
+                <p className="font-body text-xs mt-0.5" style={{ color: '#b45309' }}>
+                  Por seguridad, cerramos tu sesión automáticamente tras 30 minutos sin actividad.
+                  Iniciá sesión nuevamente para continuar.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Aviso: JWT expirado ───────────────────────────────
+              Se muestra cuando el token venció (interceptor de axios
+              detecta el 401 del backend y redirige con ?sesion_expirada=1).
+          ──────────────────────────────────────────────────── */}
+          {sesionExpirada && !cerradaPorInactividad && (
+            <div
+              className="rounded-xl p-4 mb-5 flex items-start gap-3"
+              style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}
+            >
               <AlertCircle size={16} className="shrink-0 mt-0.5" style={{ color: '#b45309' }} />
               <p className="font-body text-sm" style={{ color: '#92400e' }}>
                 Tu sesión expiró. Iniciá sesión nuevamente.
@@ -102,10 +136,12 @@ export default function Login() {
             </div>
           )}
 
-          {/* Aviso email no verificado */}
+          {/* ── Aviso: email no verificado ───────────────────── */}
           {emailNoVerificado && (
-            <div className="rounded-xl p-4 mb-5 animate-slide-down"
-              style={{ background: 'rgba(184,96,48,0.06)', border: '1px solid rgba(184,96,48,0.25)' }}>
+            <div
+              className="rounded-xl p-4 mb-5 animate-slide-down"
+              style={{ background: 'rgba(184,96,48,0.06)', border: '1px solid rgba(184,96,48,0.25)' }}
+            >
               <p className="font-body text-sm font-semibold mb-1" style={{ color: '#B86030' }}>
                 📧 Verificá tu email antes de continuar
               </p>
