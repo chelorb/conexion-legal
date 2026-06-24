@@ -67,13 +67,7 @@ const enviarEmail = async ({ to, subject, html }) => {
     return { ok: false, error: 'SendGrid no configurado' };
   }
 
-  // EMAIL_FROM debe ser el sender verificado en SendGrid (configurado en Render).
-  // Un Gmail genérico no verificado hace que SendGrid rechace el envío en silencio.
-  const from = process.env.EMAIL_FROM;
-  if (!from) {
-    console.error('❌ EMAIL_FROM no configurado en variables de entorno — email no enviado a:', to);
-    return { ok: false, error: 'EMAIL_FROM no configurado' };
-  }
+  const from = process.env.EMAIL_FROM || 'adminiustixium@gmail.com';
 
   try {
     const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -157,7 +151,7 @@ const notificarAbogadoPendiente = async ({ nombre, email }) => {
       3. Te enviamos un email cuando tu perfil esté aprobado
     </div>
     <p>Una vez aprobado, tu perfil aparecerá en el catálogo y los clientes podrán contactarte.</p>
-    <p>Si tenés alguna consulta, respondé este email o escribinos a <strong>${process.env.EMAIL_FROM}</strong>.</p>
+    <p>Si tenés alguna consulta, respondé este email o escribinos a <strong>${process.env.EMAIL_FROM || 'adminiustixium@gmail.com'}</strong>.</p>
   `;
 
   return enviarEmail({
@@ -391,12 +385,11 @@ const enviarComunicado = async ({ destinatarioEmail, destinatarioNombre, titulo,
     <h2>${titulo}</h2>
     <p>Hola <strong>${destinatarioNombre}</strong>,</p>
     <p>${mensaje}</p>
-    ${link ? `
-    <div class="btn-wrap">
-      <a href="${process.env.FRONTEND_URL}${link}" class="btn">Ver más información</a>
-    </div>` : ''}
     <hr class="divider">
-    <p style="font-size:13px;color:#8A8780;">Este es un comunicado oficial de IUSTIXIUM.</p>
+    <p style="font-size:13px;color:#8A8780;">
+      Este es un comunicado oficial de IUSTIXIUM. Si tenés alguna duda o consulta,
+      <a href="${process.env.FRONTEND_URL}" style="color:#B86030;text-decoration:none;">comunicate con nosotros</a>.
+    </p>
   `;
 
   return enviarEmail({

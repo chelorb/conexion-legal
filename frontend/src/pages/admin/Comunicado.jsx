@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useState } from 'react';
-import { Send, Users, User, Briefcase, Bell, ArrowLeft, Search } from 'lucide-react';
+import { Send, Users, User, Briefcase, Bell, ArrowLeft, Search, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
@@ -13,12 +13,13 @@ const DESTINATARIOS = [
   { valor: 'todos',      label: 'Todos los usuarios',   desc: 'Abogados y clientes activos',  icono: Users     },
   { valor: 'abogados',   label: 'Solo abogados',        desc: 'Todos los abogados aprobados', icono: Briefcase },
   { valor: 'clientes',   label: 'Solo clientes',        desc: 'Todos los clientes activos',   icono: User      },
-  { valor: 'especifico', label: 'Usuario específico',   desc: 'Buscar por nombre o email',    icono: Search    },
+  { valor: 'especifico', label: 'Usuarios específicos', desc: 'Podés seleccionar varios',     icono: Search    },
 ];
 
 export default function AdminComunicado() {
   const [destinatario, setDestinatario] = useState('todos');
-  const [form, setForm]                 = useState({ titulo: '', mensaje: '', link: '', usuario_id: '' });
+  const [form, setForm]                 = useState({ titulo: '', mensaje: '', link: '' });
+  const [usuariosSeleccionados, setUsuariosSeleccionados] = useState([]); // array para modo específico multi-usuario
   const [enviando, setEnviando]         = useState(false);
   const [resultado, setResultado]       = useState(null);
   const [busqueda,  setBusqueda]        = useState('');
@@ -45,8 +46,8 @@ export default function AdminComunicado() {
     if (!form.titulo.trim() || !form.mensaje.trim()) {
       toast.error('Título y mensaje son obligatorios.'); return;
     }
-    if (destinatario === 'especifico' && !form.usuario_id) {
-      toast.error('Seleccioná un usuario específico.'); return;
+    if (destinatario === 'especifico' && usuariosSeleccionados.length === 0) {
+      toast.error('Seleccioná al menos un usuario.'); return;
     }
     setEnviando(true);
     try {
@@ -55,11 +56,12 @@ export default function AdminComunicado() {
         mensaje:      form.mensaje.trim(),
         link:         form.link.trim() || null,
         destinatario,
-        usuario_id:   destinatario === 'especifico' ? form.usuario_id : undefined,
+        usuario_ids:  destinatario === 'especifico' ? usuariosSeleccionados.map(u => u.id) : undefined,
       });
       setResultado(data);
       toast.success(data.mensaje);
-      setForm({ titulo: '', mensaje: '', link: '', usuario_id: '' });
+      setForm({ titulo: '', mensaje: '', link: '' });
+      setUsuariosSeleccionados([]);
       setBusqueda(''); setUsuarios([]);
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error al enviar.');
@@ -113,7 +115,7 @@ export default function AdminComunicado() {
                 <button
                   key={valor}
                   type="button"
-                  onClick={() => { setDestinatario(valor); setForm(p => ({ ...p, usuario_id: '' })); setBusqueda(''); setUsuarios([]); }}
+                  onClick={() => { setDestinatario(valor); setUsuariosSeleccionados([]); setBusqueda(''); setUsuarios([]); }}
                   className="p-4 rounded-xl border-2 text-left transition-all"
                   style={{
                     borderColor: destinatario === valor ? '#2C2B27' : '#E8E6E3',
@@ -127,10 +129,30 @@ export default function AdminComunicado() {
               ))}
             </div>
 
-            {/* Buscador de usuario específico */}
+            {/* Buscador multi-usuario para modo específico */}
             {destinatario === 'especifico' && (
               <div className="mt-4 animate-slide-down">
-                <label className="input-label">Buscar usuario</label>
+                <label className="input-label">Buscar y agregar usuarios</label>
+
+                {/* Chips de usuarios ya seleccionados */}
+                {usuariosSeleccionados.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {usuariosSeleccionados.map(u => (
+                      <span key={u.id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-body font-medium"
+                        style={{ background: '#2C2B27', color: '#fff' }}>
+                        {u.nombre} {u.apellido}
+                        <button type="button"
+                          onClick={() => setUsuariosSeleccionados(prev => prev.filter(x => x.id !== u.id))}
+                          className="ml-0.5 opacity-70 hover:opacity-100 transition-opacity">
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Input de búsqueda */}
                 <div className="relative">
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#8A8780' }} />
                   <input type="text" placeholder="Nombre o email (mínimo 3 caracteres)..."
@@ -139,31 +161,41 @@ export default function AdminComunicado() {
                     className="input-field pl-9" />
                 </div>
 
-                {usuarios.length > 0 && (
+                {/* Lista de resultados — solo muestra los que no están seleccionados */}
+                {usuarios.filter(u => !usuariosSeleccionados.some(s => s.id === u.id)).length > 0 && (
                   <div className="mt-2 rounded-xl border overflow-hidden" style={{ borderColor: '#E8E6E3' }}>
-                    {usuarios.map(u => (
-                      <button key={u.id} type="button"
-                        onClick={() => { set('usuario_id', u.id); setBusqueda(`${u.nombre} ${u.apellido} (${u.email})`); setUsuarios([]); }}
-                        className="flex items-center gap-3 w-full px-4 py-3 text-left border-b last:border-0 transition-colors"
-                        style={{ borderColor: '#F7F6F4' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = ''; }}>
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ background: '#2C2B27' }}>
-                          <span className="text-white text-xs font-bold">{u.nombre[0]}{u.apellido[0]}</span>
-                        </div>
-                        <div>
-                          <p className="font-body text-sm font-medium" style={{ color: '#1C1B18' }}>{u.nombre} {u.apellido}</p>
-                          <p className="font-body text-xs" style={{ color: '#8A8780' }}>{u.email} · {u.rol}</p>
-                        </div>
-                      </button>
-                    ))}
+                    {usuarios
+                      .filter(u => !usuariosSeleccionados.some(s => s.id === u.id))
+                      .map(u => (
+                        <button key={u.id} type="button"
+                          onClick={() => {
+                            // Agregar al array de seleccionados y limpiar el input
+                            setUsuariosSeleccionados(prev => [...prev, u]);
+                            setBusqueda('');
+                            setUsuarios([]);
+                          }}
+                          className="flex items-center gap-3 w-full px-4 py-3 text-left border-b last:border-0 transition-colors"
+                          style={{ borderColor: '#F7F6F4' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#F7F6F4'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = ''; }}>
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ background: '#2C2B27' }}>
+                            <span className="text-white text-xs font-bold">{u.nombre[0]}{u.apellido[0]}</span>
+                          </div>
+                          <div>
+                            <p className="font-body text-sm font-medium" style={{ color: '#1C1B18' }}>{u.nombre} {u.apellido}</p>
+                            <p className="font-body text-xs" style={{ color: '#8A8780' }}>{u.email} · {u.rol}</p>
+                          </div>
+                        </button>
+                      ))
+                    }
                   </div>
                 )}
 
-                {form.usuario_id && (
+                {/* Contador de seleccionados */}
+                {usuariosSeleccionados.length > 0 && (
                   <p className="font-body text-xs mt-2 flex items-center gap-1.5" style={{ color: '#16a34a' }}>
-                    ✓ Usuario seleccionado
+                    ✓ {usuariosSeleccionados.length} usuario{usuariosSeleccionados.length > 1 ? 's' : ''} seleccionado{usuariosSeleccionados.length > 1 ? 's' : ''}
                   </p>
                 )}
               </div>

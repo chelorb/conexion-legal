@@ -53,7 +53,7 @@ router.patch('/leer-todas', async (req, res, next) => {
 // POST /api/notificaciones/comunicado — Solo admin
 router.post('/comunicado', requireRol('admin'), async (req, res, next) => {
   try {
-    const { titulo, mensaje, link, destinatario, usuario_id } = req.body;
+    const { titulo, mensaje, link, destinatario, usuario_id, usuario_ids } = req.body;
 
     if (!titulo?.trim() || !mensaje?.trim()) {
       return res.status(400).json({ error: 'Título y mensaje son obligatorios.' });
@@ -65,8 +65,14 @@ router.post('/comunicado', requireRol('admin'), async (req, res, next) => {
     let usuarioIds = [];
 
     if (destinatario === 'especifico') {
-      if (!usuario_id) return res.status(400).json({ error: 'Falta usuario_id.' });
-      usuarioIds = [usuario_id];
+      // Acepta array (usuario_ids) o id único (usuario_id) para retrocompatibilidad
+      if (Array.isArray(usuario_ids) && usuario_ids.length > 0) {
+        usuarioIds = usuario_ids;
+      } else if (usuario_id) {
+        usuarioIds = [usuario_id];
+      } else {
+        return res.status(400).json({ error: 'Seleccioná al menos un usuario.' });
+      }
     } else {
       const condicion = destinatario === 'todos'
         ? "r.nombre IN ('abogado','cliente')"
