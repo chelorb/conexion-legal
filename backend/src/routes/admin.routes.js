@@ -154,10 +154,11 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
         abogadoNombre: `${abogado.nombre} ${abogado.apellido}`,
       });
 
+      // Email de aprobación — con .catch() para registrar errores sin cortar el flujo
       emailService.notificarAbogadoAprobado({
         nombre: `${abogado.nombre} ${abogado.apellido}`,
         email:  abogado.email,
-      });
+      }).catch(err => console.error(`❌ Error enviando email de aprobación a ${abogado.email}:`, err.message));
 
       return res.json({ mensaje: 'Perfil aprobado. El abogado fue notificado.' });
     }
@@ -182,11 +183,12 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
         motivo:    motivo || 'Por favor revisá tu perfil y completá los datos faltantes.',
       });
 
+      // Email de rechazo — con .catch() para registrar errores sin cortar el flujo
       emailService.notificarAbogadoRechazado({
         nombre: `${abogado.nombre} ${abogado.apellido}`,
         email:  abogado.email,
         motivo,
-      });
+      }).catch(err => console.error(`❌ Error enviando email de rechazo a ${abogado.email}:`, err.message));
 
       return res.json({ mensaje: 'Perfil rechazado. El abogado fue notificado.' });
     }

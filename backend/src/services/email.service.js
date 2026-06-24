@@ -67,7 +67,13 @@ const enviarEmail = async ({ to, subject, html }) => {
     return { ok: false, error: 'SendGrid no configurado' };
   }
 
-  const from = process.env.EMAIL_FROM || 'adminiustixium@gmail.com';
+  // EMAIL_FROM debe ser el sender verificado en SendGrid (configurado en Render).
+  // Un Gmail genérico no verificado hace que SendGrid rechace el envío en silencio.
+  const from = process.env.EMAIL_FROM;
+  if (!from) {
+    console.error('❌ EMAIL_FROM no configurado en variables de entorno — email no enviado a:', to);
+    return { ok: false, error: 'EMAIL_FROM no configurado' };
+  }
 
   try {
     const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -151,7 +157,7 @@ const notificarAbogadoPendiente = async ({ nombre, email }) => {
       3. Te enviamos un email cuando tu perfil esté aprobado
     </div>
     <p>Una vez aprobado, tu perfil aparecerá en el catálogo y los clientes podrán contactarte.</p>
-    <p>Si tenés alguna consulta, respondé este email o escribinos a <strong>${process.env.EMAIL_FROM || 'adminiustixium@gmail.com'}</strong>.</p>
+    <p>Si tenés alguna consulta, respondé este email o escribinos a <strong>${process.env.EMAIL_FROM}</strong>.</p>
   `;
 
   return enviarEmail({
