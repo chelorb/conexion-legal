@@ -118,9 +118,9 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
     const { accion, motivo, visible, matricula_verificada } = req.body;
     const adminId    = req.usuario.id;
 
-    // Obtener datos del abogado para los emails
+    // Obtener datos del abogado para los emails y para restaurar email si fue anonimizado
     const { rows: abogadoRows } = await query(
-      `SELECT u.nombre, u.apellido, u.email
+      `SELECT u.nombre, u.apellido, u.email, u.email_original
        FROM usuarios u
        JOIN perfiles_abogado pa ON u.id = pa.usuario_id
        WHERE u.id = $1`,
@@ -135,6 +135,19 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
 
     // ── Acción: aprobar ──────────────────────────────────────
     if (accion === 'aprobar') {
+      // Si el email fue anonimizado por "Permitir re-registro",
+      // restaurar el email original antes de aprobar
+      if (abogado.email_original) {
+        await query(
+          `UPDATE usuarios SET
+             email          = $1,
+             email_original = NULL,
+             activo         = true
+           WHERE id = $2`,
+          [abogado.email_original, id]
+        );
+      }
+
       await query(
         `UPDATE perfiles_abogado SET
            estado_aprobacion    = 'aprobado',
@@ -154,11 +167,12 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
         abogadoNombre: `${abogado.nombre} ${abogado.apellido}`,
       });
 
-      // Email de aprobación — con .catch() para registrar errores sin cortar el flujo
+      // Email de aprobación — si el email fue anonimizado, usar el email_original restaurado
+      const emailAprobacion = abogado.email_original || abogado.email;
       emailService.notificarAbogadoAprobado({
         nombre: `${abogado.nombre} ${abogado.apellido}`,
-        email:  abogado.email,
-      }).catch(err => console.error(`❌ Error enviando email de aprobación a ${abogado.email}:`, err.message));
+        email:  emailAprobacion,
+      }).catch(err => console.error(`❌ Error enviando email de aprobación a ${emailAprobacion}:`, err.message));
 
       return res.json({ mensaje: 'Perfil aprobado. El abogado fue notificado.' });
     }
@@ -183,12 +197,11 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
         motivo:    motivo || 'Por favor revisá tu perfil y completá los datos faltantes.',
       });
 
-      // Email de rechazo — con .catch() para registrar errores sin cortar el flujo
       emailService.notificarAbogadoRechazado({
         nombre: `${abogado.nombre} ${abogado.apellido}`,
         email:  abogado.email,
         motivo,
-      }).catch(err => console.error(`❌ Error enviando email de rechazo a ${abogado.email}:`, err.message));
+      });
 
       return res.json({ mensaje: 'Perfil rechazado. El abogado fue notificado.' });
     }
@@ -956,16 +969,20 @@ router.patch('/usuarios/:id/permitir-reregistro', async (req, res, next) => {
 
     // Anonimizar el email con un sufijo único basado en timestamp
     // Ej: juan@email.com → juan@email.com__rechazado_1718000000000
-    const emailAnonimizado = `${usuario.email}__rechazado_${Date.now()}`;
+    // Se guarda el email real en email_original para poder restaurarlo
+    // si el admin luego usa "Aprobar directamente"
+    const emailReal        = usuario.email_original || usuario.email; // por si ya fue anonimizado antes
+    const emailAnonimizado = `${emailReal}__rechazado_${Date.now()}`;
 
     await query(
       `UPDATE usuarios SET
          email              = $1,
+         email_original     = $2,
          activo             = false,
          token_verificacion = NULL,
          token_reset_pass   = NULL
-       WHERE id = $2`,
-      [emailAnonimizado, id]
+       WHERE id = $3`,
+      [emailAnonimizado, emailReal, id]
     );
 
     res.json({
