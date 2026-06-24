@@ -435,15 +435,48 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
                   </button>
                 )}
 
-                {/* Permitir re-registro — solo abogados rechazados */}
+                {/* Aprobar directamente + Permitir re-registro — solo abogados rechazados */}
                 {esAbogado && usuario.estado_aprobacion === 'rechazado' && (
-                  <button onClick={permitirReregistro} disabled={procesando}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
-                    style={{ borderColor: '#B86030', color: '#B86030', background: 'rgba(184,96,48,0.04)' }}
-                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.1)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.04)'; }}>
-                    <RotateCcw size={15} /> Permitir re-registro
-                  </button>
+                  <>
+                    {/* Aprobación directa: útil cuando el rechazo fue un error
+                        o el abogado corrigió algo sin necesidad de volver a registrarse.
+                        Reutiliza el mismo endpoint de aprobación de abogados pendientes. */}
+                    <button
+                      onClick={() => {
+                        if (!window.confirm(
+                          `¿Aprobar directamente a ${usuario.nombre} ${usuario.apellido}?\n\n` +
+                          `Su perfil pasará a estado "Aprobado" y recibirá un email de confirmación.`
+                        )) return;
+                        setAccionApro('aprobar');
+                        // Ejecutar inmediatamente después de setear la acción
+                        api.patch(`/admin/abogados/${usuario.id}/aprobar`, {
+                          accion: 'aprobar',
+                          visible: toggleVis,
+                          matricula_verificada: toggleMat,
+                        }).then(() => {
+                          toast.success('✅ Perfil aprobado directamente.');
+                          onActualizar(); onCerrar();
+                        }).catch(() => {
+                          toast.error('Error al aprobar el perfil.');
+                          setAccionApro('');
+                        });
+                      }}
+                      disabled={procesando}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
+                      style={{ borderColor: 'rgba(22,163,74,0.3)', color: '#15803d', background: 'rgba(22,163,74,0.06)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(22,163,74,0.12)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(22,163,74,0.06)'; }}>
+                      <Check size={15} /> Aprobar directamente
+                    </button>
+
+                    <button onClick={permitirReregistro} disabled={procesando}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm border-2 transition-colors"
+                      style={{ borderColor: '#B86030', color: '#B86030', background: 'rgba(184,96,48,0.04)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.1)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.04)'; }}>
+                      <RotateCcw size={15} /> Permitir re-registro
+                    </button>
+                  </>
                 )}
 
                 {/* Eliminar definitivamente — nunca para admins */}
