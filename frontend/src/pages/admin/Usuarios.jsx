@@ -11,7 +11,7 @@ import {
   Search, UserCheck, UserX, Shield, RefreshCw,
   Mail, User, Briefcase, Crown, X, Filter,
   Trash2, RotateCcw, Check, ChevronDown, ChevronUp,
-  MapPin, FileText, ExternalLink, FolderOpen, Save
+  MapPin, FileText, ExternalLink, FolderOpen, Save, Pencil, Phone
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -127,6 +127,7 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
   const [motivo,      setMotivo]      = useState('');
   const [toggleVis,   setToggleVis]   = useState(usuario.visible_en_grilla ?? false);
   const [toggleMat,   setToggleMat]   = useState(usuario.matricula_verificada ?? false);
+  const [editandoDatos, setEditandoDatos] = useState(false); // toggle del formulario de datos personales
 
   const esAbogado = usuario.rol === 'abogado';
 
@@ -137,6 +138,16 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
       ciudad:           usuario.ciudad || '',
       provincia:        usuario.provincia || '',
       matricula:        usuario.matricula || '',
+    }
+  });
+
+  // Formulario separado para datos personales (nombre, apellido, email, teléfono)
+  const { register: regDatos, handleSubmit: handleDatos, formState: { errors: errDatos } } = useForm({
+    defaultValues: {
+      nombre:   usuario.nombre   || '',
+      apellido: usuario.apellido || '',
+      email:    usuario.email    || '',
+      telefono: usuario.telefono || '',
     }
   });
 
@@ -205,6 +216,19 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
     finally { setProcesando(false); }
   };
 
+  // ── Guardar datos personales ────────────────────────────────
+  const onSubmitDatos = async (datos) => {
+    setProcesando(true);
+    try {
+      await api.patch(`/admin/usuarios/${usuario.id}/datos`, datos);
+      toast.success('Datos personales actualizados.');
+      setEditandoDatos(false);
+      onActualizar(); onCerrar();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al guardar.');
+    } finally { setProcesando(false); }
+  };
+
   // ── Permitir re-registro ────────────────────────────────────
   const permitirReregistro = async () => {
     if (!window.confirm(
@@ -239,8 +263,8 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
 
   // ── Pestañas según rol ──────────────────────────────────────
   const tabs = esAbogado
-    ? [{ id: 'info', label: 'Info y estado' }, { id: 'documentos', label: 'Documentos' }, { id: 'perfil', label: 'Editar perfil' }]
-    : [{ id: 'info', label: 'Info y estado' }];
+    ? [{ id: 'info', label: 'Info y estado' }, { id: 'documentos', label: 'Documentos' }, { id: 'perfil', label: 'Editar perfil' }, { id: 'datos', label: 'Datos personales' }]
+    : [{ id: 'info', label: 'Info y estado' }, { id: 'datos', label: 'Datos personales' }];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
@@ -549,6 +573,64 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
                 <div>
                   <label className="input-label">Provincia</label>
                   <input type="text" className="input-field" {...register('provincia')} />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={onCerrar} className="btn-secondary flex-1">Cancelar</button>
+                <button type="submit" disabled={procesando} className="btn-primary flex-1">
+                  {procesando ? 'Guardando...' : <><Save size={14} /> Guardar</>}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ── Tab: Datos personales ───────────────────── */}
+          {tab === 'datos' && usuario.rol !== 'admin' && (
+            <form onSubmit={handleDatos(onSubmitDatos)} className="space-y-4">
+              <div className="rounded-xl p-3 flex items-center gap-2"
+                style={{ background: 'rgba(184,96,48,0.06)', border: '1px solid rgba(184,96,48,0.15)' }}>
+                <Pencil size={13} style={{ color: '#B86030' }} className="shrink-0" />
+                <p className="font-body text-xs" style={{ color: '#B86030' }}>
+                  Estos cambios quedan registrados en el log de auditoría.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="input-label">Nombre</label>
+                  <input type="text" className={`input-field ${errDatos.nombre ? 'border-red-300' : ''}`}
+                    {...regDatos('nombre', { required: 'Requerido' })} />
+                  {errDatos.nombre && <p className="input-error">{errDatos.nombre.message}</p>}
+                </div>
+                <div>
+                  <label className="input-label">Apellido</label>
+                  <input type="text" className={`input-field ${errDatos.apellido ? 'border-red-300' : ''}`}
+                    {...regDatos('apellido', { required: 'Requerido' })} />
+                  {errDatos.apellido && <p className="input-error">{errDatos.apellido.message}</p>}
+                </div>
+              </div>
+
+              <div>
+                <label className="input-label">Email</label>
+                <input type="email" className={`input-field ${errDatos.email ? 'border-red-300' : ''}`}
+                  {...regDatos('email', {
+                    required: 'Requerido',
+                    pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Email inválido' },
+                  })} />
+                {errDatos.email && <p className="input-error">{errDatos.email.message}</p>}
+                <p className="font-body text-xs mt-1" style={{ color: '#8A8780' }}>
+                  ⚠️ Cambiar el email modifica el login del usuario.
+                </p>
+              </div>
+
+              <div>
+                <label className="input-label">Teléfono</label>
+                <div className="relative">
+                  <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#8A8780' }} />
+                  <input type="text" className="input-field pl-9"
+                    placeholder="+54 299 000-0000"
+                    {...regDatos('telefono')} />
                 </div>
               </div>
 
