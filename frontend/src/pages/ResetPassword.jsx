@@ -42,7 +42,7 @@ export default function ResetPassword() {
             <div className="w-8 h-8 bg-navy-900 rounded-lg flex items-center justify-center">
               <Scale size={16} className="text-white" />
             </div>
-            <span className="font-display font-bold text-navy-900">Conexión<span className="text-gold-500">Legal</span></span>
+            <span className="font-display font-bold text-navy-900">IUSTIXIUM</span>
           </Link>
           <h1 className="font-display text-2xl font-bold text-navy-900">Nueva contraseña</h1>
         </div>

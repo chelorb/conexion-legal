@@ -430,7 +430,7 @@ export default function Inicio() {
             ¿Listo para empezar?
           </h2>
           <p className="font-body mb-8" style={{ color: '#8A8780' }}>
-            Más de 500 profesionales ya confían en Conexión Legal.
+            Más de 500 profesionales ya confían en IUSTIXIUM.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link

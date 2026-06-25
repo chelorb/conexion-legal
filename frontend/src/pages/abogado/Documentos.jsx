@@ -173,7 +173,7 @@ export default function DocumentosAbogado() {
           <div>
             <h1 className="section-title">Mis documentos</h1>
             <p className="section-subtitle">
-              Documentación profesional verificada por el equipo de Conexión Legal.
+              Documentación profesional verificada por el equipo de IUSTIXIUM.
             </p>
           </div>
           <button onClick={() => setModal(true)} className="btn-primary gap-2 shrink-0">

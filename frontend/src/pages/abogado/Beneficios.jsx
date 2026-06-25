@@ -156,7 +156,7 @@ export default function Beneficios() {
 
         <div className="mb-8">
           <h1 className="section-title">Mis beneficios</h1>
-          <p className="section-subtitle">Descuentos y convenios exclusivos para miembros de Conexión Legal.</p>
+          <p className="section-subtitle">Descuentos y convenios exclusivos para miembros de IUSTIXIUM.</p>
         </div>
 
         {/* Filtros */}

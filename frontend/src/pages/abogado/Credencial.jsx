@@ -52,7 +52,7 @@ function TarjetaCredencial({ usuario, perfil, codigo }) {
               <Scale size={14} className="text-white" />
             </div>
             <span className="font-display font-bold text-white text-sm">
-              Conexión<span className="text-gold-400">Legal</span>
+              IUSTIXIUM
             </span>
           </div>
           {/* Badge de plan */}
@@ -114,9 +114,9 @@ export default function Credencial() {
 
   // Función para compartir / copiar el código
   const compartir = () => {
-    const texto = `Mi credencial de Conexión Legal — ${usuario?.nombre} ${usuario?.apellido} | ID: ${perfil?.credencial_codigo || 'CL-000000'}`;
+    const texto = `Mi credencial de IUSTIXIUM — ${usuario?.nombre} ${usuario?.apellido} | ID: ${perfil?.credencial_codigo || 'CL-000000'}`;
     if (navigator.share) {
-      navigator.share({ title: 'Mi credencial Conexión Legal', text: texto });
+      navigator.share({ title: 'Mi credencial IUSTIXIUM', text: texto });
     } else {
       navigator.clipboard.writeText(texto);
       toast.success('Credencial copiada al portapapeles');
@@ -159,7 +159,7 @@ export default function Credencial() {
         <div className="mb-8">
           <h1 className="section-title">Mi credencial virtual</h1>
           <p className="section-subtitle">
-            Tu identificación digital como miembro verificado de Conexión Legal.
+            Tu identificación digital como miembro verificado de IUSTIXIUM.
           </p>
         </div>
 
@@ -198,7 +198,7 @@ export default function Credencial() {
               {
                 icono: '💼',
                 titulo: 'Identificación profesional',
-                desc: 'Usala como identificación digital que certifica tu membresía y verificación en Conexión Legal.',
+                desc: 'Usala como identificación digital que certifica tu membresía y verificación en IUSTIXIUM.',
               },
               {
                 icono: '📱',
