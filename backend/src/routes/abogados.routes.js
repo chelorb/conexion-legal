@@ -55,4 +55,108 @@ router.patch('/me/notificaciones-plan/marcar-todas', verificarToken, requireRol(
   } catch (error) { next(error); }
 });
 
+// ─────────────────────────────────────────────────────────────
+// POST /api/abogados/me/solicitar-cambio-plan
+// El abogado solicita cambiar su plan — no lo cambia automáticamente.
+// Guarda el plan solicitado en la DB y notifica al admin (in-app + email)
+// para que lo procese manualmente desde el panel de administración.
+// ─────────────────────────────────────────────────────────────
+router.post('/me/solicitar-cambio-plan', verificarToken, requireRol('abogado'), async (req, res, next) => {
+  try {
+    const { plan_id } = req.body;
+    const abogadoId   = req.usuario.id;
+
+    if (!plan_id) {
+      return res.status(400).json({ error: 'Falta el plan solicitado.' });
+    }
+
+    // Verificar que el plan solicitado existe y está activo
+    const { rows: [planSolicitado] } = await query(
+      'SELECT id, nombre FROM planes_suscripcion WHERE id = $1 AND activo = true',
+      [plan_id]
+    );
+    if (!planSolicitado) {
+      return res.status(404).json({ error: 'Plan no encontrado.' });
+    }
+
+    // Obtener el perfil actual del abogado (plan actual + datos personales)
+    const { rows: [perfil] } = await query(
+      `SELECT pa.plan_id, pa.plan_solicitado_id,
+              ps.nombre AS plan_actual_nombre,
+              u.nombre, u.apellido, u.email
+       FROM perfiles_abogado pa
+       JOIN planes_suscripcion ps ON pa.plan_id = ps.id
+       JOIN usuarios u ON u.id = pa.usuario_id
+       WHERE pa.usuario_id = $1`,
+      [abogadoId]
+    );
+
+    if (!perfil) {
+      return res.status(404).json({ error: 'Perfil de abogado no encontrado.' });
+    }
+
+    // Evitar solicitar el mismo plan que ya tiene activo
+    if (perfil.plan_id === parseInt(plan_id)) {
+      return res.status(400).json({ error: 'Ya tenés este plan activo.' });
+    }
+
+    // Evitar solicitar el mismo plan que ya está solicitado
+    if (perfil.plan_solicitado_id === parseInt(plan_id)) {
+      return res.status(400).json({ error: 'Ya tenés una solicitud pendiente para este plan.' });
+    }
+
+    // Guardar la solicitud en la DB
+    await query(
+      `UPDATE perfiles_abogado
+       SET plan_solicitado_id = $1,
+           plan_solicitado_en = NOW()
+       WHERE usuario_id = $2`,
+      [plan_id, abogadoId]
+    );
+
+    // Notificar a todos los admins (in-app + email) en background
+    const emailService = require('../services/email.service');
+    const { query: dbQuery } = require('../config/database');
+
+    dbQuery(
+      `SELECT u.id, u.nombre, u.email
+       FROM usuarios u
+       JOIN roles r ON u.rol_id = r.id
+       WHERE r.nombre = 'admin' AND u.activo = true`
+    ).then(async ({ rows: admins }) => {
+      const notifService = require('../services/notificaciones.service');
+
+      for (const admin of admins) {
+        // Notificación in-app
+        notifService.crear({
+          usuarioId: admin.id,
+          tipo:      'cambio_plan_solicitado',
+          titulo:    `Solicitud de cambio de plan`,
+          mensaje:   `Dr./Dra. ${perfil.nombre} ${perfil.apellido} solicita cambiar del plan ${perfil.plan_actual_nombre} al plan ${planSolicitado.nombre}.`,
+          link:      '/admin/abogados',
+        }).catch(err => console.error('❌ Notif solicitud plan admin:', err.message));
+
+        // Email al admin
+        emailService.notificarAdminSolicitudCambioPlan({
+          adminEmail:           admin.email,
+          adminNombre:          admin.nombre,
+          abogadoNombre:        `${perfil.nombre} ${perfil.apellido}`,
+          abogadoEmail:         perfil.email,
+          planActualNombre:     perfil.plan_actual_nombre,
+          planSolicitadoNombre: planSolicitado.nombre,
+        }).catch(err => console.error(`❌ Email solicitud plan a ${admin.email}:`, err.message));
+      }
+
+      console.log(`📋 Solicitud de cambio de plan: ${perfil.nombre} ${perfil.apellido} → ${planSolicitado.nombre}`);
+    }).catch(err => console.error('❌ Error notificando admins:', err.message));
+
+    res.json({
+      mensaje: `Solicitud de cambio al plan ${planSolicitado.nombre} enviada correctamente. El equipo de IUSTIXIUM la procesará a la brevedad.`,
+      plan_solicitado: planSolicitado,
+    });
+
+  } catch (error) { next(error); }
+});
+
 module.exports = router;
+

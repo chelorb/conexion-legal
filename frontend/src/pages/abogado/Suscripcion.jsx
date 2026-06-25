@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, X, Crown, ArrowRight, CreditCard, Calendar, AlertCircle, RefreshCw } from 'lucide-react';
+import { Check, X, Crown, ArrowRight, CreditCard, Calendar, AlertCircle, RefreshCw, Clock, Send } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -30,10 +30,22 @@ export default function Suscripcion() {
   const [periodo,    setPeriodo]  = useState('mensual');
   const [cargando,   setCargando] = useState(true);
   const [procesando, setProcesando] = useState(null);
+  const [solicitudPendiente, setSolicitudPendiente] = useState(null); // id del plan con solicitud pendiente
 
   useEffect(() => {
-    Promise.all([api.get('/pagos/planes'), api.get('/pagos/historial')])
-      .then(([p, h]) => { setPlanes(p.data.planes); setHistorial(h.data.pagos); })
+    Promise.all([
+      api.get('/pagos/planes'),
+      api.get('/pagos/historial'),
+      api.get('/auth/me'), // para obtener plan_solicitado_id del perfil
+    ])
+      .then(([p, h, me]) => {
+        setPlanes(p.data.planes);
+        setHistorial(h.data.pagos);
+        // Si hay una solicitud pendiente, guardar el id del plan solicitado
+        if (me.data?.usuario?.perfil_abogado?.plan_solicitado_id) {
+          setSolicitudPendiente(me.data.usuario.perfil_abogado.plan_solicitado_id);
+        }
+      })
       .catch(() => toast.error('Error al cargar la suscripción.'))
       .finally(() => setCargando(false));
   }, []);
@@ -45,6 +57,24 @@ export default function Suscripcion() {
       window.location.href = data.checkout_url;
     } catch (err) {
       toast.error(err.response?.data?.error || 'Error al procesar el pago.');
+      setProcesando(null);
+    }
+  };
+
+  // Solicita al admin el cambio de plan — no lo cambia automáticamente
+  const solicitarCambio = async (planId, planNombre) => {
+    if (solicitudPendiente === planId) {
+      toast('Ya tenés una solicitud pendiente para este plan.', { icon: '⏳' });
+      return;
+    }
+    setProcesando(planId);
+    try {
+      const { data } = await api.post('/abogados/me/solicitar-cambio-plan', { plan_id: planId });
+      setSolicitudPendiente(planId);
+      toast.success(data.mensaje || `Solicitud enviada. El equipo de IUSTIXIUM la procesará a la brevedad.`);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al enviar la solicitud.');
+    } finally {
       setProcesando(null);
     }
   };
@@ -227,18 +257,26 @@ export default function Suscripcion() {
                       style={{ background: '#F7F6F4', color: '#8A8780' }}>
                       <Check size={14} /> Plan activo
                     </div>
+                  ) : solicitudPendiente === plan.id ? (
+                    /* Solicitud ya enviada para este plan — mostrar estado en espera */
+                    <div
+                      className="flex items-center justify-center gap-2 py-3 rounded-xl font-body text-sm font-medium"
+                      style={{ background: 'rgba(184,96,48,0.08)', color: '#B86030', border: '1px solid rgba(184,96,48,0.2)' }}
+                    >
+                      <Clock size={14} /> Solicitud enviada — pendiente
+                    </div>
                   ) : (
                     <button
-                      onClick={() => suscribirse(plan.slug)}
+                      onClick={() => solicitarCambio(plan.id, plan.nombre)}
                       disabled={!!procesando}
                       className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-body font-medium text-sm text-white transition-colors disabled:opacity-50"
                       style={{ background: esComunidad ? '#B86030' : '#2C2B27' }}
                       onMouseEnter={e => { e.currentTarget.style.background = esComunidad ? '#8B4A1E' : '#1C1B18'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = esComunidad ? '#B86030' : '#2C2B27'; }}
                     >
-                      {procesando === plan.slug
-                        ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Procesando...</>
-                        : <>Cambiar a {plan.nombre} <ArrowRight size={14} /></>
+                      {procesando === plan.id
+                        ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Enviando solicitud...</>
+                        : <><Send size={14} /> Solicitar cambio a {plan.nombre}</>
                       }
                     </button>
                   )}

@@ -428,70 +428,38 @@ const enviarConfirmacionSuscripcion = async ({ nombre, email, plan, fechaFin }) 
 };
 
 
-// ═════════════════════════════════════════════════════════════
-// EMAIL DE CAMBIO DE PRECIOS EN PLANES
-// ═════════════════════════════════════════════════════════════
-
 /**
- * Notifica a un abogado que el precio de su plan fue actualizado
- * Se llama desde admin.routes.js al modificar un plan
+ * Solicitud de cambio de plan de un abogado → admin
+ * Se envía a todos los admins cuando un abogado solicita cambiar su plan
  */
-const notificarCambioPreciosPlan = async ({
-  nombre, email, planNombre,
-  precioMensualAnterior, precioMensualNuevo,
-  precioAnualAnterior,   precioAnualNuevo,
+const notificarAdminSolicitudCambioPlan = async ({
+  adminEmail, adminNombre,
+  abogadoNombre, abogadoEmail,
+  planActualNombre, planSolicitadoNombre,
 }) => {
-  // Formatear precios en pesos argentinos
-  const fmt = (n) => n != null
-    ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
-    : null;
-
-  // Construir filas de la tabla solo si el precio cambió
-  const filaMensual = precioMensualAnterior !== precioMensualNuevo && precioMensualNuevo != null ? `
-    <tr>
-      <td style="padding:10px 0;border-bottom:1px solid #F0EFED;color:#56534A;font-size:14px;">Mensual</td>
-      <td style="padding:10px 0;border-bottom:1px solid #F0EFED;color:#8A8780;font-size:14px;text-decoration:line-through;">${fmt(precioMensualAnterior)}</td>
-      <td style="padding:10px 0;border-bottom:1px solid #F0EFED;color:#1C1B18;font-size:14px;font-weight:600;">${fmt(precioMensualNuevo)}</td>
-    </tr>` : '';
-
-  const filaAnual = precioAnualAnterior !== precioAnualNuevo && precioAnualNuevo != null ? `
-    <tr>
-      <td style="padding:10px 0;color:#56534A;font-size:14px;">Anual</td>
-      <td style="padding:10px 0;color:#8A8780;font-size:14px;text-decoration:line-through;">${fmt(precioAnualAnterior)}</td>
-      <td style="padding:10px 0;color:#1C1B18;font-size:14px;font-weight:600;">${fmt(precioAnualNuevo)}</td>
-    </tr>` : '';
-
   const contenido = `
-    <h2>Actualizamos los valores de tu plan 📋</h2>
-    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, te informamos que actualizamos los precios del plan <strong>${planNombre}</strong>.</p>
-
-    <div class="info-box" style="margin:20px 0;">
-      <table style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr>
-            <th style="text-align:left;padding:8px 0;font-size:12px;color:#8A8780;text-transform:uppercase;letter-spacing:0.05em;">Período</th>
-            <th style="text-align:left;padding:8px 0;font-size:12px;color:#8A8780;text-transform:uppercase;letter-spacing:0.05em;">Precio anterior</th>
-            <th style="text-align:left;padding:8px 0;font-size:12px;color:#8A8780;text-transform:uppercase;letter-spacing:0.05em;">Precio nuevo</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${filaMensual}
-          ${filaAnual}
-        </tbody>
-      </table>
+    <h2>Solicitud de cambio de plan 📋</h2>
+    <p>Hola <strong>${adminNombre || 'Admin'}</strong>, un abogado solicitó cambiar su plan de suscripción.</p>
+    <div class="info-box">
+      <strong>👤 Abogado:</strong> ${abogadoNombre}<br>
+      <strong>📧 Email:</strong> ${abogadoEmail}<br><br>
+      <strong>📦 Plan actual:</strong> ${planActualNombre}<br>
+      <strong>⬆️  Plan solicitado:</strong> ${planSolicitadoNombre}
     </div>
-
-    <p>Tu suscripción activa no se ve afectada hasta la próxima renovación.</p>
+    <p>Ingresá al panel de administración para procesar el cambio manualmente.</p>
+    <div class="btn-wrap">
+      <a href="${process.env.FRONTEND_URL}/admin/abogados" class="btn">Ir al panel de abogados</a>
+    </div>
     <p style="font-size:13px;color:#8A8780;">
-      Si tenés alguna consulta sobre este cambio,
+      Si tenés dudas sobre esta solicitud,
       <a href="${process.env.FRONTEND_URL}" style="color:#B86030;text-decoration:none;">comunicate con nosotros</a>.
     </p>
   `;
 
   return enviarEmail({
-    to:      email,
-    subject: `📋 Actualización de precios — Plan ${planNombre} — IUSTIXIUM`,
-    html:    templateBase(`Actualización de precios: ${planNombre}`, contenido),
+    to:      adminEmail,
+    subject: `🔔 Solicitud de cambio de plan: ${abogadoNombre} → ${planSolicitadoNombre} — IUSTIXIUM`,
+    html:    templateBase('Solicitud de cambio de plan', contenido),
   });
 };
 
@@ -512,4 +480,5 @@ module.exports = {
   enviarComunicado,
   enviarConfirmacionSuscripcion,
   notificarCambioPreciosPlan,
+  notificarAdminSolicitudCambioPlan,
 };

@@ -307,6 +307,9 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
          matricula        = COALESCE($5, matricula),
          especialidades   = COALESCE($6, especialidades),
          plan_id          = COALESCE($7, plan_id),
+         -- Si el admin cambió el plan, limpiar la solicitud pendiente
+         plan_solicitado_id = CASE WHEN $7 IS NOT NULL THEN NULL ELSE plan_solicitado_id END,
+         plan_solicitado_en = CASE WHEN $7 IS NOT NULL THEN NULL ELSE plan_solicitado_en END,
          perfil_completo  = true
        WHERE usuario_id = $8`,
       [
@@ -517,8 +520,6 @@ router.get('/planes', async (req, res, next) => {
 });
 
 // PUT /api/admin/planes/:id — Actualizar un plan
-// Al modificar el precio, notifica automáticamente a todos los abogados
-// suscriptos a ese plan (notificación in-app + email informativo)
 router.put('/planes/:id', async (req, res, next) => {
   try {
     const {
@@ -529,12 +530,6 @@ router.put('/planes/:id', async (req, res, next) => {
       networking, beneficios_exclusivos, difusion_profesional,
       activo,
     } = req.body;
-
-    // Guardar los precios actuales ANTES del UPDATE para comparar después
-    const { rows: [planAnterior] } = await query(
-      'SELECT nombre, precio_mensual, precio_anual FROM planes_suscripcion WHERE id = $1',
-      [req.params.id]
-    );
 
     const { rows: [plan] } = await query(
       `UPDATE planes_suscripcion SET
@@ -575,57 +570,6 @@ router.put('/planes/:id', async (req, res, next) => {
     );
 
     if (!plan) return res.status(404).json({ error: 'Plan no encontrado.' });
-
-    // ── Notificar cambio de precios si el precio mensual o anual cambió ──
-    // Se hace en background para no bloquear la respuesta al admin
-    const cambioPrecioMensual = precio_mensual !== undefined &&
-      parseFloat(precio_mensual) !== parseFloat(planAnterior?.precio_mensual);
-    const cambioPrecioAnual   = precio_anual !== undefined &&
-      parseFloat(precio_anual)   !== parseFloat(planAnterior?.precio_anual);
-
-    if (planAnterior && (cambioPrecioMensual || cambioPrecioAnual)) {
-      // Buscar todos los abogados activos suscriptos a este plan
-      query(
-        `SELECT u.id, u.nombre, u.apellido, u.email
-         FROM usuarios u
-         JOIN perfiles_abogado pa ON pa.usuario_id = u.id
-         WHERE pa.plan_id = $1
-           AND pa.suscripcion_activa = true
-           AND u.activo = true`,
-        [req.params.id]
-      ).then(async ({ rows: abogados }) => {
-        if (abogados.length === 0) return;
-
-        const notifService  = require('../services/notificaciones.service');
-        const emailService  = require('../services/email.service');
-        const planNombreActual = plan.nombre || planAnterior.nombre;
-
-        for (const abogado of abogados) {
-          // Notificación in-app (campana)
-          notifService.crear({
-            usuarioId: abogado.id,
-            tipo:      'cambio_plan',
-            titulo:    `Actualización de precios — Plan ${planNombreActual}`,
-            mensaje:   `Actualizamos los valores del plan ${planNombreActual}. Tu suscripción activa no se ve afectada hasta la próxima renovación.`,
-            link:      '/abogado/suscripcion',
-          }).catch(err => console.error(`❌ Notif cambio precio abogado ${abogado.id}:`, err.message));
-
-          // Email informativo
-          emailService.notificarCambioPreciosPlan({
-            nombre:                abogado.nombre,
-            email:                 abogado.email,
-            planNombre:            planNombreActual,
-            precioMensualAnterior: parseFloat(planAnterior.precio_mensual),
-            precioMensualNuevo:    cambioPrecioMensual ? parseFloat(precio_mensual) : parseFloat(planAnterior.precio_mensual),
-            precioAnualAnterior:   parseFloat(planAnterior.precio_anual),
-            precioAnualNuevo:      cambioPrecioAnual   ? parseFloat(precio_anual)   : parseFloat(planAnterior.precio_anual),
-          }).catch(err => console.error(`❌ Email cambio precio abogado ${abogado.email}:`, err.message));
-        }
-
-        console.log(`📋 Notificación de cambio de precios enviada a ${abogados.length} abogado(s) del plan ${planNombreActual}`);
-      }).catch(err => console.error('❌ Error buscando abogados para notificación de precio:', err.message));
-    }
-
     res.json({ mensaje: 'Plan actualizado correctamente.', plan });
   } catch (error) { next(error); }
 });
