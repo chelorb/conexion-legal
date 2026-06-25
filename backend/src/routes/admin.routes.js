@@ -9,6 +9,7 @@ const router  = express.Router();
 const { query } = require('../config/database');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 const emailService = require('../services/email.service');
+const auditar      = require('../services/auditoria.service'); // log de acciones críticas del admin
 
 // Todos los endpoints de admin requieren autenticación y rol admin
 router.use(verificarToken, requireRol('admin'));
@@ -159,6 +160,16 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
         email:  abogado.email,
       });
 
+      // Registrar en auditoría
+      await auditar(req, {
+        accion:        'aprobar_abogado',
+        descripcion:   `Aprobó el perfil de ${abogado.nombre} ${abogado.apellido}`,
+        entidad:       'usuario',
+        entidad_id:    id,
+        entidad_label: `${abogado.nombre} ${abogado.apellido} <${abogado.email}>`,
+        datos_despues: { estado_aprobacion: 'aprobado', matricula_verificada: matricula_verificada ?? null },
+      });
+
       return res.json({ mensaje: 'Perfil aprobado. El abogado fue notificado.' });
     }
 
@@ -186,6 +197,16 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
         nombre: `${abogado.nombre} ${abogado.apellido}`,
         email:  abogado.email,
         motivo,
+      });
+
+      // Registrar en auditoría
+      await auditar(req, {
+        accion:        'rechazar_abogado',
+        descripcion:   `Rechazó el perfil de ${abogado.nombre} ${abogado.apellido}`,
+        entidad:       'usuario',
+        entidad_id:    id,
+        entidad_label: `${abogado.nombre} ${abogado.apellido} <${abogado.email}>`,
+        datos_despues: { estado_aprobacion: 'rechazado', motivo: motivo || null },
       });
 
       return res.json({ mensaje: 'Perfil rechazado. El abogado fue notificado.' });
@@ -226,6 +247,15 @@ router.patch('/usuarios/:id/estado', async (req, res, next) => {
       [activo, req.params.id]
     );
 
+    // Registrar en auditoría
+    await auditar(req, {
+      accion:        activo ? 'habilitar_cuenta' : 'deshabilitar_cuenta',
+      descripcion:   `${activo ? 'Habilitó' : 'Deshabilitó'} la cuenta del usuario`,
+      entidad:       'usuario',
+      entidad_id:    req.params.id,
+      datos_despues: { activo },
+    });
+
     res.json({ mensaje: `Usuario ${activo ? 'habilitado' : 'deshabilitado'} correctamente.` });
   } catch (error) { next(error); }
 });
@@ -265,6 +295,16 @@ router.delete('/usuarios/:id', async (req, res, next) => {
     // Eliminar el usuario — el CASCADE en la BD elimina todo lo relacionado:
     // perfiles_abogado, consultas, calificaciones, notificaciones, etc.
     await query('DELETE FROM usuarios WHERE id = $1', [id]);
+
+    // Registrar en auditoría ANTES de eliminar (después el usuario no existe)
+    await auditar(req, {
+      accion:        'eliminar_cuenta',
+      descripcion:   `Eliminó definitivamente la cuenta de ${usuario.nombre} ${usuario.apellido}`,
+      entidad:       'usuario',
+      entidad_id:    id,
+      entidad_label: `${usuario.nombre} ${usuario.apellido} <${usuario.email}>`,
+      datos_antes:   { nombre: usuario.nombre, apellido: usuario.apellido, email: usuario.email, rol: usuario.rol },
+    });
 
     res.json({
       mensaje: `Usuario ${usuario.nombre} ${usuario.apellido} eliminado definitivamente.`,
@@ -323,6 +363,17 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
         id,
       ]
     );
+
+    // Registrar en auditoría solo si se cambió el plan
+    if (planId) {
+      await auditar(req, {
+        accion:        'cambiar_plan_abogado',
+        descripcion:   `Cambió el plan del abogado (plan_slug: ${plan_slug})`,
+        entidad:       'usuario',
+        entidad_id:    id,
+        datos_despues: { plan_slug, plan_id: planId },
+      });
+    }
 
     res.json({ mensaje: 'Perfil actualizado correctamente.' });
   } catch (error) { next(error); }
@@ -969,9 +1020,89 @@ router.patch('/usuarios/:id/permitir-reregistro', async (req, res, next) => {
       [emailAnonimizado, id]
     );
 
+    // Registrar en auditoría
+    await auditar(req, {
+      accion:        'permitir_reregistro',
+      descripcion:   `Permitió el re-registro de ${usuario.nombre} ${usuario.apellido} — email liberado`,
+      entidad:       'usuario',
+      entidad_id:    id,
+      entidad_label: `${usuario.nombre} ${usuario.apellido} <${usuario.email}>`,
+      datos_antes:   { email: usuario.email },
+      datos_despues: { email: emailAnonimizado, activo: false },
+    });
+
     res.json({
       mensaje: `El email "${usuario.email}" fue liberado. El abogado puede volver a registrarse con ese email.`,
       email_liberado: usuario.email,
+    });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/admin/auditoria
+// Historial de acciones críticas del admin — para auditorías
+// Soporta filtros: ?accion=&admin_id=&desde=&hasta=&pagina=
+// ─────────────────────────────────────────────────────────────
+router.get('/auditoria', async (req, res, next) => {
+  try {
+    const { accion, admin_id, desde, hasta, pagina = 1 } = req.query;
+    const limite = 50;
+    const offset = (parseInt(pagina) - 1) * limite;
+
+    // Construir filtros dinámicos
+    const condiciones = [];
+    const valores     = [];
+
+    if (accion) {
+      condiciones.push(`a.accion = $${valores.length + 1}`);
+      valores.push(accion);
+    }
+    if (admin_id) {
+      condiciones.push(`a.admin_id = $${valores.length + 1}`);
+      valores.push(admin_id);
+    }
+    if (desde) {
+      condiciones.push(`a.creado_en >= $${valores.length + 1}`);
+      valores.push(new Date(desde));
+    }
+    if (hasta) {
+      condiciones.push(`a.creado_en <= $${valores.length + 1}`);
+      valores.push(new Date(hasta));
+    }
+
+    const where = condiciones.length ? 'WHERE ' + condiciones.join(' AND ') : '';
+
+    // Total para paginación
+    const { rows: [{ total }] } = await query(
+      `SELECT COUNT(*) AS total FROM auditoria_admin a ${where}`,
+      valores
+    );
+
+    // Registros paginados
+    const { rows } = await query(
+      `SELECT
+         a.id, a.accion, a.descripcion,
+         a.entidad, a.entidad_id, a.entidad_label,
+         a.datos_antes, a.datos_despues,
+         a.ip, a.creado_en,
+         a.admin_email,
+         u.nombre AS admin_nombre, u.apellido AS admin_apellido
+       FROM auditoria_admin a
+       LEFT JOIN usuarios u ON a.admin_id = u.id
+       ${where}
+       ORDER BY a.creado_en DESC
+       LIMIT $${valores.length + 1} OFFSET $${valores.length + 2}`,
+      [...valores, limite, offset]
+    );
+
+    res.json({
+      registros: rows,
+      paginacion: {
+        total:   parseInt(total),
+        pagina:  parseInt(pagina),
+        limite,
+        paginas: Math.ceil(parseInt(total) / limite),
+      },
     });
   } catch (error) { next(error); }
 });
