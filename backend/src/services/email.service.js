@@ -60,6 +60,8 @@ const templateBase = (titulo, contenido) => `
 
 // ─────────────────────────────────────────────────────────────
 // FUNCIÓN BASE DE ENVÍO — SendGrid HTTP API
+// EMAIL_FROM debe ser el sender verificado en SendGrid (configurado en Render).
+// Un Gmail genérico no verificado hace que SendGrid rechace el envío en silencio.
 // ─────────────────────────────────────────────────────────────
 const enviarEmail = async ({ to, subject, html }) => {
   if (!process.env.SENDGRID_API_KEY) {
@@ -67,7 +69,11 @@ const enviarEmail = async ({ to, subject, html }) => {
     return { ok: false, error: 'SendGrid no configurado' };
   }
 
-  const from = process.env.EMAIL_FROM || 'adminiustixium@gmail.com';
+  const from = process.env.EMAIL_FROM;
+  if (!from) {
+    console.error('❌ EMAIL_FROM no configurado en variables de entorno — email no enviado a:', to);
+    return { ok: false, error: 'EMAIL_FROM no configurado' };
+  }
 
   try {
     const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
@@ -151,7 +157,9 @@ const notificarAbogadoPendiente = async ({ nombre, email }) => {
       3. Te enviamos un email cuando tu perfil esté aprobado
     </div>
     <p>Una vez aprobado, tu perfil aparecerá en el catálogo y los clientes podrán contactarte.</p>
-    <p>Si tenés alguna consulta, respondé este email o escribinos a <strong>${process.env.EMAIL_FROM || 'adminiustixium@gmail.com'}</strong>.</p>
+    <p>Si tenés alguna consulta,
+      <a href="${process.env.FRONTEND_URL}" style="color:#B86030;text-decoration:none;">comunicate con nosotros</a>.
+    </p>
   `;
 
   return enviarEmail({
@@ -378,6 +386,41 @@ const notificarAdminNuevoAbogado = async ({ adminEmail, adminNombre, abogadoNomb
 };
 
 /**
+ * Solicitud de cambio de plan de un abogado → admins
+ * Se envía cuando un abogado solicita cambiar su plan desde Mi suscripción
+ */
+const notificarAdminSolicitudCambioPlan = async ({
+  adminEmail, adminNombre,
+  abogadoNombre, abogadoEmail,
+  planActualNombre, planSolicitadoNombre,
+}) => {
+  const contenido = `
+    <h2>Solicitud de cambio de plan 📋</h2>
+    <p>Hola <strong>${adminNombre || 'Admin'}</strong>, un abogado solicitó cambiar su plan de suscripción.</p>
+    <div class="info-box">
+      <strong>👤 Abogado:</strong> ${abogadoNombre}<br>
+      <strong>📧 Email:</strong> ${abogadoEmail}<br><br>
+      <strong>📦 Plan actual:</strong> ${planActualNombre}<br>
+      <strong>⬆️  Plan solicitado:</strong> ${planSolicitadoNombre}
+    </div>
+    <p>Ingresá al panel de administración para procesar el cambio manualmente.</p>
+    <div class="btn-wrap">
+      <a href="${process.env.FRONTEND_URL}/admin/abogados" class="btn">Ir al panel de abogados</a>
+    </div>
+    <p style="font-size:13px;color:#8A8780;">
+      Si tenés dudas sobre esta solicitud,
+      <a href="${process.env.FRONTEND_URL}" style="color:#B86030;text-decoration:none;">comunicate con nosotros</a>.
+    </p>
+  `;
+
+  return enviarEmail({
+    to:      adminEmail,
+    subject: `🔔 Solicitud de cambio de plan: ${abogadoNombre} → ${planSolicitadoNombre} — IUSTIXIUM`,
+    html:    templateBase('Solicitud de cambio de plan', contenido),
+  });
+};
+
+/**
  * Comunicado manual del admin → usuarios
  */
 const enviarComunicado = async ({ destinatarioEmail, destinatarioNombre, titulo, mensaje, link }) => {
@@ -385,12 +428,11 @@ const enviarComunicado = async ({ destinatarioEmail, destinatarioNombre, titulo,
     <h2>${titulo}</h2>
     <p>Hola <strong>${destinatarioNombre}</strong>,</p>
     <p>${mensaje}</p>
-    ${link ? `
-    <div class="btn-wrap">
-      <a href="${process.env.FRONTEND_URL}${link}" class="btn">Ver más información</a>
-    </div>` : ''}
     <hr class="divider">
-    <p style="font-size:13px;color:#8A8780;">Este es un comunicado oficial de IUSTIXIUM.</p>
+    <p style="font-size:13px;color:#8A8780;">
+      Este es un comunicado oficial de IUSTIXIUM. Si tenés alguna duda o consulta,
+      <a href="${process.env.FRONTEND_URL}" style="color:#B86030;text-decoration:none;">comunicate con nosotros</a>.
+    </p>
   `;
 
   return enviarEmail({
@@ -427,39 +469,68 @@ const enviarConfirmacionSuscripcion = async ({ nombre, email, plan, fechaFin }) 
   });
 };
 
+// ═════════════════════════════════════════════════════════════
+// EMAIL DE CAMBIO DE PRECIOS EN PLANES
+// ═════════════════════════════════════════════════════════════
 
 /**
- * Solicitud de cambio de plan de un abogado → admin
- * Se envía a todos los admins cuando un abogado solicita cambiar su plan
+ * Notifica a un abogado que el precio de su plan fue actualizado
+ * Se llama desde admin.routes.js al modificar un plan con nuevo precio
  */
-const notificarAdminSolicitudCambioPlan = async ({
-  adminEmail, adminNombre,
-  abogadoNombre, abogadoEmail,
-  planActualNombre, planSolicitadoNombre,
+const notificarCambioPreciosPlan = async ({
+  nombre, email, planNombre,
+  precioMensualAnterior, precioMensualNuevo,
+  precioAnualAnterior,   precioAnualNuevo,
 }) => {
+  // Formatear precios en pesos argentinos
+  const fmt = (n) => n != null
+    ? new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+    : null;
+
+  // Construir filas de la tabla solo si el precio cambió
+  const filaMensual = precioMensualAnterior !== precioMensualNuevo && precioMensualNuevo != null ? `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #F0EFED;color:#56534A;font-size:14px;">Mensual</td>
+      <td style="padding:10px 0;border-bottom:1px solid #F0EFED;color:#8A8780;font-size:14px;text-decoration:line-through;">${fmt(precioMensualAnterior)}</td>
+      <td style="padding:10px 0;border-bottom:1px solid #F0EFED;color:#1C1B18;font-size:14px;font-weight:600;">${fmt(precioMensualNuevo)}</td>
+    </tr>` : '';
+
+  const filaAnual = precioAnualAnterior !== precioAnualNuevo && precioAnualNuevo != null ? `
+    <tr>
+      <td style="padding:10px 0;color:#56534A;font-size:14px;">Anual</td>
+      <td style="padding:10px 0;color:#8A8780;font-size:14px;text-decoration:line-through;">${fmt(precioAnualAnterior)}</td>
+      <td style="padding:10px 0;color:#1C1B18;font-size:14px;font-weight:600;">${fmt(precioAnualNuevo)}</td>
+    </tr>` : '';
+
   const contenido = `
-    <h2>Solicitud de cambio de plan 📋</h2>
-    <p>Hola <strong>${adminNombre || 'Admin'}</strong>, un abogado solicitó cambiar su plan de suscripción.</p>
-    <div class="info-box">
-      <strong>👤 Abogado:</strong> ${abogadoNombre}<br>
-      <strong>📧 Email:</strong> ${abogadoEmail}<br><br>
-      <strong>📦 Plan actual:</strong> ${planActualNombre}<br>
-      <strong>⬆️  Plan solicitado:</strong> ${planSolicitadoNombre}
+    <h2>Actualizamos los valores de tu plan 📋</h2>
+    <p>Hola <strong>Dr./Dra. ${nombre}</strong>, te informamos que actualizamos los precios del plan <strong>${planNombre}</strong>.</p>
+    <div class="info-box" style="margin:20px 0;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:8px 0;font-size:12px;color:#8A8780;text-transform:uppercase;letter-spacing:0.05em;">Período</th>
+            <th style="text-align:left;padding:8px 0;font-size:12px;color:#8A8780;text-transform:uppercase;letter-spacing:0.05em;">Precio anterior</th>
+            <th style="text-align:left;padding:8px 0;font-size:12px;color:#8A8780;text-transform:uppercase;letter-spacing:0.05em;">Precio nuevo</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filaMensual}
+          ${filaAnual}
+        </tbody>
+      </table>
     </div>
-    <p>Ingresá al panel de administración para procesar el cambio manualmente.</p>
-    <div class="btn-wrap">
-      <a href="${process.env.FRONTEND_URL}/admin/abogados" class="btn">Ir al panel de abogados</a>
-    </div>
+    <p>Tu suscripción activa no se ve afectada hasta la próxima renovación.</p>
     <p style="font-size:13px;color:#8A8780;">
-      Si tenés dudas sobre esta solicitud,
+      Si tenés alguna consulta sobre este cambio,
       <a href="${process.env.FRONTEND_URL}" style="color:#B86030;text-decoration:none;">comunicate con nosotros</a>.
     </p>
   `;
 
   return enviarEmail({
-    to:      adminEmail,
-    subject: `🔔 Solicitud de cambio de plan: ${abogadoNombre} → ${planSolicitadoNombre} — IUSTIXIUM`,
-    html:    templateBase('Solicitud de cambio de plan', contenido),
+    to:      email,
+    subject: `📋 Actualización de precios — Plan ${planNombre} — IUSTIXIUM`,
+    html:    templateBase(`Actualización de precios: ${planNombre}`, contenido),
   });
 };
 
@@ -477,8 +548,8 @@ module.exports = {
   notificarCuentaDeshabilitada,
   notificarCuentaRehabilitada,
   notificarAdminNuevoAbogado,
+  notificarAdminSolicitudCambioPlan,
   enviarComunicado,
   enviarConfirmacionSuscripcion,
   notificarCambioPreciosPlan,
-  notificarAdminSolicitudCambioPlan,
 };
