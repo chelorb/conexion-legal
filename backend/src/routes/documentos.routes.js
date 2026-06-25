@@ -210,8 +210,9 @@ router.patch('/:id/revisar', verificarToken, requireRol('admin'), async (req, re
 // DELETE /api/documentos/:id
 // Eliminar un documento — abogado (solo el suyo, no aprobado)
 //                       — admin  (cualquiera)
+// La lógica de permisos se valida dentro del handler
 // ─────────────────────────────────────────────────────────────
-router.delete('/:id', verificarToken, async (req, res, next) => {
+router.delete('/:id', verificarToken, requireRol('abogado', 'admin'), async (req, res, next) => {
   try {
     const esAdmin   = req.usuario.rol === 'admin';
     const esAbogado = req.usuario.rol === 'abogado';

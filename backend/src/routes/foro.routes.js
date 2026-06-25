@@ -246,8 +246,9 @@ router.post('/hilos/:id/respuestas', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 // DELETE /api/foro/hilos/:id (admin o autor)
 // Eliminar un hilo propio o cualquiera si es admin
+// verificarToken explícito como refuerzo al router.use global
 // ─────────────────────────────────────────────────────────────
-router.delete('/hilos/:id', async (req, res, next) => {
+router.delete('/hilos/:id', verificarToken, async (req, res, next) => {
   try {
     const { rows: hilo } = await query(
       'SELECT autor_id FROM foro_hilos WHERE id = $1',
@@ -274,8 +275,9 @@ router.delete('/hilos/:id', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 // DELETE /api/foro/respuestas/:id (admin o autor)
 // Eliminar una respuesta propia o cualquiera si es admin
+// verificarToken explícito como refuerzo al router.use global
 // ─────────────────────────────────────────────────────────────
-router.delete('/respuestas/:id', async (req, res, next) => {
+router.delete('/respuestas/:id', verificarToken, async (req, res, next) => {
   try {
     const { rows: resp } = await query(
       'SELECT autor_id FROM foro_respuestas WHERE id = $1',
@@ -302,7 +304,7 @@ router.delete('/respuestas/:id', async (req, res, next) => {
 // PATCH /api/foro/hilos/:id/fijar (solo admin)
 // Fijar o desfijar un hilo
 // ─────────────────────────────────────────────────────────────
-router.patch('/hilos/:id/fijar', requireRol('admin'), async (req, res, next) => {
+router.patch('/hilos/:id/fijar',    verificarToken, requireRol('admin'), async (req, res, next) => {
   try {
     const { fijado } = req.body;
     await query(
@@ -318,7 +320,7 @@ router.patch('/hilos/:id/fijar', requireRol('admin'), async (req, res, next) => 
 // Editar título y/o contenido de un hilo
 // Casos de uso: remover info sensible, corregir datos erróneos
 // ─────────────────────────────────────────────────────────────
-router.patch('/hilos/:id/editar', requireRol('admin'), async (req, res, next) => {
+router.patch('/hilos/:id/editar',   verificarToken, requireRol('admin'), async (req, res, next) => {
   try {
     const { titulo, contenido } = req.body;
 
@@ -353,7 +355,7 @@ router.patch('/hilos/:id/editar', requireRol('admin'), async (req, res, next) =>
 // Editar el contenido de una respuesta
 // Casos de uso: remover info sensible, lenguaje inapropiado
 // ─────────────────────────────────────────────────────────────
-router.patch('/respuestas/:id/editar', requireRol('admin'), async (req, res, next) => {
+router.patch('/respuestas/:id/editar', verificarToken, requireRol('admin'), async (req, res, next) => {
   try {
     const { contenido } = req.body;
 
@@ -382,7 +384,7 @@ router.patch('/respuestas/:id/editar', requireRol('admin'), async (req, res, nex
 // Mover un hilo a otra categoría
 // Casos de uso: hilo posteado en categoría incorrecta
 // ─────────────────────────────────────────────────────────────
-router.patch('/hilos/:id/mover', requireRol('admin'), async (req, res, next) => {
+router.patch('/hilos/:id/mover',    verificarToken, requireRol('admin'), async (req, res, next) => {
   try {
     const { categoria_id } = req.body;
 
