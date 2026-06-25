@@ -56,7 +56,8 @@ import AdminPlanes      from './pages/admin/Planes';
 import AdminComunicado  from './pages/admin/Comunicado';
 import AdminCampus      from './pages/admin/Campus';
 import AdminLinks       from './pages/admin/Links';
-import AdminForo        from './pages/admin/Foro';   // ← NUEVO
+import AdminForo        from './pages/admin/Foro';
+import AdminAuditoria   from './pages/admin/Auditoria';
 import NotFound         from './pages/NotFound';      // ← NUEVO
 
 // ─────────────────────────────────────────────────────────────
@@ -286,7 +287,8 @@ function AppRoutes() {
           <Route path="/admin/comunicado"   element={<RutaProtegida rolesPermitidos={['admin']}><AdminComunicado /></RutaProtegida>} />
           <Route path="/admin/campus"    element={<RutaProtegida rolesPermitidos={['admin']}><AdminCampus /></RutaProtegida>} />
           <Route path="/admin/links"     element={<RutaProtegida rolesPermitidos={['admin']}><AdminLinks /></RutaProtegida>} />
-          <Route path="/admin/foro"      element={<RutaProtegida rolesPermitidos={['admin']}><AdminForo /></RutaProtegida>} />  {/* ← NUEVO */}
+          <Route path="/admin/foro"      element={<RutaProtegida rolesPermitidos={['admin']}><AdminForo /></RutaProtegida>} />
+          <Route path="/admin/auditoria" element={<RutaProtegida rolesPermitidos={['admin']}><AdminAuditoria /></RutaProtegida>} />
 
           {/* ── 404 ───────────────────────────────────────── */}
           <Route path="*" element={<NotFound />} />

@@ -50,6 +50,7 @@ export default function Navbar() {
     { href: '/admin/eventos',    label: 'Eventos'    },
     { href: '/admin/links',      label: 'Links'      },
     { href: '/admin/comunicado', label: '📢 Comunicado' },
+    { href: '/admin/auditoria',  label: '🔐 Auditoría'  },
   ];
 
   const linksPublicos = [
