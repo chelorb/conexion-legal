@@ -9,6 +9,7 @@ const router  = express.Router();
 const { query } = require('../config/database');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 const emailService = require('../services/email.service');
+const auditar      = require('../services/auditoria.service'); // log de acciones críticas del admin
 
 // Todos los endpoints de admin requieren autenticación y rol admin
 router.use(verificarToken, requireRol('admin'));
@@ -573,19 +574,10 @@ router.put('/planes/:id', async (req, res, next) => {
 
 // ─────────────────────────────────────────────────────────────
 // PATCH /api/admin/usuarios/:id/datos — Editar datos personales
-// Registra el cambio en auditoría automáticamente
 // ─────────────────────────────────────────────────────────────
-router.patch('/usuarios/:id/datos', verificarToken, async (req, res, next) => {
+router.patch('/usuarios/:id/datos', async (req, res, next) => {
   try {
     const { nombre, apellido, email, telefono } = req.body;
-
-    // Guardar datos anteriores para la auditoría
-    const { rows: [anterior] } = await query(
-      'SELECT nombre, apellido, email, telefono FROM usuarios WHERE id = $1',
-      [req.params.id]
-    );
-    if (!anterior) return res.status(404).json({ error: 'Usuario no encontrado.' });
-
     const { rows: [usuario] } = await query(
       `UPDATE usuarios SET
          nombre   = COALESCE($1, nombre),
@@ -597,18 +589,6 @@ router.patch('/usuarios/:id/datos', verificarToken, async (req, res, next) => {
       [nombre || null, apellido || null, email || null, telefono || null, req.params.id]
     );
     if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado.' });
-
-    // Registrar en auditoría
-    await auditar(req, {
-      accion:        'editar_datos_personales',
-      descripcion:   `Editó datos personales de ${usuario.nombre} ${usuario.apellido}`,
-      entidad:       'usuario',
-      entidad_id:    req.params.id,
-      entidad_label: `${usuario.nombre} ${usuario.apellido} <${usuario.email}>`,
-      datos_antes:   anterior,
-      datos_despues: { nombre: usuario.nombre, apellido: usuario.apellido, email: usuario.email, telefono: usuario.telefono },
-    });
-
     res.json({ mensaje: 'Datos actualizados.', usuario });
   } catch (err) {
     if (err.code === '23505') {
