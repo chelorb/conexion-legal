@@ -214,14 +214,24 @@ router.put('/:id', async (req, res, next) => {
 
     // Detectar qué cambió y armar mensajes de notificación
     const cambios = [];
-    const precioAnterior = parseFloat(anterior.precio_mensual);
-    const precioNuevo    = parseFloat(precio_mensual ?? anterior.precio_mensual);
+    const precioMensualAnterior = parseFloat(anterior.precio_mensual);
+    const precioMensualNuevo    = parseFloat(precio_mensual ?? anterior.precio_mensual);
+    const precioAnualAnterior   = parseFloat(anterior.precio_anual);
+    const precioAnualNuevo      = parseFloat(precio_anual ?? anterior.precio_anual);
 
-    if (Math.abs(precioAnterior - precioNuevo) > 1) {
+    console.log(`📋 Cambio plan ${id}: mensual ${precioMensualAnterior}→${precioMensualNuevo}, anual ${precioAnualAnterior}→${precioAnualNuevo}`);
+
+    if (Math.abs(precioMensualAnterior - precioMensualNuevo) > 1 || Math.abs(precioAnualAnterior - precioAnualNuevo) > 1) {
+      const partesMensual = Math.abs(precioMensualAnterior - precioMensualNuevo) > 1
+        ? ` El precio mensual cambió de $${precioMensualAnterior.toLocaleString('es-AR')} a $${precioMensualNuevo.toLocaleString('es-AR')}.`
+        : '';
+      const partesAnual = Math.abs(precioAnualAnterior - precioAnualNuevo) > 1
+        ? ` El precio anual cambió de $${precioAnualAnterior.toLocaleString('es-AR')} a $${precioAnualNuevo.toLocaleString('es-AR')}.`
+        : '';
       cambios.push({
         tipo: 'precio',
-        titulo: `Cambio de precio en tu plan ${plan.nombre}`,
-        mensaje: `El precio del plan ${plan.nombre} cambió de $${precioAnterior.toLocaleString('es-AR')}/mes a $${precioNuevo.toLocaleString('es-AR')}/mes. Este cambio aplica a partir de tu próxima renovación.`,
+        titulo: `Actualización de precios en tu plan ${plan.nombre}`,
+        mensaje: `Actualizamos los valores del plan ${plan.nombre}.${partesMensual}${partesAnual} Los cambios aplican a partir de tu próxima renovación.`,
       });
     }
 
