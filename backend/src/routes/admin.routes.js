@@ -5,11 +5,11 @@
 // ============================================================
 
 const express = require('express');
-const router  = express.Router();
+const router = express.Router();
 const { query } = require('../config/database');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 const emailService = require('../services/email.service');
-const auditar      = require('../services/auditoria.service'); // log de acciones críticas del admin
+const auditar = require('../services/auditoria.service'); // log de acciones críticas del admin
 
 // Todos los endpoints de admin requieren autenticación y rol admin
 router.use(verificarToken, requireRol('admin'));
@@ -22,8 +22,8 @@ router.get('/estadisticas', async (req, res, next) => {
   try {
     // Ejecutar todas las queries en paralelo para mayor velocidad
     const [usuarios, abogados, consultas, pagos, pendientes] = await Promise.all([
-      query("SELECT COUNT(*) AS total FROM usuarios WHERE activo = true"),
-      query("SELECT COUNT(*) AS total FROM perfiles_abogado WHERE visible_en_grilla = true"),
+      query('SELECT COUNT(*) AS total FROM usuarios WHERE activo = true'),
+      query('SELECT COUNT(*) AS total FROM perfiles_abogado WHERE visible_en_grilla = true'),
       query(`SELECT COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE estado = 'completada') AS completadas
              FROM consultas`),
@@ -33,14 +33,16 @@ router.get('/estadisticas', async (req, res, next) => {
     ]);
 
     res.json({
-      usuarios_activos:      parseInt(usuarios.rows[0].total),
-      abogados_visibles:     parseInt(abogados.rows[0].total),
-      consultas_totales:     parseInt(consultas.rows[0].total),
+      usuarios_activos: parseInt(usuarios.rows[0].total),
+      abogados_visibles: parseInt(abogados.rows[0].total),
+      consultas_totales: parseInt(consultas.rows[0].total),
       consultas_completadas: parseInt(consultas.rows[0].completadas),
-      ingresos_totales:      parseFloat(pagos.rows[0].total),
-      abogados_pendientes:   parseInt(pendientes.rows[0].total),
+      ingresos_totales: parseFloat(pagos.rows[0].total),
+      abogados_pendientes: parseInt(pendientes.rows[0].total),
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -61,7 +63,9 @@ router.get('/usuarios', async (req, res, next) => {
        LIMIT 200`
     );
     res.json({ usuarios: rows });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -74,9 +78,7 @@ router.get('/abogados', async (req, res, next) => {
     const { estado } = req.query;
 
     // Construir condición de filtro dinámica
-    const condicion = estado
-      ? `WHERE pa.estado_aprobacion = '${estado}'`
-      : '';
+    const condicion = estado ? `WHERE pa.estado_aprobacion = '${estado}'` : '';
 
     const { rows } = await query(
       `SELECT
@@ -105,7 +107,9 @@ router.get('/abogados', async (req, res, next) => {
        LIMIT 200`
     );
     res.json({ abogados: rows });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -115,9 +119,9 @@ router.get('/abogados', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 router.patch('/abogados/:id/aprobar', async (req, res, next) => {
   try {
-    const { id }     = req.params;
+    const { id } = req.params;
     const { accion, motivo, visible, matricula_verificada } = req.body;
-    const adminId    = req.usuario.id;
+    const adminId = req.usuario.id;
 
     // Obtener datos del abogado para los emails
     const { rows: abogadoRows } = await query(
@@ -151,20 +155,22 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
       // Notificación real-time + email
       const notifService = require('../services/notificaciones.service');
       await notifService.perfilAprobado({
-        abogadoId:     id,
+        abogadoId: id,
         abogadoNombre: `${abogado.nombre} ${abogado.apellido}`,
       });
 
-      emailService.notificarAbogadoAprobado({
-        nombre: `${abogado.nombre} ${abogado.apellido}`,
-        email:  abogado.email,
-      }).catch(err => console.error(`❌ Email aprobación a ${abogado.email}:`, err.message));
+      emailService
+        .notificarAbogadoAprobado({
+          nombre: `${abogado.nombre} ${abogado.apellido}`,
+          email: abogado.email,
+        })
+        .catch((err) => console.error(`❌ Email aprobación a ${abogado.email}:`, err.message));
 
       await auditar(req, {
-        accion:        'aprobar_abogado',
-        descripcion:   `Aprobó el perfil de ${abogado.nombre} ${abogado.apellido}`,
-        entidad:       'usuario',
-        entidad_id:    id,
+        accion: 'aprobar_abogado',
+        descripcion: `Aprobó el perfil de ${abogado.nombre} ${abogado.apellido}`,
+        entidad: 'usuario',
+        entidad_id: id,
         entidad_label: `${abogado.nombre} ${abogado.apellido} <${abogado.email}>`,
         datos_despues: { estado_aprobacion: 'aprobado' },
       });
@@ -189,20 +195,22 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
       const notifService = require('../services/notificaciones.service');
       await notifService.perfilRechazado({
         abogadoId: id,
-        motivo:    motivo || 'Por favor revisá tu perfil y completá los datos faltantes.',
+        motivo: motivo || 'Por favor revisá tu perfil y completá los datos faltantes.',
       });
 
-      emailService.notificarAbogadoRechazado({
-        nombre: `${abogado.nombre} ${abogado.apellido}`,
-        email:  abogado.email,
-        motivo,
-      }).catch(err => console.error(`❌ Email rechazo a ${abogado.email}:`, err.message));
+      emailService
+        .notificarAbogadoRechazado({
+          nombre: `${abogado.nombre} ${abogado.apellido}`,
+          email: abogado.email,
+          motivo,
+        })
+        .catch((err) => console.error(`❌ Email rechazo a ${abogado.email}:`, err.message));
 
       await auditar(req, {
-        accion:        'rechazar_abogado',
-        descripcion:   `Rechazó el perfil de ${abogado.nombre} ${abogado.apellido}`,
-        entidad:       'usuario',
-        entidad_id:    id,
+        accion: 'rechazar_abogado',
+        descripcion: `Rechazó el perfil de ${abogado.nombre} ${abogado.apellido}`,
+        entidad: 'usuario',
+        entidad_id: id,
         entidad_label: `${abogado.nombre} ${abogado.apellido} <${abogado.email}>`,
         datos_despues: { estado_aprobacion: 'rechazado', motivo: motivo || null },
       });
@@ -223,8 +231,9 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
     }
 
     res.status(400).json({ error: 'Acción no válida.' });
-
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -240,21 +249,20 @@ router.patch('/usuarios/:id/estado', async (req, res, next) => {
       return res.status(400).json({ error: 'No podés deshabilitar tu propia cuenta.' });
     }
 
-    await query(
-      'UPDATE usuarios SET activo = $1 WHERE id = $2',
-      [activo, req.params.id]
-    );
+    await query('UPDATE usuarios SET activo = $1 WHERE id = $2', [activo, req.params.id]);
 
     await auditar(req, {
-      accion:        activo ? 'habilitar_cuenta' : 'deshabilitar_cuenta',
-      descripcion:   `${activo ? 'Habilitó' : 'Deshabilitó'} la cuenta del usuario`,
-      entidad:       'usuario',
-      entidad_id:    req.params.id,
+      accion: activo ? 'habilitar_cuenta' : 'deshabilitar_cuenta',
+      descripcion: `${activo ? 'Habilitó' : 'Deshabilitó'} la cuenta del usuario`,
+      entidad: 'usuario',
+      entidad_id: req.params.id,
       datos_despues: { activo },
     });
 
     res.json({ mensaje: `Usuario ${activo ? 'habilitado' : 'deshabilitado'} correctamente.` });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -273,7 +281,9 @@ router.delete('/usuarios/:id', async (req, res, next) => {
     }
 
     // Verificar que el usuario existe y no es admin
-    const { rows: [usuario] } = await query(
+    const {
+      rows: [usuario],
+    } = await query(
       `SELECT u.id, u.nombre, u.apellido, u.email, r.nombre AS rol
        FROM usuarios u
        JOIN roles r ON u.rol_id = r.id
@@ -292,12 +302,17 @@ router.delete('/usuarios/:id', async (req, res, next) => {
     // Eliminar el usuario — el CASCADE en la BD elimina todo lo relacionado:
     // perfiles_abogado, consultas, calificaciones, notificaciones, etc.
     await auditar(req, {
-      accion:        'eliminar_cuenta',
-      descripcion:   `Eliminó definitivamente la cuenta de ${usuario.nombre} ${usuario.apellido}`,
-      entidad:       'usuario',
-      entidad_id:    id,
+      accion: 'eliminar_cuenta',
+      descripcion: `Eliminó definitivamente la cuenta de ${usuario.nombre} ${usuario.apellido}`,
+      entidad: 'usuario',
+      entidad_id: id,
       entidad_label: `${usuario.nombre} ${usuario.apellido} <${usuario.email}>`,
-      datos_antes:   { nombre: usuario.nombre, apellido: usuario.apellido, email: usuario.email, rol: usuario.rol },
+      datos_antes: {
+        nombre: usuario.nombre,
+        apellido: usuario.apellido,
+        email: usuario.email,
+        rol: usuario.rol,
+      },
     });
 
     await query('DELETE FROM usuarios WHERE id = $1', [id]);
@@ -305,9 +320,10 @@ router.delete('/usuarios/:id', async (req, res, next) => {
     res.json({
       mensaje: `Usuario ${usuario.nombre} ${usuario.apellido} eliminado definitivamente.`,
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
-
 
 // ─────────────────────────────────────────────────────────────
 // PUT /api/admin/abogados/:id/perfil
@@ -317,8 +333,13 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
   try {
     const { id } = req.params;
     const {
-      descripcion, anos_experiencia, ciudad, provincia,
-      matricula, especialidades, plan_slug,
+      descripcion,
+      anos_experiencia,
+      ciudad,
+      provincia,
+      matricula,
+      especialidades,
+      plan_slug,
     } = req.body;
 
     // Si viene plan_slug, buscar el plan_id correspondiente
@@ -359,16 +380,18 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
 
     if (planId) {
       await auditar(req, {
-        accion:        'cambiar_plan_abogado',
-        descripcion:   `Cambió el plan del abogado (plan: ${plan_slug})`,
-        entidad:       'usuario',
-        entidad_id:    id,
+        accion: 'cambiar_plan_abogado',
+        descripcion: `Cambió el plan del abogado (plan: ${plan_slug})`,
+        entidad: 'usuario',
+        entidad_id: id,
         datos_despues: { plan_slug, plan_id: planId },
       });
     }
 
     res.json({ mensaje: 'Perfil actualizado correctamente.' });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -385,7 +408,9 @@ router.get('/campus', async (req, res, next) => {
        ORDER BY creado_en DESC`
     );
     res.json({ contenido: rows });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -394,30 +419,44 @@ router.get('/campus', async (req, res, next) => {
 router.post('/campus', async (req, res, next) => {
   try {
     const {
-      tipo, titulo, descripcion, autor, especialidad,
-      duracion_min, plan_requerido, contenido_url,
+      tipo,
+      titulo,
+      descripcion,
+      autor,
+      especialidad,
+      duracion_min,
+      plan_requerido,
+      contenido_url,
     } = req.body;
 
     if (!titulo) {
       return res.status(400).json({ error: 'El título es obligatorio.' });
     }
 
-    const { rows: [item] } = await query(
+    const {
+      rows: [item],
+    } = await query(
       `INSERT INTO contenido_campus
          (tipo, titulo, descripcion, autor, especialidad,
           duracion_min, plan_requerido, contenido_url, es_evento, activo)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8, false, true)
        RETURNING *`,
       [
-        tipo || 'curso', titulo, descripcion || null,
-        autor || null, especialidad || null,
-        duracion_min || null, plan_requerido || 'comunidad',
+        tipo || 'curso',
+        titulo,
+        descripcion || null,
+        autor || null,
+        especialidad || null,
+        duracion_min || null,
+        plan_requerido || 'comunidad',
         contenido_url || null,
       ]
     );
 
     res.status(201).json({ mensaje: 'Contenido creado.', item });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -426,11 +465,20 @@ router.post('/campus', async (req, res, next) => {
 router.put('/campus/:id', async (req, res, next) => {
   try {
     const {
-      tipo, titulo, descripcion, autor, especialidad,
-      duracion_min, plan_requerido, contenido_url, activo,
+      tipo,
+      titulo,
+      descripcion,
+      autor,
+      especialidad,
+      duracion_min,
+      plan_requerido,
+      contenido_url,
+      activo,
     } = req.body;
 
-    const { rows: [item] } = await query(
+    const {
+      rows: [item],
+    } = await query(
       `UPDATE contenido_campus SET
          tipo           = COALESCE($1, tipo),
          titulo         = COALESCE($2, titulo),
@@ -444,17 +492,24 @@ router.put('/campus/:id', async (req, res, next) => {
        WHERE id = $10 AND es_evento = false
        RETURNING *`,
       [
-        tipo || null, titulo || null, descripcion || null,
-        autor || null, especialidad || null,
-        duracion_min || null, plan_requerido || null,
-        contenido_url || null, activo ?? null,
+        tipo || null,
+        titulo || null,
+        descripcion || null,
+        autor || null,
+        especialidad || null,
+        duracion_min || null,
+        plan_requerido || null,
+        contenido_url || null,
+        activo ?? null,
         req.params.id,
       ]
     );
 
     if (!item) return res.status(404).json({ error: 'Contenido no encontrado.' });
     res.json({ mensaje: 'Contenido actualizado.', item });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -462,12 +517,11 @@ router.put('/campus/:id', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 router.delete('/campus/:id', async (req, res, next) => {
   try {
-    await query(
-      'UPDATE contenido_campus SET activo = false WHERE id = $1',
-      [req.params.id]
-    );
+    await query('UPDATE contenido_campus SET activo = false WHERE id = $1', [req.params.id]);
     res.json({ mensaje: 'Contenido desactivado.' });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -477,11 +531,11 @@ router.delete('/campus/:id', async (req, res, next) => {
 // GET /api/admin/links — Listar todos (admin)
 router.get('/links', async (req, res, next) => {
   try {
-    const { rows } = await query(
-      'SELECT * FROM links_interes ORDER BY orden ASC, creado_en ASC'
-    );
+    const { rows } = await query('SELECT * FROM links_interes ORDER BY orden ASC, creado_en ASC');
     res.json({ links: rows });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // GET pública (sin auth) — para mostrar en el dashboard del abogado
@@ -492,7 +546,9 @@ module.exports.linksPublicos = async (req, res, next) => {
       'SELECT id, titulo, url, descripcion FROM links_interes WHERE activo = true ORDER BY orden ASC'
     );
     res.json({ links: rows });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
 // POST /api/admin/links — Crear link
@@ -502,20 +558,26 @@ router.post('/links', async (req, res, next) => {
     if (!titulo || !url) {
       return res.status(400).json({ error: 'Título y URL son obligatorios.' });
     }
-    const { rows: [link] } = await query(
+    const {
+      rows: [link],
+    } = await query(
       `INSERT INTO links_interes (titulo, url, descripcion, orden)
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [titulo, url, descripcion || null, orden || 0]
     );
     res.status(201).json({ link });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // PUT /api/admin/links/:id — Editar link
 router.put('/links/:id', async (req, res, next) => {
   try {
     const { titulo, url, descripcion, orden, activo } = req.body;
-    const { rows: [link] } = await query(
+    const {
+      rows: [link],
+    } = await query(
       `UPDATE links_interes SET
          titulo      = COALESCE($1, titulo),
          url         = COALESCE($2, url),
@@ -527,7 +589,9 @@ router.put('/links/:id', async (req, res, next) => {
     );
     if (!link) return res.status(404).json({ error: 'Link no encontrado.' });
     res.json({ link });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // DELETE /api/admin/links/:id — Eliminar link
@@ -535,7 +599,9 @@ router.delete('/links/:id', async (req, res, next) => {
   try {
     await query('DELETE FROM links_interes WHERE id = $1', [req.params.id]);
     res.json({ mensaje: 'Link eliminado.' });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -559,7 +625,9 @@ router.get('/planes', async (req, res, next) => {
        ORDER BY precio_mensual ASC`
     );
     res.json({ planes: rows });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // PUT /api/admin/planes/:id — Actualizar un plan
@@ -567,21 +635,33 @@ router.get('/planes', async (req, res, next) => {
 router.put('/planes/:id', async (req, res, next) => {
   try {
     const {
-      nombre, precio_mensual, precio_anual,
+      nombre,
+      precio_mensual,
+      precio_anual,
       max_consultas_mes,
-      aparece_en_grilla, acceso_campus, acceso_campus_completo,
-      gestion_turnos, perfil_validado, credencial_virtual,
-      networking, beneficios_exclusivos, difusion_profesional,
+      aparece_en_grilla,
+      acceso_campus,
+      acceso_campus_completo,
+      gestion_turnos,
+      perfil_validado,
+      credencial_virtual,
+      networking,
+      beneficios_exclusivos,
+      difusion_profesional,
       activo,
     } = req.body;
 
     // Guardar precios actuales ANTES del UPDATE para detectar si cambiaron
-    const { rows: [planAnterior] } = await query(
+    const {
+      rows: [planAnterior],
+    } = await query(
       'SELECT nombre, precio_mensual, precio_anual FROM planes_suscripcion WHERE id = $1',
       [req.params.id]
     );
 
-    const { rows: [plan] } = await query(
+    const {
+      rows: [plan],
+    } = await query(
       `UPDATE planes_suscripcion SET
          nombre                 = COALESCE($1,  nombre),
          precio_mensual         = COALESCE($2,  precio_mensual),
@@ -603,18 +683,22 @@ router.put('/planes/:id', async (req, res, next) => {
       [
         nombre || null,
         precio_mensual !== undefined ? parseFloat(precio_mensual) : null,
-        precio_anual   !== undefined ? parseFloat(precio_anual)   : null,
-        max_consultas_mes !== undefined ? (max_consultas_mes === '' || max_consultas_mes === null ? null : parseInt(max_consultas_mes)) : undefined,
-        aparece_en_grilla      ?? null,
-        acceso_campus          ?? null,
+        precio_anual !== undefined ? parseFloat(precio_anual) : null,
+        max_consultas_mes !== undefined
+          ? max_consultas_mes === '' || max_consultas_mes === null
+            ? null
+            : parseInt(max_consultas_mes)
+          : undefined,
+        aparece_en_grilla ?? null,
+        acceso_campus ?? null,
         acceso_campus_completo ?? null,
-        gestion_turnos         ?? null,
-        perfil_validado        ?? null,
-        credencial_virtual     ?? null,
-        networking             ?? null,
-        beneficios_exclusivos  ?? null,
-        difusion_profesional   ?? null,
-        activo                 ?? null,
+        gestion_turnos ?? null,
+        perfil_validado ?? null,
+        credencial_virtual ?? null,
+        networking ?? null,
+        beneficios_exclusivos ?? null,
+        difusion_profesional ?? null,
+        activo ?? null,
         req.params.id,
       ]
     );
@@ -622,12 +706,21 @@ router.put('/planes/:id', async (req, res, next) => {
     if (!plan) return res.status(404).json({ error: 'Plan no encontrado.' });
 
     // Detectar si cambió el precio mensual o anual
-    const cambioPrecioMensual = precio_mensual !== undefined &&
+    const cambioPrecioMensual =
+      precio_mensual !== undefined &&
       parseFloat(precio_mensual) !== parseFloat(planAnterior?.precio_mensual);
-    const cambioPrecioAnual = precio_anual !== undefined &&
+    const cambioPrecioAnual =
+      precio_anual !== undefined &&
       parseFloat(precio_anual) !== parseFloat(planAnterior?.precio_anual);
 
     // Si cambió algún precio, notificar en background a los abogados suscriptos
+    console.log('DEBUG precio:', {
+      planAnterior,
+      precio_mensual,
+      precio_anual,
+      cambioPrecioMensual,
+      cambioPrecioAnual,
+    });
     if (planAnterior && (cambioPrecioMensual || cambioPrecioAnual)) {
       query(
         `SELECT u.id, u.nombre, u.apellido, u.email
@@ -637,40 +730,60 @@ router.put('/planes/:id', async (req, res, next) => {
            AND pa.suscripcion_activa = true
            AND u.activo = true`,
         [req.params.id]
-      ).then(async ({ rows: abogados }) => {
-        if (abogados.length === 0) return;
+      )
+        .then(async ({ rows: abogados }) => {
+          if (abogados.length === 0) return;
 
-        const notifService = require('../services/notificaciones.service');
-        const planNombreActual = plan.nombre || planAnterior.nombre;
+          const notifService = require('../services/notificaciones.service');
+          const planNombreActual = plan.nombre || planAnterior.nombre;
 
-        for (const abogado of abogados) {
-          // Notificación in-app (campana)
-          notifService.crear({
-            usuarioId: abogado.id,
-            tipo:      'cambio_plan',
-            titulo:    `Actualización de precios — Plan ${planNombreActual}`,
-            mensaje:   `Actualizamos los valores del plan ${planNombreActual}. Tu suscripción activa no se ve afectada hasta la próxima renovación.`,
-            link:      '/abogado/suscripcion',
-          }).catch(err => console.error(`❌ Notif cambio precio abogado ${abogado.id}:`, err.message));
+          for (const abogado of abogados) {
+            // Notificación in-app (campana)
+            notifService
+              .crear({
+                usuarioId: abogado.id,
+                tipo: 'cambio_plan',
+                titulo: `Actualización de precios — Plan ${planNombreActual}`,
+                mensaje: `Actualizamos los valores del plan ${planNombreActual}. Tu suscripción activa no se ve afectada hasta la próxima renovación.`,
+                link: '/abogado/suscripcion',
+              })
+              .catch((err) =>
+                console.error(`❌ Notif cambio precio abogado ${abogado.id}:`, err.message)
+              );
 
-          // Email informativo
-          emailService.notificarCambioPreciosPlan({
-            nombre:                abogado.nombre,
-            email:                 abogado.email,
-            planNombre:            planNombreActual,
-            precioMensualAnterior: parseFloat(planAnterior.precio_mensual),
-            precioMensualNuevo:    cambioPrecioMensual ? parseFloat(precio_mensual) : parseFloat(planAnterior.precio_mensual),
-            precioAnualAnterior:   parseFloat(planAnterior.precio_anual),
-            precioAnualNuevo:      cambioPrecioAnual   ? parseFloat(precio_anual)   : parseFloat(planAnterior.precio_anual),
-          }).catch(err => console.error(`❌ Email cambio precio a ${abogado.email}:`, err.message));
-        }
+            // Email informativo
+            emailService
+              .notificarCambioPreciosPlan({
+                nombre: abogado.nombre,
+                email: abogado.email,
+                planNombre: planNombreActual,
+                precioMensualAnterior: parseFloat(planAnterior.precio_mensual),
+                precioMensualNuevo: cambioPrecioMensual
+                  ? parseFloat(precio_mensual)
+                  : parseFloat(planAnterior.precio_mensual),
+                precioAnualAnterior: parseFloat(planAnterior.precio_anual),
+                precioAnualNuevo: cambioPrecioAnual
+                  ? parseFloat(precio_anual)
+                  : parseFloat(planAnterior.precio_anual),
+              })
+              .catch((err) =>
+                console.error(`❌ Email cambio precio a ${abogado.email}:`, err.message)
+              );
+          }
 
-        console.log(`📋 Notificación de cambio de precios enviada a ${abogados.length} abogado(s) del plan ${planNombreActual}`);
-      }).catch(err => console.error('❌ Error buscando abogados para notificación de precio:', err.message));
+          console.log(
+            `📋 Notificación de cambio de precios enviada a ${abogados.length} abogado(s) del plan ${planNombreActual}`
+          );
+        })
+        .catch((err) =>
+          console.error('❌ Error buscando abogados para notificación de precio:', err.message)
+        );
     }
 
     res.json({ mensaje: 'Plan actualizado correctamente.', plan });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -681,13 +794,16 @@ router.patch('/usuarios/:id/datos', async (req, res, next) => {
     const { nombre, apellido, email, telefono } = req.body;
 
     // Guardar datos anteriores para la auditoría
-    const { rows: [anterior] } = await query(
-      'SELECT nombre, apellido, email, telefono FROM usuarios WHERE id = $1',
-      [req.params.id]
-    );
+    const {
+      rows: [anterior],
+    } = await query('SELECT nombre, apellido, email, telefono FROM usuarios WHERE id = $1', [
+      req.params.id,
+    ]);
     if (!anterior) return res.status(404).json({ error: 'Usuario no encontrado.' });
 
-    const { rows: [usuario] } = await query(
+    const {
+      rows: [usuario],
+    } = await query(
       `UPDATE usuarios SET
          nombre   = COALESCE($1, nombre),
          apellido = COALESCE($2, apellido),
@@ -700,13 +816,18 @@ router.patch('/usuarios/:id/datos', async (req, res, next) => {
     if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado.' });
 
     await auditar(req, {
-      accion:        'editar_datos_personales',
-      descripcion:   `Editó datos personales de ${usuario.nombre} ${usuario.apellido}`,
-      entidad:       'usuario',
-      entidad_id:    req.params.id,
+      accion: 'editar_datos_personales',
+      descripcion: `Editó datos personales de ${usuario.nombre} ${usuario.apellido}`,
+      entidad: 'usuario',
+      entidad_id: req.params.id,
       entidad_label: `${usuario.nombre} ${usuario.apellido} <${usuario.email}>`,
-      datos_antes:   anterior,
-      datos_despues: { nombre: usuario.nombre, apellido: usuario.apellido, email: usuario.email, telefono: usuario.telefono },
+      datos_antes: anterior,
+      datos_despues: {
+        nombre: usuario.nombre,
+        apellido: usuario.apellido,
+        email: usuario.email,
+        telefono: usuario.telefono,
+      },
     });
 
     res.json({ mensaje: 'Datos actualizados.', usuario });
@@ -729,7 +850,9 @@ router.patch('/usuarios/:id/datos', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 router.get('/foro/resumen', async (req, res, next) => {
   try {
-    const { rows: [totales] } = await query(`
+    const {
+      rows: [totales],
+    } = await query(`
       SELECT
         (SELECT COUNT(*) FROM foro_categorias)                   AS total_categorias,
         (SELECT COUNT(*) FROM foro_hilos)                        AS total_hilos,
@@ -738,7 +861,9 @@ router.get('/foro/resumen', async (req, res, next) => {
         (SELECT COUNT(*) FROM foro_respuestas)                   AS total_respuestas
     `);
     res.json({ resumen: totales });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -758,7 +883,9 @@ router.get('/foro/categorias', async (req, res, next) => {
       ORDER BY fc.orden ASC
     `);
     res.json({ categorias: rows });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -773,7 +900,9 @@ router.post('/foro/categorias', async (req, res, next) => {
       return res.status(400).json({ error: 'El nombre de la categoría es obligatorio.' });
     }
 
-    const { rows: [categoria] } = await query(
+    const {
+      rows: [categoria],
+    } = await query(
       `INSERT INTO foro_categorias (nombre, descripcion, icono, orden)
        VALUES ($1, $2, $3, $4)
        RETURNING id, nombre, descripcion, icono, orden, activa`,
@@ -781,7 +910,9 @@ router.post('/foro/categorias', async (req, res, next) => {
     );
 
     res.status(201).json({ mensaje: 'Categoría creada.', categoria });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -796,7 +927,9 @@ router.put('/foro/categorias/:id', async (req, res, next) => {
       return res.status(400).json({ error: 'El nombre es obligatorio.' });
     }
 
-    const { rows: [categoria] } = await query(
+    const {
+      rows: [categoria],
+    } = await query(
       `UPDATE foro_categorias
        SET nombre = $1, descripcion = $2, icono = $3, orden = $4
        WHERE id = $5
@@ -806,7 +939,9 @@ router.put('/foro/categorias/:id', async (req, res, next) => {
 
     if (!categoria) return res.status(404).json({ error: 'Categoría no encontrada.' });
     res.json({ mensaje: 'Categoría actualizada.', categoria });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -818,7 +953,9 @@ router.patch('/foro/categorias/:id/pausar', async (req, res, next) => {
   try {
     const { activa } = req.body;
 
-    const { rows: [categoria] } = await query(
+    const {
+      rows: [categoria],
+    } = await query(
       `UPDATE foro_categorias SET activa = $1 WHERE id = $2
        RETURNING id, nombre, activa`,
       [activa, req.params.id]
@@ -830,7 +967,9 @@ router.patch('/foro/categorias/:id/pausar', async (req, res, next) => {
       mensaje: `Categoría ${activa ? 'activada' : 'pausada'}.`,
       categoria,
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -839,17 +978,18 @@ router.patch('/foro/categorias/:id/pausar', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 router.delete('/foro/categorias/:id', async (req, res, next) => {
   try {
-    const { rows: [categoria] } = await query(
-      'SELECT id, nombre FROM foro_categorias WHERE id = $1',
-      [req.params.id]
-    );
+    const {
+      rows: [categoria],
+    } = await query('SELECT id, nombre FROM foro_categorias WHERE id = $1', [req.params.id]);
 
     if (!categoria) return res.status(404).json({ error: 'Categoría no encontrada.' });
 
     await query('DELETE FROM foro_categorias WHERE id = $1', [req.params.id]);
 
     res.json({ mensaje: `Categoría "${categoria.nombre}" eliminada junto con todos sus hilos.` });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -860,13 +1000,13 @@ router.delete('/foro/categorias/:id', async (req, res, next) => {
 router.get('/foro/hilos', async (req, res, next) => {
   try {
     const { categoria_id, cerrado, busqueda } = req.query;
-    const pagina  = parseInt(req.query.pagina) || 1;
-    const limite  = 25;
-    const offset  = (pagina - 1) * limite;
+    const pagina = parseInt(req.query.pagina) || 1;
+    const limite = 25;
+    const offset = (pagina - 1) * limite;
 
     // Construir filtros dinámicamente para evitar SQL injection
     const condiciones = [];
-    const valores     = [];
+    const valores = [];
 
     if (categoria_id) {
       valores.push(categoria_id);
@@ -884,10 +1024,9 @@ router.get('/foro/hilos', async (req, res, next) => {
     const where = condiciones.length > 0 ? `WHERE ${condiciones.join(' AND ')}` : '';
 
     // Total de resultados para paginación
-    const { rows: [{ total }] } = await query(
-      `SELECT COUNT(*) AS total FROM foro_hilos fh ${where}`,
-      valores
-    );
+    const {
+      rows: [{ total }],
+    } = await query(`SELECT COUNT(*) AS total FROM foro_hilos fh ${where}`, valores);
 
     // Hilos con datos del autor y categoría
     const valoresPag = [...valores, limite, offset];
@@ -913,13 +1052,15 @@ router.get('/foro/hilos', async (req, res, next) => {
     res.json({
       hilos,
       paginacion: {
-        total:   parseInt(total),
+        total: parseInt(total),
         pagina,
         limite,
         paginas: Math.ceil(parseInt(total) / limite),
       },
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -931,7 +1072,9 @@ router.patch('/foro/hilos/:id/cerrar', async (req, res, next) => {
   try {
     const { cerrado } = req.body;
 
-    const { rows: [hilo] } = await query(
+    const {
+      rows: [hilo],
+    } = await query(
       `UPDATE foro_hilos SET cerrado = $1 WHERE id = $2
        RETURNING id, titulo, cerrado`,
       [cerrado, req.params.id]
@@ -943,7 +1086,9 @@ router.patch('/foro/hilos/:id/cerrar', async (req, res, next) => {
       mensaje: `Hilo ${cerrado ? 'cerrado' : 'reabierto'}.`,
       hilo,
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -955,7 +1100,9 @@ router.patch('/foro/hilos/:id/fijar', async (req, res, next) => {
   try {
     const { fijado } = req.body;
 
-    const { rows: [hilo] } = await query(
+    const {
+      rows: [hilo],
+    } = await query(
       `UPDATE foro_hilos SET fijado = $1 WHERE id = $2
        RETURNING id, titulo, fijado`,
       [fijado, req.params.id]
@@ -967,7 +1114,9 @@ router.patch('/foro/hilos/:id/fijar', async (req, res, next) => {
       mensaje: `Hilo ${fijado ? 'fijado' : 'desfijado'}.`,
       hilo,
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -976,17 +1125,18 @@ router.patch('/foro/hilos/:id/fijar', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 router.delete('/foro/hilos/:id', async (req, res, next) => {
   try {
-    const { rows: [hilo] } = await query(
-      'SELECT id, titulo FROM foro_hilos WHERE id = $1',
-      [req.params.id]
-    );
+    const {
+      rows: [hilo],
+    } = await query('SELECT id, titulo FROM foro_hilos WHERE id = $1', [req.params.id]);
 
     if (!hilo) return res.status(404).json({ error: 'Hilo no encontrado.' });
 
     await query('DELETE FROM foro_hilos WHERE id = $1', [req.params.id]);
 
     res.json({ mensaje: `Hilo "${hilo.titulo}" eliminado.` });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ============================================================
@@ -1006,11 +1156,17 @@ router.get('/config', async (req, res, next) => {
     );
     // Convertir a objeto clave-valor para facilidad de uso
     const config = rows.reduce((acc, row) => {
-      acc[row.clave] = { valor: row.valor, descripcion: row.descripcion, actualizado_en: row.actualizado_en };
+      acc[row.clave] = {
+        valor: row.valor,
+        descripcion: row.descripcion,
+        actualizado_en: row.actualizado_en,
+      };
       return acc;
     }, {});
     res.json({ config });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -1021,10 +1177,12 @@ router.get('/config', async (req, res, next) => {
 router.put('/config/:clave', async (req, res, next) => {
   try {
     const { clave } = req.params;
-    const { valor }  = req.body;
+    const { valor } = req.body;
 
     // Upsert: actualiza si existe, inserta si no
-    const { rows: [config] } = await query(
+    const {
+      rows: [config],
+    } = await query(
       `INSERT INTO config_plataforma (clave, valor, actualizado_en)
        VALUES ($1, $2, NOW())
        ON CONFLICT (clave)
@@ -1034,7 +1192,9 @@ router.put('/config/:clave', async (req, res, next) => {
     );
 
     res.json({ mensaje: 'Configuración actualizada.', config });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -1049,7 +1209,9 @@ router.patch('/usuarios/:id/permitir-reregistro', async (req, res, next) => {
     const { id } = req.params;
 
     // Verificar que el usuario existe y es un abogado rechazado
-    const { rows: [usuario] } = await query(
+    const {
+      rows: [usuario],
+    } = await query(
       `SELECT u.id, u.email, u.nombre, u.apellido, r.nombre AS rol,
               pa.estado_aprobacion
        FROM usuarios u
@@ -1088,12 +1250,12 @@ router.patch('/usuarios/:id/permitir-reregistro', async (req, res, next) => {
     );
 
     await auditar(req, {
-      accion:        'permitir_reregistro',
-      descripcion:   `Permitió el re-registro de ${usuario.nombre} ${usuario.apellido} — email liberado`,
-      entidad:       'usuario',
-      entidad_id:    id,
+      accion: 'permitir_reregistro',
+      descripcion: `Permitió el re-registro de ${usuario.nombre} ${usuario.apellido} — email liberado`,
+      entidad: 'usuario',
+      entidad_id: id,
       entidad_label: `${usuario.nombre} ${usuario.apellido} <${usuario.email}>`,
-      datos_antes:   { email: usuario.email },
+      datos_antes: { email: usuario.email },
       datos_despues: { email: emailAnonimizado, activo: false },
     });
 
@@ -1101,7 +1263,9 @@ router.patch('/usuarios/:id/permitir-reregistro', async (req, res, next) => {
       mensaje: `El email "${usuario.email}" fue liberado. El abogado puede volver a registrarse con ese email.`,
       email_liberado: usuario.email,
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -1116,7 +1280,7 @@ router.get('/auditoria', async (req, res, next) => {
     const offset = (parseInt(pagina) - 1) * limite;
 
     const condiciones = [];
-    const valores     = [];
+    const valores = [];
 
     if (accion) {
       condiciones.push(`a.accion = $${valores.length + 1}`);
@@ -1133,10 +1297,9 @@ router.get('/auditoria', async (req, res, next) => {
 
     const where = condiciones.length ? 'WHERE ' + condiciones.join(' AND ') : '';
 
-    const { rows: [{ total }] } = await query(
-      `SELECT COUNT(*) AS total FROM auditoria_admin a ${where}`,
-      valores
-    );
+    const {
+      rows: [{ total }],
+    } = await query(`SELECT COUNT(*) AS total FROM auditoria_admin a ${where}`, valores);
 
     const { rows } = await query(
       `SELECT
@@ -1157,13 +1320,15 @@ router.get('/auditoria', async (req, res, next) => {
     res.json({
       registros: rows,
       paginacion: {
-        total:   parseInt(total),
-        pagina:  parseInt(pagina),
+        total: parseInt(total),
+        pagina: parseInt(pagina),
         limite,
         paginas: Math.ceil(parseInt(total) / limite),
       },
     });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 });
 
 module.exports = router;
