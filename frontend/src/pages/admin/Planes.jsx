@@ -440,7 +440,7 @@ function TarjetaPlan({ plan: planOrig, onActualizar }) {
         {/* Botones guardar / cancelar */}
         {editando && (
           <div className="flex gap-3 pt-2 border-t" style={{ borderColor: '#F0EFED' }}>
-            <button onClick={() => { setPlan(planOrig); setEditando(false); }} className="btn-secondary flex-1">
+            <button type="button" onClick={() => { setPlan(planOrig); setEditando(false); }} className="btn-secondary flex-1">
               Cancelar
             </button>
             <button type="button" onClick={guardar} disabled={guardando} className="btn-primary flex-1">
