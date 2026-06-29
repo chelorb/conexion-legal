@@ -443,7 +443,7 @@ function TarjetaPlan({ plan: planOrig, onActualizar }) {
             <button onClick={() => { setPlan(planOrig); setEditando(false); }} className="btn-secondary flex-1">
               Cancelar
             </button>
-            <button onClick={guardar} disabled={guardando} className="btn-primary flex-1">
+            <button type="button" onClick={guardar} disabled={guardando} className="btn-primary flex-1">
               {guardando
                 ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Guardando...</>
                 : <><Save size={15} /> Guardar y notificar</>
