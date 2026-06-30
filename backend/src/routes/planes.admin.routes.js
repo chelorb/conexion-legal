@@ -20,7 +20,7 @@ async function notificarAbogados(planId, tipo, titulo, mensaje) {
   try {
     // Buscar abogados suscriptos al plan
     const { rows: abogados } = await query(
-      `SELECT u.id, u.nombre, u.email
+      `SELECT u.id, u.nombre, u.apellido, u.email
        FROM perfiles_abogado pa
        JOIN usuarios u ON pa.usuario_id = u.id
        WHERE pa.plan_id = $1 AND pa.suscripcion_activa = true`,
