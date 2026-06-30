@@ -7,6 +7,19 @@ const express = require('express');
 const router  = express.Router();
 const ctrl    = require('../controllers/consultas.controller');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
+const rateLimit = require('express-rate-limit');
+
+// Rate limiting para envío de mensajes
+// Máximo 30 mensajes por 5 minutos por IP — evita flood
+const limiterMensajes = rateLimit({
+  windowMs:        5 * 60 * 1000, // 5 minutos
+  max:             30,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  skip:            () => process.env.NODE_ENV === 'development',
+  message: { error: 'Demasiados mensajes en poco tiempo. Esperá unos minutos.' },
+});
+
 const { validarConsulta } = require('../middleware/validacion.middleware');
 
 // Crear consulta (cliente)
@@ -57,7 +70,7 @@ router.patch('/:id/link',
 
 // Enviar mensaje en una consulta
 router.post('/:id/mensajes',
-  verificarToken, requireRol('abogado', 'cliente'),
+  limiterMensajes, verificarToken, requireRol('abogado', 'cliente'),
   ctrl.enviarMensaje
 );
 

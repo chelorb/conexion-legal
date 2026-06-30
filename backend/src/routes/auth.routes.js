@@ -46,6 +46,17 @@ const limiterRegistro = rateLimit({
   skip: () => process.env.NODE_ENV === 'development',
 });
 
+// Rate limiting para reenvío de email de verificación
+// Máximo 3 reenvíos por hora por IP — evita abuso del sistema de emails
+const limiterReenvioEmail = rateLimit({
+  windowMs:        60 * 60 * 1000, // 1 hora
+  max:             3,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  skip:            () => process.env.NODE_ENV === 'development',
+  message: { error: 'Demasiados reenvíos de verificación. Intentá de nuevo en una hora.' },
+});
+
 // ─────────────────────────────────────────────────────────────
 // Multer con memoryStorage — archivos en RAM, no en disco
 // Render no tiene filesystem persistente entre deploys
@@ -141,7 +152,8 @@ router.post('/registro',
 router.post('/login', limiterLogin, validarLogin, ctrl.login);
 
 router.get('/verificar-email',           ctrl.verificarEmail);
-router.post('/solicitar-reset-password', ctrl.solicitarResetPassword);
+// Rate limiting también en reset de contraseña — mismo criterio que reenvío
+router.post('/solicitar-reset-password', limiterReenvioEmail, ctrl.solicitarResetPassword);
 router.post('/reset-password',           ctrl.resetPassword);
 router.get('/me', verificarToken,        ctrl.obtenerPerfil);
 
@@ -149,7 +161,7 @@ router.get('/me', verificarToken,        ctrl.obtenerPerfil);
 // POST /api/auth/reenviar-verificacion
 // Reenvía el email de verificación si el usuario no lo recibió
 // ─────────────────────────────────────────────────────────────
-router.post('/reenviar-verificacion', async (req, res, next) => {
+router.post('/reenviar-verificacion', limiterReenvioEmail, async (req, res, next) => {
   try {
     const { email } = req.body;
     if (!email?.trim()) {

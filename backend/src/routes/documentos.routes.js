@@ -11,6 +11,7 @@ const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 const cloudSvc   = require('../services/cloudinary.service');
 const notifSvc   = require('../services/notificaciones.service');
 const emailSvc   = require('../services/email.service');
+const auditar    = require('../services/auditoria.service'); // log de acciones del abogado
 
 // Multer en memoria (los archivos van directo a Cloudinary, no al disco)
 const upload = multer({
@@ -96,6 +97,16 @@ router.post('/subir', verificarToken, requireRol('abogado'), upload.single('arch
         link:      '/admin/abogados',
       });
     }));
+
+    // Registrar en auditoría — el abogado subió un documento
+    await auditar(req, {
+      accion:        'abogado_subio_documento',
+      descripcion:   `El abogado subió el documento: ${nombre || TIPOS[tipo]}`,
+      entidad:       'documento',
+      entidad_id:    doc.id,
+      entidad_label: `${nombre || TIPOS[tipo]} (${tipo})`,
+      datos_despues: { tipo, nombre: nombre || TIPOS[tipo], estado: 'pendiente' },
+    }).catch(() => {}); // no cortar el flujo si falla la auditoría
 
     res.status(201).json({ documento: doc });
   } catch (error) { next(error); }

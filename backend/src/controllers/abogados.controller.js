@@ -6,6 +6,7 @@
 // ============================================================
 
 const { query } = require('../config/database');
+const auditar   = require('../services/auditoria.service'); // log de acciones del abogado
 
 // ─────────────────────────────────────────────────────────────
 // GET /api/abogados
@@ -248,6 +249,15 @@ const actualizarPerfil = async (req, res, next) => {
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Perfil no encontrado.' });
     }
+
+    // Registrar en auditoría — el abogado modificó su propio perfil
+    await auditar(req, {
+      accion:        'abogado_modifico_perfil',
+      descripcion:   `El abogado actualizó su perfil profesional`,
+      entidad:       'perfil_abogado',
+      entidad_id:    usuarioId,
+      datos_despues: { matricula, descripcion, ciudad, provincia, anos_experiencia },
+    }).catch(() => {}); // no cortar el flujo si falla la auditoría
 
     res.json({
       mensaje: 'Perfil actualizado correctamente.',

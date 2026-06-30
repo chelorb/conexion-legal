@@ -129,6 +129,12 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
     const { accion, motivo, visible, matricula_verificada } = req.body;
     const adminId = req.usuario.id;
 
+    // Validar que la acción sea un valor permitido
+    const ACCIONES_VALIDAS = ['aprobar', 'rechazar'];
+    if (accion && !ACCIONES_VALIDAS.includes(accion)) {
+      return res.status(400).json({ error: `Acción inválida. Debe ser: ${ACCIONES_VALIDAS.join(' o ')}.` });
+    }
+
     // Obtener datos del abogado para los emails
     const { rows: abogadoRows } = await query(
       `SELECT u.nombre, u.apellido, u.email
@@ -944,6 +950,23 @@ router.patch('/usuarios/:id/datos', async (req, res, next) => {
   try {
     const { nombre, apellido, email, telefono } = req.body;
 
+    // Validar datos de entrada antes de tocar la DB
+    if (email !== undefined) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: 'El email no tiene un formato válido.' });
+      }
+    }
+    if (nombre !== undefined && (nombre.trim().length < 2 || nombre.trim().length > 100)) {
+      return res.status(400).json({ error: 'El nombre debe tener entre 2 y 100 caracteres.' });
+    }
+    if (apellido !== undefined && (apellido.trim().length < 2 || apellido.trim().length > 100)) {
+      return res.status(400).json({ error: 'El apellido debe tener entre 2 y 100 caracteres.' });
+    }
+    if (telefono !== undefined && telefono.trim().length > 30) {
+      return res.status(400).json({ error: 'El teléfono no puede superar 30 caracteres.' });
+    }
+
     // Guardar datos anteriores para la auditoría
     const {
       rows: [anterior],
@@ -1329,6 +1352,11 @@ router.put('/config/:clave', async (req, res, next) => {
   try {
     const { clave } = req.params;
     const { valor } = req.body;
+
+    // Validar que el valor no esté vacío
+    if (valor === undefined || valor === null || String(valor).trim() === '') {
+      return res.status(400).json({ error: 'El valor de configuración no puede estar vacío.' });
+    }
 
     // Upsert: actualiza si existe, inserta si no
     const {

@@ -7,6 +7,30 @@ const ctrl    = require('../controllers/abogados.controller');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 const { validarPerfilAbogado } = require('../middleware/validacion.middleware');
 const { query } = require('../config/database'); // necesario para rutas de notificaciones-plan
+const rateLimit = require('express-rate-limit');
+
+// Rate limiting para solicitudes de cambio de plan
+// Máximo 3 solicitudes por hora por IP — evita spam al admin
+const limiterSolicitudPlan = rateLimit({
+  windowMs:        60 * 60 * 1000, // 1 hora
+  max:             3,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  skip:            () => process.env.NODE_ENV === 'development',
+  message: { error: 'Demasiadas solicitudes de cambio de plan. Intentá de nuevo en una hora.' },
+});
+
+// Rate limiting para reenvío de verificación de email
+// Máximo 3 reenvíos por hora por IP — evita abuso del sistema de emails
+const limiterReenvioEmail = rateLimit({
+  windowMs:        60 * 60 * 1000, // 1 hora
+  max:             3,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  skip:            () => process.env.NODE_ENV === 'development',
+  message: { error: 'Demasiados reenvíos. Intentá de nuevo en una hora.' },
+});
+
 
 // Rutas públicas
 router.get('/',                ctrl.listarAbogados);
@@ -61,7 +85,7 @@ router.patch('/me/notificaciones-plan/marcar-todas', verificarToken, requireRol(
 // Guarda el plan solicitado en la DB y notifica al admin (in-app + email)
 // para que lo procese manualmente desde el panel de administración.
 // ─────────────────────────────────────────────────────────────
-router.post('/me/solicitar-cambio-plan', verificarToken, requireRol('abogado'), async (req, res, next) => {
+router.post('/me/solicitar-cambio-plan', limiterSolicitudPlan, verificarToken, requireRol('abogado'), async (req, res, next) => {
   try {
     const { plan_id } = req.body;
     const abogadoId   = req.usuario.id;
@@ -148,6 +172,16 @@ router.post('/me/solicitar-cambio-plan', verificarToken, requireRol('abogado'), 
       }
 
       console.log(`📋 Solicitud de cambio de plan: ${perfil.nombre} ${perfil.apellido} → ${planSolicitado.nombre}`);
+
+      // Registrar en auditoría
+      const auditar = require('../services/auditoria.service');
+      auditar(req, {
+        accion:        'abogado_solicito_cambio_plan',
+        descripcion:   `Solicitó cambio del plan ${perfil.plan_actual_nombre} al plan ${planSolicitado.nombre}`,
+        entidad:       'perfil_abogado',
+        entidad_id:    abogadoId,
+        datos_despues: { plan_solicitado: planSolicitado.nombre, plan_solicitado_id: plan_id },
+      }).catch(() => {});
     }).catch(err => console.error('❌ Error notificando admins:', err.message));
 
     res.json({
