@@ -244,6 +244,22 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
     finally { setProcesando(false); }
   };
 
+  // ── Rechazar solicitud de cambio de plan ───────────────────────
+  const rechazarSolicitudPlan = async () => {
+    const motivoRechazo = window.prompt(
+      `¿Rechazar la solicitud de cambio al plan "${usuario.plan_solicitado_nombre}" ` +
+      `de ${usuario.nombre} ${usuario.apellido}?\n\nMotivo (opcional):`
+    );
+    if (motivoRechazo === null) return;
+    setProcesando(true);
+    try {
+      await api.patch(`/admin/abogados/${usuario.id}/rechazar-plan`, { motivo: motivoRechazo });
+      toast.success('Solicitud rechazada. El abogado fue notificado.');
+      onActualizar(); onCerrar();
+    } catch (err) { toast.error(err.response?.data?.error || 'Error al rechazar.'); }
+    finally { setProcesando(false); }
+  };
+
   // ── Eliminar definitivamente ────────────────────────────────
   const eliminarDefinitivamente = async () => {
     if (!window.confirm(
