@@ -58,8 +58,8 @@ const crearPreferencia = async (req, res, next) => {
         items: [
           {
             id:          plan.slug,
-            title:       `Conexión Legal — Plan ${plan.nombre} (${descripcionPeriodo})`,
-            description: `Suscripción ${descripcionPeriodo} al Plan ${plan.nombre} de Conexión Legal`,
+            title:       `IUSTIXIUM — Plan ${plan.nombre} (${descripcionPeriodo})`,
+            description: `Suscripción ${descripcionPeriodo} al Plan ${plan.nombre} de IUSTIXIUM`,
             quantity:    1,
             currency_id: 'ARS',
             unit_price:  parseFloat(precio),
@@ -78,7 +78,9 @@ const crearPreferencia = async (req, res, next) => {
         },
         auto_return: 'approved', // Redirige automáticamente si el pago fue aprobado
         external_reference: `${usuarioId}|${plan.id}|${periodo}`, // Para identificar en webhook
-        notification_url: `${process.env.BACKEND_URL || 'https://api.conexionlegal.com'}/api/pagos/webhook`,
+        // BACKEND_URL debe estar configurado en Render con la URL real del backend
+        // Ej: https://conexion-legal.onrender.com
+        notification_url: `${process.env.BACKEND_URL}/api/pagos/webhook`,
       }
     });
 
