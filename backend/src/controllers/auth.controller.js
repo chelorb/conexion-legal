@@ -13,11 +13,18 @@ const emailService = require('../services/email.service');
 // ─────────────────────────────────────────────────────────────
 // Genera un JWT firmado con los datos del usuario
 // ─────────────────────────────────────────────────────────────
-const generarToken = (usuario) => {
+// sessionToken: UUID único de esta sesión — el middleware lo compara
+// con el guardado en la DB para garantizar sesión única por usuario
+const generarToken = (usuario, sessionToken) => {
   return jwt.sign(
-    { id: usuario.id, email: usuario.email, rol: usuario.rol },
+    {
+      id:            usuario.id,
+      email:         usuario.email,
+      rol:           usuario.rol,
+      session_token: sessionToken,
+    },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
   );
 };
 
@@ -236,10 +243,16 @@ const login = async (req, res, next) => {
 
     const advertencias = [];
 
-    // Actualizar fecha de último login
-    await query('UPDATE usuarios SET ultimo_login = NOW() WHERE id = $1', [usuario.id]);
+    // Generar session_token único para esta sesión y guardarlo en la DB
+    // Si el mismo usuario inicia sesión desde otro dispositivo, el token anterior
+    // queda inválido automáticamente (el middleware compara ambos tokens)
+    const sessionToken = uuidv4();
+    await query(
+      'UPDATE usuarios SET ultimo_login = NOW(), session_token = $1 WHERE id = $2',
+      [sessionToken, usuario.id]
+    );
 
-    const token = generarToken(usuario);
+    const token = generarToken(usuario, sessionToken);
 
     // Si es abogado, incluir datos del perfil y estado de aprobación
     let perfilAbogado = null;
