@@ -145,8 +145,6 @@ router.post('/solicitar-reset-password', ctrl.solicitarResetPassword);
 router.post('/reset-password',           ctrl.resetPassword);
 router.get('/me', verificarToken,        ctrl.obtenerPerfil);
 
-module.exports = router;
-
 // ─────────────────────────────────────────────────────────────
 // POST /api/auth/reenviar-verificacion
 // Reenvía el email de verificación si el usuario no lo recibió
@@ -159,10 +157,13 @@ router.post('/reenviar-verificacion', async (req, res, next) => {
     }
 
     const { query: dbQuery } = require('../config/database');
+    // JOIN con roles porque 'rol' no es columna de usuarios — es una FK (rol_id)
     const { rows } = await dbQuery(
-      `SELECT id, nombre, email, rol, email_verificado, token_verificacion
-       FROM usuarios
-       WHERE email = $1 AND activo = true`,
+      `SELECT u.id, u.nombre, u.email, r.nombre AS rol,
+              u.email_verificado, u.token_verificacion
+       FROM usuarios u
+       JOIN roles r ON u.rol_id = r.id
+       WHERE u.email = $1 AND u.activo = true`,
       [email.toLowerCase().trim()]
     );
 
@@ -187,12 +188,14 @@ router.post('/reenviar-verificacion', async (req, res, next) => {
 
     const emailService = require('../services/email.service');
     await emailService.enviarBienvenida({
-      nombre:           usuario.nombre,
-      email:            usuario.email,
-      rol:              usuario.rol,
+      nombre:            usuario.nombre,
+      email:             usuario.email,
+      rol:               usuario.rol,
       tokenVerificacion: token,
     });
 
     res.json({ mensaje: 'Si el email existe y no está verificado, te enviaremos el enlace.' });
   } catch (error) { next(error); }
 });
+
+module.exports = router;
