@@ -11,7 +11,7 @@ import {
   Search, UserCheck, UserX, Shield, RefreshCw,
   Mail, User, Briefcase, Crown, X, Filter,
   Trash2, RotateCcw, Check, ChevronDown, ChevronUp,
-  MapPin, FileText, ExternalLink, FolderOpen, Save, Pencil, Phone, ArrowUpCircle
+  MapPin, FileText, ExternalLink, FolderOpen, Save, Pencil, Phone, ArrowUpCircle, CheckCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -244,6 +244,21 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
     finally { setProcesando(false); }
   };
 
+  // ── Verificar email manualmente ─────────────────────────────────
+  const verificarEmailManual = async () => {
+    if (!window.confirm(
+      `¿Verificar manualmente el email de ${usuario.nombre} ${usuario.apellido}?\n\n` +
+      `Esto le permitirá iniciar sesión sin pasar por el proceso de verificación.`
+    )) return;
+    setProcesando(true);
+    try {
+      await api.patch(`/admin/usuarios/${usuario.id}/verificar-email`);
+      toast.success('Email verificado correctamente.');
+      onActualizar(); onCerrar();
+    } catch (err) { toast.error(err.response?.data?.error || 'Error al verificar.'); }
+    finally { setProcesando(false); }
+  };
+
   // ── Rechazar solicitud de cambio de plan ───────────────────────
   const rechazarSolicitudPlan = async () => {
     const motivoRechazo = window.prompt(
@@ -346,11 +361,27 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
               <div className="rounded-xl p-4 space-y-3" style={{ background: '#F7F6F4' }}>
                 <div className="flex items-center gap-3">
                   <Mail size={14} style={{ color: '#8A8780' }} />
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="font-body text-xs" style={{ color: '#8A8780' }}>Email</p>
-                    <p className="font-body text-sm" style={{ color: '#1C1B18' }}>{usuario.email}</p>
+                    <p className="font-body text-sm truncate" style={{ color: '#1C1B18' }}>{usuario.email}</p>
                   </div>
-                  {usuario.email_verificado && <Shield size={13} style={{ color: '#16a34a' }} className="ml-auto" />}
+                  {/* Badge de verificación de email */}
+                  {usuario.email_verificado
+                    ? <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full font-body text-xs font-medium"
+                        style={{ background: 'rgba(22,163,74,0.08)', color: '#16a34a' }}>
+                        <CheckCircle size={11} /> Verificado
+                      </span>
+                    : <button
+                        onClick={verificarEmailManual}
+                        disabled={procesando}
+                        className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full font-body text-xs font-medium transition-colors"
+                        style={{ background: 'rgba(220,38,38,0.08)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}
+                        title="Verificar email manualmente"
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.15)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.08)'; }}>
+                        Sin verificar — click para verificar
+                      </button>
+                  }
                 </div>
                 <div className="border-t pt-3 grid grid-cols-2 gap-3" style={{ borderColor: '#E8E6E3' }}>
                   <div>

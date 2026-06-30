@@ -96,7 +96,8 @@ router.get('/abogados', async (req, res, next) => {
          -- Plan solicitado por el abogado (para mostrarlo en el panel admin)
          pa.plan_solicitado_id,
          ps2.nombre AS plan_solicitado_nombre,
-         pa.plan_solicitado_en
+         pa.plan_solicitado_en,
+         u.email_original  -- para saber si el email fue anonimizado
        FROM usuarios u
        JOIN perfiles_abogado pa ON u.id = pa.usuario_id
        JOIN planes_suscripcion ps ON pa.plan_id = ps.id
@@ -145,6 +146,18 @@ router.patch('/abogados/:id/aprobar', async (req, res, next) => {
 
     // ── Acción: aprobar ──────────────────────────────────────
     if (accion === 'aprobar') {
+      // Si el email fue anonimizado por "Permitir re-registro",
+      // restaurar el email original antes de aprobar
+      if (abogado.email_original) {
+        await query(
+          `UPDATE usuarios SET
+             email          = $1,
+             email_original = NULL
+           WHERE id = $2`,
+          [abogado.email_original, id]
+        );
+      }
+
       await query(
         `UPDATE perfiles_abogado SET
            estado_aprobacion    = 'aprobado',
@@ -1375,16 +1388,20 @@ router.patch('/usuarios/:id/permitir-reregistro', async (req, res, next) => {
 
     // Anonimizar el email con un sufijo único basado en timestamp
     // Ej: juan@email.com → juan@email.com__rechazado_1718000000000
-    const emailAnonimizado = `${usuario.email}__rechazado_${Date.now()}`;
+    // Guardamos el email real en email_original para poder restaurarlo
+    // si el admin usa "Aprobar directamente" después
+    const emailReal        = usuario.email_original || usuario.email; // por si ya fue anonimizado antes
+    const emailAnonimizado = `${emailReal}__rechazado_${Date.now()}`;
 
     await query(
       `UPDATE usuarios SET
          email              = $1,
+         email_original     = $2,
          activo             = false,
          token_verificacion = NULL,
          token_reset_pass   = NULL
-       WHERE id = $2`,
-      [emailAnonimizado, id]
+       WHERE id = $3`,
+      [emailAnonimizado, emailReal, id]
     );
 
     await auditar(req, {
@@ -1404,6 +1421,44 @@ router.patch('/usuarios/:id/permitir-reregistro', async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/admin/usuarios/:id/verificar-email
+// El admin verifica manualmente el email de un usuario
+// Útil cuando el usuario reporta que no recibió el email de verificación
+// ─────────────────────────────────────────────────────────────
+router.patch('/usuarios/:id/verificar-email', async (req, res, next) => {
+  try {
+    const { rows: [usuario] } = await query(
+      'SELECT id, nombre, apellido, email, email_verificado FROM usuarios WHERE id = $1',
+      [req.params.id]
+    );
+
+    if (!usuario) return res.status(404).json({ error: 'Usuario no encontrado.' });
+
+    if (usuario.email_verificado) {
+      return res.status(400).json({ error: 'El email de este usuario ya está verificado.' });
+    }
+
+    await query(
+      'UPDATE usuarios SET email_verificado = true, token_verificacion = NULL WHERE id = $1',
+      [req.params.id]
+    );
+
+    // Registrar en auditoría
+    await auditar(req, {
+      accion:        'verificar_email_manual',
+      descripcion:   `Verificó manualmente el email de ${usuario.nombre} ${usuario.apellido}`,
+      entidad:       'usuario',
+      entidad_id:    req.params.id,
+      entidad_label: `${usuario.nombre} ${usuario.apellido} <${usuario.email}>`,
+      datos_antes:   { email_verificado: false },
+      datos_despues: { email_verificado: true },
+    });
+
+    res.json({ mensaje: `Email de ${usuario.nombre} ${usuario.apellido} verificado correctamente.` });
+  } catch (error) { next(error); }
 });
 
 // ─────────────────────────────────────────────────────────────
