@@ -92,10 +92,15 @@ router.get('/abogados', async (req, res, next) => {
          pa.cuil, pa.titulo_universitario, pa.universidad,
          pa.anio_graduacion, pa.nro_credencial_letrado,
          pa.doc_credencial_url, pa.doc_titulo_url, pa.doc_cuil_url,
-         ps.nombre AS plan_nombre, ps.slug AS plan_slug
+         ps.nombre AS plan_nombre, ps.slug AS plan_slug,
+         -- Plan solicitado por el abogado (para mostrarlo en el panel admin)
+         pa.plan_solicitado_id,
+         ps2.nombre AS plan_solicitado_nombre,
+         pa.plan_solicitado_en
        FROM usuarios u
        JOIN perfiles_abogado pa ON u.id = pa.usuario_id
        JOIN planes_suscripcion ps ON pa.plan_id = ps.id
+       LEFT JOIN planes_suscripcion ps2 ON pa.plan_solicitado_id = ps2.id
        ${condicion}
        ORDER BY
          CASE pa.estado_aprobacion
@@ -340,13 +345,28 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
       matricula,
       especialidades,
       plan_slug,
+      plan_id: plan_id_directo, // plan_id directo (para aprobación de solicitudes)
     } = req.body;
 
-    // Si viene plan_slug, buscar el plan_id correspondiente
+    // Resolver el plan: acepta plan_id directo (número) o plan_slug (string)
+    // Usar plan_id directo es más robusto y funciona con cualquier plan presente o futuro
     let planId = null;
-    if (plan_slug) {
+    let planSlugFinal = plan_slug;
+    if (plan_id_directo) {
+      // Aprobación de solicitud: buscar por id
       const { rows: planRows } = await query(
-        'SELECT id FROM planes_suscripcion WHERE slug = $1 AND activo = true',
+        'SELECT id, slug FROM planes_suscripcion WHERE id = $1 AND activo = true',
+        [parseInt(plan_id_directo)]
+      );
+      if (planRows.length === 0) {
+        return res.status(400).json({ error: 'Plan no encontrado o inactivo.' });
+      }
+      planId = planRows[0].id;
+      planSlugFinal = planRows[0].slug;
+    } else if (plan_slug) {
+      // Edición manual del perfil: buscar por slug
+      const { rows: planRows } = await query(
+        'SELECT id, slug FROM planes_suscripcion WHERE slug = $1 AND activo = true',
         [plan_slug]
       );
       if (planRows.length === 0) {
@@ -364,6 +384,9 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
          matricula        = COALESCE($5, matricula),
          especialidades   = COALESCE($6, especialidades),
          plan_id          = COALESCE($7, plan_id),
+         -- Si el admin cambió el plan, limpiar la solicitud pendiente automáticamente
+         plan_solicitado_id = CASE WHEN $7 IS NOT NULL THEN NULL ELSE plan_solicitado_id END,
+         plan_solicitado_en = CASE WHEN $7 IS NOT NULL THEN NULL ELSE plan_solicitado_en END,
          perfil_completo  = true
        WHERE usuario_id = $8`,
       [
@@ -381,17 +404,106 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
     if (planId) {
       await auditar(req, {
         accion: 'cambiar_plan_abogado',
-        descripcion: `Cambió el plan del abogado (plan: ${plan_slug})`,
+        descripcion: `Cambió el plan del abogado (plan: ${planSlugFinal})`,
         entidad: 'usuario',
         entidad_id: id,
-        datos_despues: { plan_slug, plan_id: planId },
+        datos_despues: { plan_slug: planSlugFinal, plan_id: planId },
       });
+    }
+
+    // Notificar al abogado cuando el admin le cambia el plan
+    if (planId) {
+      const notifService = require('../services/notificaciones.service');
+      const { rows: [abogadoInfo] } = await query(
+        'SELECT u.nombre, u.email FROM usuarios u WHERE u.id = $1', [id]
+      );
+      if (abogadoInfo) {
+        notifService.crear({
+          usuarioId: id,
+          tipo:      'cambio_plan',
+          titulo:    `Tu plan fue actualizado`,
+          mensaje:   `El equipo de IUSTIXIUM actualizó tu plan de suscripción. Revisá los detalles en tu panel.`,
+          link:      '/abogado/suscripcion',
+        }).catch(err => console.error('❌ Notif cambio plan abogado:', err.message));
+      }
     }
 
     res.json({ mensaje: 'Perfil actualizado correctamente.' });
   } catch (error) {
     next(error);
   }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/admin/abogados/:id/rechazar-plan
+// El admin rechaza la solicitud de cambio de plan del abogado.
+// Limpia plan_solicitado_id y notifica al abogado.
+// ─────────────────────────────────────────────────────────────
+router.patch('/abogados/:id/rechazar-plan', async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body;
+
+    // Obtener datos del abogado y plan solicitado
+    const { rows: [abogado] } = await query(
+      `SELECT u.nombre, u.email,
+              ps_actual.nombre AS plan_actual_nombre,
+              ps_sol.nombre    AS plan_solicitado_nombre
+       FROM usuarios u
+       JOIN perfiles_abogado pa ON pa.usuario_id = u.id
+       JOIN planes_suscripcion ps_actual ON ps_actual.id = pa.plan_id
+       LEFT JOIN planes_suscripcion ps_sol ON ps_sol.id = pa.plan_solicitado_id
+       WHERE u.id = $1`,
+      [id]
+    );
+
+    if (!abogado) return res.status(404).json({ error: 'Abogado no encontrado.' });
+    if (!abogado.plan_solicitado_nombre) {
+      return res.status(400).json({ error: 'No hay solicitud de cambio de plan pendiente.' });
+    }
+
+    // Limpiar la solicitud
+    await query(
+      `UPDATE perfiles_abogado
+       SET plan_solicitado_id = NULL,
+           plan_solicitado_en = NULL
+       WHERE usuario_id = $1`,
+      [id]
+    );
+
+    // Notificar al abogado in-app
+    const notifService = require('../services/notificaciones.service');
+    notifService.crear({
+      usuarioId: id,
+      tipo:      'cambio_plan',
+      titulo:    'Solicitud de cambio de plan rechazada',
+      mensaje:   `Tu solicitud para cambiar al plan "${abogado.plan_solicitado_nombre}" fue rechazada.`
+                 + (motivo ? ` Motivo: ${motivo}.` : '')
+                 + ` Tu plan actual "${abogado.plan_actual_nombre}" sigue activo.`,
+      link:      '/abogado/suscripcion',
+    }).catch(err => console.error('❌ Notif rechazo plan:', err.message));
+
+    // Email al abogado
+    emailService.enviarComunicado({
+      destinatarioEmail:  abogado.email,
+      destinatarioNombre: abogado.nombre,
+      titulo:             'Solicitud de cambio de plan rechazada',
+      mensaje:            `Tu solicitud para cambiar al plan "<strong>${abogado.plan_solicitado_nombre}</strong>" no pudo ser aprobada.`
+                         + (motivo ? `<br><br><strong>Motivo:</strong> ${motivo}` : '')
+                         + `<br><br>Tu plan actual "<strong>${abogado.plan_actual_nombre}</strong>" sigue vigente.`,
+    }).catch(err => console.error('❌ Email rechazo plan:', err.message));
+
+    // Registrar en auditoría
+    await auditar(req, {
+      accion:        'rechazar_solicitud_plan',
+      descripcion:   `Rechazó la solicitud de cambio al plan "${abogado.plan_solicitado_nombre}" de ${abogado.nombre}`,
+      entidad:       'usuario',
+      entidad_id:    id,
+      datos_despues: { plan_solicitado_rechazado: abogado.plan_solicitado_nombre, motivo: motivo || null },
+    });
+
+    res.json({ mensaje: 'Solicitud rechazada. El abogado fue notificado.' });
+  } catch (error) { next(error); }
 });
 
 // ─────────────────────────────────────────────────────────────

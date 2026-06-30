@@ -11,7 +11,7 @@ import {
   Search, UserCheck, UserX, Shield, RefreshCw,
   Mail, User, Briefcase, Crown, X, Filter,
   Trash2, RotateCcw, Check, ChevronDown, ChevronUp,
-  MapPin, FileText, ExternalLink, FolderOpen, Save, Pencil, Phone
+  MapPin, FileText, ExternalLink, FolderOpen, Save, Pencil, Phone, ArrowUpCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -437,6 +437,58 @@ function ModalUsuario({ usuario, onCerrar, onActualizar }) {
                 <button onClick={guardarEstadoAbogado} disabled={procesando} className="btn-primary w-full">
                   {procesando ? 'Guardando...' : <><Save size={14} /> Guardar cambios</>}
                 </button>
+              )}
+
+              {/* Solicitud de cambio de plan pendiente — visible solo para abogados aprobados */}
+              {esAbogado && usuario.plan_solicitado_id && usuario.estado_aprobacion === 'aprobado' && (
+                <div className="rounded-xl p-4 space-y-3"
+                  style={{ background: 'rgba(184,96,48,0.06)', border: '1px solid rgba(184,96,48,0.2)' }}>
+                  <div className="flex items-center gap-2">
+                    <ArrowUpCircle size={15} style={{ color: '#B86030' }} />
+                    <p className="font-body text-sm font-semibold" style={{ color: '#B86030' }}>
+                      Solicitud de cambio de plan
+                    </p>
+                  </div>
+                  <p className="font-body text-xs" style={{ color: '#56534A' }}>
+                    El abogado solicitó cambiar de <strong>{usuario.plan_nombre}</strong> a <strong>{usuario.plan_solicitado_nombre}</strong>.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Aprobar: usa plan_id directo — funciona con cualquier plan presente o futuro */}
+                    <button
+                      onClick={() => {
+                        if (!window.confirm(
+                          `¿Aprobar el cambio al plan "${usuario.plan_solicitado_nombre}" ` +
+                          `para ${usuario.nombre} ${usuario.apellido}?`
+                        )) return;
+                        setProcesando(true);
+                        api.put(`/admin/abogados/${usuario.id}/perfil`, {
+                          plan_id: usuario.plan_solicitado_id,
+                        }).then(() => {
+                          toast.success('Plan actualizado. El abogado fue notificado.');
+                          onActualizar(); onCerrar();
+                        }).catch(() => {
+                          toast.error('Error al cambiar el plan.');
+                          setProcesando(false);
+                        });
+                      }}
+                      disabled={procesando}
+                      className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-body text-xs font-medium border-2 transition-colors"
+                      style={{ borderColor: 'rgba(22,163,74,0.3)', color: '#15803d', background: 'rgba(22,163,74,0.06)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(22,163,74,0.12)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(22,163,74,0.06)'; }}>
+                      <Check size={13} /> Aprobar
+                    </button>
+                    <button
+                      onClick={rechazarSolicitudPlan}
+                      disabled={procesando}
+                      className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl font-body text-xs font-medium border-2 transition-colors"
+                      style={{ borderColor: 'rgba(220,38,38,0.3)', color: '#dc2626', background: 'rgba(220,38,38,0.04)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.1)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.04)'; }}>
+                      <X size={13} /> Rechazar
+                    </button>
+                  </div>
+                </div>
               )}
 
               {/* Separador de acciones de cuenta */}
