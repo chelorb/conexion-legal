@@ -425,6 +425,16 @@ router.put('/abogados/:id/perfil', async (req, res, next) => {
           mensaje:   `El equipo de IUSTIXIUM actualizó tu plan de suscripción. Revisá los detalles en tu panel.`,
           link:      '/abogado/suscripcion',
         }).catch(err => console.error('❌ Notif cambio plan abogado:', err.message));
+
+        // Email al abogado confirmando el cambio de plan
+        emailService.enviarComunicado({
+          destinatarioEmail:  abogadoInfo.email,
+          destinatarioNombre: abogadoInfo.nombre,
+          titulo:             'Tu plan de suscripción fue actualizado',
+          mensaje:            `El equipo de IUSTIXIUM actualizó tu plan de suscripción.<br><br>`
+                             + `Revisá los detalles y las nuevas funcionalidades disponibles en tu panel.`,
+          link:               '/abogado/suscripcion',
+        }).catch(err => console.error('❌ Email cambio plan abogado:', err.message));
       }
     }
 
@@ -492,6 +502,22 @@ router.patch('/abogados/:id/rechazar-plan', async (req, res, next) => {
                          + (motivo ? `<br><br><strong>Motivo:</strong> ${motivo}` : '')
                          + `<br><br>Tu plan actual "<strong>${abogado.plan_actual_nombre}</strong>" sigue vigente.`,
     }).catch(err => console.error('❌ Email rechazo plan:', err.message));
+
+    // Email al admin confirmando que procesó el rechazo
+    query(
+      `SELECT u.nombre, u.email FROM usuarios u JOIN roles r ON u.rol_id = r.id WHERE r.nombre = 'admin' AND u.activo = true`
+    ).then(({ rows: admins }) => {
+      for (const admin of admins) {
+        emailService.enviarComunicado({
+          destinatarioEmail:  admin.email,
+          destinatarioNombre: admin.nombre,
+          titulo:             'Solicitud de cambio de plan rechazada',
+          mensaje:            `Confirmación: rechazaste la solicitud de cambio de plan de <strong>${abogado.nombre}</strong>.<br><br>`
+                             + `Plan solicitado: <strong>${abogado.plan_solicitado_nombre}</strong><br>`
+                             + (motivo ? `Motivo registrado: ${motivo}` : 'Sin motivo registrado.'),
+        }).catch(() => {});
+      }
+    }).catch(() => {});
 
     // Registrar en auditoría
     await auditar(req, {
