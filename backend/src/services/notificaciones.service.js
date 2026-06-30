@@ -60,7 +60,9 @@ async function crear({ usuarioId, tipo, titulo, mensaje, link = null }) {
       });
     }
 
-    // 3. Email para notificaciones importantes (cuando esté configurado el SMTP)
+    // 3. Email para notificaciones importantes
+    // Usa enviarComunicado (función real y testeada) en lugar del
+    // placeholder enviarNotificacion que nunca existió
     if (TIPOS[tipo]?.importante) {
       try {
         const { rows: [usuario] } = await query(
@@ -68,13 +70,13 @@ async function crear({ usuarioId, tipo, titulo, mensaje, link = null }) {
         );
         if (usuario) {
           const emailService = require('./email.service');
-          emailService.enviarNotificacion?.({
-            email:   usuario.email,
-            nombre:  usuario.nombre,
+          emailService.enviarComunicado({
+            destinatarioEmail:  usuario.email,
+            destinatarioNombre: usuario.nombre,
             titulo,
             mensaje,
-            link,
-          }).catch(() => {}); // silencioso si falla
+            link: link || null,
+          }).catch(() => {}); // silencioso — la notificación in-app ya fue guardada
         }
       } catch {}
     }
