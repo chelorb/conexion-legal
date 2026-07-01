@@ -60,26 +60,10 @@ async function crear({ usuarioId, tipo, titulo, mensaje, link = null }) {
       });
     }
 
-    // 3. Email para notificaciones importantes
-    // Usa enviarComunicado (función real y testeada) en lugar del
-    // placeholder enviarNotificacion que nunca existió
-    if (TIPOS[tipo]?.importante) {
-      try {
-        const { rows: [usuario] } = await query(
-          'SELECT email, nombre FROM usuarios WHERE id = $1', [usuarioId]
-        );
-        if (usuario) {
-          const emailService = require('./email.service');
-          emailService.enviarComunicado({
-            destinatarioEmail:  usuario.email,
-            destinatarioNombre: usuario.nombre,
-            titulo,
-            mensaje,
-            link: link || null,
-          }).catch(() => {}); // silencioso — la notificación in-app ya fue guardada
-        }
-      } catch {}
-    }
+    // 3. Email
+    // Los emails se mandan explícitamente desde cada endpoint con la función
+    // específica que corresponde (notificarAbogadoAprobado, enviarComunicado, etc.)
+    // NO se manda email genérico acá para evitar duplicados.
 
     return notif;
   } catch (err) {
