@@ -118,6 +118,29 @@ const registro = async (req, res, next) => {
         ]
       );
 
+      // Insertar los documentos del registro en documentos_abogado
+      // Así quedan visibles en el panel del abogado y en el modal del admin
+      const docsRegistro = [
+        { tipo: 'credencial', nombre: 'Credencial del letrado', url: docCredencialUrl },
+        { tipo: 'titulo',     nombre: 'Título universitario',   url: docTituloUrl     },
+        { tipo: 'cuil',       nombre: 'Constancia de CUIL',     url: docCuilUrl       },
+      ].filter(d => d.url); // solo insertar los que efectivamente se subieron
+
+      for (const doc of docsRegistro) {
+        await client.query(
+          `INSERT INTO documentos_abogado
+             (abogado_id, tipo, nombre, cloudinary_id, url, estado)
+           VALUES ($1, $2, $3, $4, $5, 'pendiente')`,
+          [
+            usuario.id,
+            doc.tipo,
+            doc.nombre,
+            doc.url, // usamos la URL como cloudinary_id temporario — es suficiente para el panel
+            doc.url,
+          ]
+        );
+      }
+
       notificarAdminNuevoAbogado({
         abogadoNombre:   nombre,
         abogadoApellido: apellido,
