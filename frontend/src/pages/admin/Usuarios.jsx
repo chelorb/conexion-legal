@@ -11,7 +11,8 @@ import {
   Search, UserCheck, UserX, Shield, RefreshCw,
   Mail, User, Briefcase, Crown, X, Filter,
   Trash2, RotateCcw, Check, ChevronDown, ChevronUp,
-  MapPin, FileText, ExternalLink, FolderOpen, Save, Pencil, Phone, ArrowUpCircle, CheckCircle
+  MapPin, FileText, ExternalLink, FolderOpen, Save, Pencil, Phone, ArrowUpCircle, CheckCircle,
+  XCircle, Clock, ThumbsUp, ThumbsDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -66,16 +67,56 @@ function BadgePlan({ slug }) {
 
 // ─────────────────────────────────────────────────────────────
 // Tab documentos del abogado
+// Lee de documentos_abogado con estado real y permite aprobar/rechazar
 // ─────────────────────────────────────────────────────────────
 function TabDocumentos({ usuario }) {
-  const docs = [
-    { campo: 'doc_titulo_url',     label: 'Título universitario', desc: usuario.titulo_universitario || 'No especificado' },
-    { campo: 'doc_cuil_url',       label: 'Constancia de CUIL',   desc: usuario.cuil || 'No especificado' },
-    { campo: 'doc_credencial_url', label: 'Credencial de letrado', desc: usuario.nro_credencial_letrado ? `Nro. ${usuario.nro_credencial_letrado}` : 'Sin número' },
-  ];
-  const hay = docs.some(d => usuario[d.campo]);
+  const [docs,       setDocs]       = useState([]);
+  const [cargando,   setCargando]   = useState(true);
+  const [procesando, setProcesando] = useState(null); // id del doc que se está procesando
 
-  if (!hay) return (
+  const cargar = async () => {
+    setCargando(true);
+    try {
+      const { data } = await api.get(`/documentos/abogado/${usuario.id}`);
+      setDocs(data.documentos || []);
+    } catch {
+      toast.error('No se pudieron cargar los documentos.');
+    } finally { setCargando(false); }
+  };
+
+  useEffect(() => { cargar(); }, [usuario.id]);
+
+  const revisar = async (docId, estado) => {
+    let motivo = null;
+    if (estado === 'rechazado') {
+      motivo = window.prompt('Ingresá el motivo del rechazo (opcional):');
+      if (motivo === null) return; // canceló
+    }
+    setProcesando(docId);
+    try {
+      await api.patch(`/documentos/${docId}/revisar`, { estado, motivo });
+      toast.success(`Documento ${estado === 'aprobado' ? 'aprobado' : 'rechazado'}.`);
+      cargar();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Error al procesar el documento.');
+    } finally { setProcesando(null); }
+  };
+
+  const ESTADOS = {
+    pendiente: { icono: <Clock size={11} />,       label: 'En revisión', color: '#b45309', bg: 'rgba(245,158,11,0.1)' },
+    aprobado:  { icono: <CheckCircle size={11} />, label: 'Aprobado',    color: '#15803d', bg: 'rgba(22,163,74,0.1)'  },
+    rechazado: { icono: <XCircle size={11} />,     label: 'Rechazado',   color: '#dc2626', bg: 'rgba(220,38,38,0.1)'  },
+  };
+
+  if (cargando) return (
+    <div className="space-y-2 pt-2">
+      {[1,2,3].map(i => (
+        <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: '#F7F6F4' }} />
+      ))}
+    </div>
+  );
+
+  if (docs.length === 0) return (
     <div className="py-8 text-center">
       <FolderOpen size={32} className="mx-auto mb-2" style={{ color: '#D4D2CC' }} />
       <p className="font-body text-sm" style={{ color: '#8A8780' }}>Sin documentos adjuntos</p>
@@ -88,26 +129,63 @@ function TabDocumentos({ usuario }) {
         style={{ background: 'rgba(184,96,48,0.06)', color: '#B86030' }}>
         ⚠️ Verificá la autenticidad antes de aprobar el perfil.
       </p>
-      {docs.map(({ campo, label, desc }) => {
-        const url = usuario[campo];
+      {docs.map(doc => {
+        const cfg = ESTADOS[doc.estado] || ESTADOS.pendiente;
+        const enProceso = procesando === doc.id;
         return (
-          <div key={campo} className="flex items-center justify-between gap-3 p-3 rounded-xl"
-            style={{ background: '#F7F6F4' }}>
-            <div className="flex items-center gap-2 min-w-0">
-              <FileText size={14} style={{ color: url ? '#B86030' : '#B0AEA8' }} className="shrink-0" />
-              <div className="min-w-0">
-                <p className="font-body font-semibold text-xs" style={{ color: '#1C1B18' }}>{label}</p>
-                <p className="font-body text-xs truncate" style={{ color: '#8A8780' }}>{desc}</p>
+          <div key={doc.id} className="rounded-xl p-3 space-y-2"
+            style={{ background: '#F7F6F4', border: '1px solid #E8E6E3' }}>
+            {/* Fila superior: nombre + estado + ver */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText size={14} style={{ color: '#B86030' }} className="shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-body font-semibold text-xs truncate" style={{ color: '#1C1B18' }}>{doc.nombre}</p>
+                </div>
               </div>
-            </div>
-            {url
-              ? <a href={url} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-body text-xs font-medium text-white shrink-0"
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Badge de estado */}
+                <span className="inline-flex items-center gap-1 text-xs font-body font-medium px-2 py-0.5 rounded-full"
+                  style={{ background: cfg.bg, color: cfg.color }}>
+                  {cfg.icono} {cfg.label}
+                </span>
+                {/* Ver documento */}
+                <a href={doc.url} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg font-body text-xs font-medium text-white"
                   style={{ background: '#2C2B27' }}>
                   <ExternalLink size={11} /> Ver
                 </a>
-              : <span className="font-body text-xs shrink-0" style={{ color: '#B0AEA8' }}>No adjunto</span>
-            }
+              </div>
+            </div>
+            {/* Motivo de rechazo */}
+            {doc.estado === 'rechazado' && doc.motivo_rechazo && (
+              <p className="font-body text-xs px-2" style={{ color: '#dc2626' }}>
+                Motivo: {doc.motivo_rechazo}
+              </p>
+            )}
+            {/* Botones aprobar/rechazar — solo si está pendiente */}
+            {doc.estado === 'pendiente' && (
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => revisar(doc.id, 'aprobado')}
+                  disabled={enProceso}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-body text-xs font-medium transition-colors disabled:opacity-40"
+                  style={{ background: 'rgba(22,163,74,0.1)', color: '#15803d', border: '1px solid rgba(22,163,74,0.25)' }}
+                  onMouseEnter={e => { if (!enProceso) e.currentTarget.style.background = 'rgba(22,163,74,0.2)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(22,163,74,0.1)'; }}>
+                  <ThumbsUp size={12} /> {enProceso ? 'Procesando...' : 'Aprobar'}
+                </button>
+                <button
+                  onClick={() => revisar(doc.id, 'rechazado')}
+                  disabled={enProceso}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-body text-xs font-medium transition-colors disabled:opacity-40"
+                  style={{ background: 'rgba(220,38,38,0.06)', color: '#dc2626', border: '1px solid rgba(220,38,38,0.2)' }}
+                  onMouseEnter={e => { if (!enProceso) e.currentTarget.style.background = 'rgba(220,38,38,0.15)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.06)'; }}>
+                  <ThumbsDown size={12} /> {enProceso ? 'Procesando...' : 'Rechazar'}
+                </button>
+              </div>
+            )}
           </div>
         );
       })}
