@@ -95,7 +95,7 @@ app.use('/api/calificaciones',     calificacionesRoutes);
 app.use('/api/campus',             campusRoutes);
 app.use('/api/agenda',             agendaRoutes);
 app.use('/api/foro',               foroRoutes);
-// app.use('/api/pagos', pagosRoutes); // ← DESHABILITADO — MercadoPago pendiente de activar
+app.use('/api/pagos',              pagosRoutes); // GET /planes activo — MP deshabilitado dentro de la ruta
 app.use('/api/beneficios',         beneficiosRoutes);
 app.use('/api/notificaciones',     notificacionesRoutes);
 app.use('/api/disponibilidad',     disponibilidadRoutes); // ← Fix: ahora registrada
