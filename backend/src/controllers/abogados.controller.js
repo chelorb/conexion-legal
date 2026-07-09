@@ -201,10 +201,24 @@ const actualizarPerfil = async (req, res, next) => {
   try {
     const usuarioId = req.usuario.id;
     const {
-      matricula, especialidades, descripcion, anos_experiencia,
+      matricula, descripcion, anos_experiencia,
       provincia, ciudad, direccion_consultorio,
       atiende_online, atiende_presencial,
     } = req.body;
+
+    // Las especialidades llegan como JSON string desde FormData
+    // Hay que parsearlas antes de pasarlas a PostgreSQL (que espera un array)
+    let especialidades = null;
+    if (req.body.especialidades !== undefined && req.body.especialidades !== null) {
+      try {
+        const parsed = typeof req.body.especialidades === 'string'
+          ? JSON.parse(req.body.especialidades)
+          : req.body.especialidades;
+        especialidades = Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+      } catch {
+        especialidades = null;
+      }
+    }
 
     // También actualizar nombre y teléfono en la tabla usuarios si vienen
     if (req.body.nombre || req.body.apellido || req.body.telefono) {
