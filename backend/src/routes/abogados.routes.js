@@ -7,7 +7,28 @@ const ctrl    = require('../controllers/abogados.controller');
 const { verificarToken, requireRol } = require('../middleware/auth.middleware');
 const { validarPerfilAbogado } = require('../middleware/validacion.middleware');
 const { query } = require('../config/database'); // necesario para rutas de notificaciones-plan
-const rateLimit = require('express-rate-limit');
+const rateLimit   = require('express-rate-limit');
+const multer      = require('multer');
+const streamifier = require('streamifier');
+const cloudinary  = require('cloudinary').v2;
+
+// Cloudinary para el avatar del perfil
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+  secure:     true,
+});
+
+// Multer en memoria para procesar FormData (avatar + campos de texto)
+const uploadPerfil = multer({
+  storage: multer.memoryStorage(),
+  limits:  { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const tipos = ['image/jpeg', 'image/png', 'image/webp'];
+    cb(tipos.includes(file.mimetype) ? null : new Error('Solo JPG, PNG o WebP.'), tipos.includes(file.mimetype));
+  },
+});
 
 // Rate limiting para solicitudes de cambio de plan
 // Máximo 3 solicitudes por hora por IP — evita spam al admin
@@ -39,7 +60,38 @@ router.get('/:id',             ctrl.obtenerAbogado);
 
 // Rutas privadas (solo abogado autenticado)
 router.get('/me/dashboard',  verificarToken, requireRol('abogado'), ctrl.obtenerDashboard);
-router.put('/me/perfil',     verificarToken, requireRol('abogado'), validarPerfilAbogado, ctrl.actualizarPerfil);
+// PUT /me/perfil — multer necesario para procesar FormData (campos de texto + avatar opcional)
+router.put('/me/perfil',
+  verificarToken,
+  requireRol('abogado'),
+  uploadPerfil.single('avatar'), // procesa FormData; req.body queda disponible para el controller
+  async (req, res, next) => {
+    // Si viene avatar, subirlo a Cloudinary y agregar la URL al body
+    if (req.file) {
+      try {
+        const avatarUrl = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder:        'iustixium/avatars',
+              public_id:     `avatar_${req.usuario.id}`,
+              overwrite:     true,
+              transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }, { quality: 'auto' }],
+            },
+            (err, result) => err ? reject(err) : resolve(result.secure_url)
+          );
+          streamifier.createReadStream(req.file.buffer).pipe(stream);
+        });
+        // Guardar la URL del avatar en la tabla usuarios
+        await query('UPDATE usuarios SET avatar_url = $1 WHERE id = $2', [avatarUrl, req.usuario.id]);
+        req.body.avatar_url = avatarUrl;
+      } catch (err) {
+        console.error('❌ Error subiendo avatar:', err.message);
+      }
+    }
+    next();
+  },
+  ctrl.actualizarPerfil
+);
 
 // GET /api/abogados/me/notificaciones-plan — Notificaciones de cambios de plan no leídas
 router.get('/me/notificaciones-plan', verificarToken, requireRol('abogado'), async (req, res, next) => {
