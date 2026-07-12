@@ -86,7 +86,16 @@ const validarPerfilAbogado = [
 
   body('especialidades')
     .optional()
-    .isArray({ min: 1, max: 10 }).withMessage('Debe seleccionar entre 1 y 10 especialidades'),
+    // Puede llegar como array (JSON body) o como string JSON (FormData)
+    // La validación de tipo se hace en el controller después del parseo
+    .custom(val => {
+      if (val === undefined || val === null) return true;
+      if (Array.isArray(val)) return true;
+      if (typeof val === 'string') {
+        try { const p = JSON.parse(val); return Array.isArray(p); } catch { return false; }
+      }
+      return false;
+    }).withMessage('Las especialidades deben ser un array válido'),
 
   body('descripcion')
     .optional()

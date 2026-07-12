@@ -64,7 +64,8 @@ router.get('/me/dashboard',  verificarToken, requireRol('abogado'), ctrl.obtener
 router.put('/me/perfil',
   verificarToken,
   requireRol('abogado'),
-  uploadPerfil.single('avatar'), // procesa FormData; req.body queda disponible para el controller
+  uploadPerfil.single('avatar'), // multer primero — parsea el FormData y deja req.body disponible
+  validarPerfilAbogado,          // validador después — ahora sí puede leer req.body
   async (req, res, next) => {
     // Si viene avatar, subirlo a Cloudinary y agregar la URL al body
     if (req.file) {
