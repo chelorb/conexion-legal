@@ -7,39 +7,31 @@ const { query: kQuery } = require('../config/database');
 const { verificarToken, requireRol, requirePlanFeature } = require('../middleware/auth.middleware');
 
 // GET /api/campus — Lista de contenido según plan del abogado
-//
-// Antes: filtraba por slugs hardcodeados ['gratuito', 'basico', 'premium']
-// Ahora: usa las columnas reales del plan (acceso_campus_completo) para determinar
-//        qué contenido puede ver, lo que funciona con cualquier plan presente o futuro
+// Usa planes_requeridos (array) para determinar qué contenido puede ver cada abogado
+// El abogado ve todo el contenido que incluya su slug de plan en planes_requeridos
 routerK.get('/', verificarToken, requireRol('abogado'), requirePlanFeature('acceso_campus'), async (req, res, next) => {
   try {
     const { tipo, pagina = 1, limite = 12 } = req.query;
 
-    // Verificar si el abogado tiene acceso completo al campus
-    // según la columna real de su plan en la DB — no por slug hardcodeado
+    // Obtener el slug del plan actual del abogado
     const { rows: perfil } = await kQuery(
-      `SELECT ps.acceso_campus_completo
+      `SELECT ps.slug AS plan_slug
        FROM perfiles_abogado pa
        JOIN planes_suscripcion ps ON pa.plan_id = ps.id
        WHERE pa.usuario_id = $1`,
       [req.usuario.id]
     );
 
-    const tieneAccesoCompleto = perfil[0]?.acceso_campus_completo ?? false;
+    const planSlug = perfil[0]?.plan_slug || 'gratuito';
 
-    // Si tiene acceso completo: ve todo el contenido activo
-    // Si no: solo ve el contenido que NO requiere acceso completo
-    // Esto funciona con cualquier plan nuevo que se cree en el futuro
-    const condiciones = ['activo = true'];
-    const params = [];
-    let idx = 1;
-
-    if (!tieneAccesoCompleto) {
-      // Solo contenido que no requiera campus completo
-      // El contenido "premium/comunidad" tiene plan_requerido distinto de 'gratuito'/'basico'
-      // pero el criterio real es la columna acceso_campus_completo del plan
-      condiciones.push(`plan_requerido != 'comunidad'`);
-    }
+    // Filtrar contenido donde el slug del plan del abogado esté en planes_requeridos
+    // Esto funciona con cualquier plan presente o futuro
+    const condiciones = [
+      'activo = true',
+      '$1 = ANY(planes_requeridos)', // el abogado puede ver este contenido
+    ];
+    const params = [planSlug];
+    let idx = 2;
 
     if (tipo) {
       condiciones.push(`tipo = $${idx++}`);
@@ -49,21 +41,35 @@ routerK.get('/', verificarToken, requireRol('abogado'), requirePlanFeature('acce
     const offset = (parseInt(pagina) - 1) * parseInt(limite);
     params.push(parseInt(limite), offset);
 
-    const { rows } = await kQuery(
+    // También traer TODO el contenido bloqueado para mostrar el candado
+    // (el abogado ve qué existe pero no puede acceder)
+    const { rows: todo } = await kQuery(
       `SELECT id, tipo, titulo, descripcion, miniatura_url, duracion_min,
-              autor, especialidad, plan_requerido, es_evento, fecha_evento, creado_en
+              autor, especialidad, planes_requeridos, es_evento, fecha_evento, creado_en,
+              ($1 = ANY(planes_requeridos)) AS tiene_acceso
        FROM contenido_campus
-       WHERE ${condiciones.join(' AND ')}
+       WHERE activo = true
+       ${tipo ? `AND tipo = $${idx - 1}` : ''}
        ORDER BY es_evento DESC, creado_en DESC
        LIMIT $${idx} OFFSET $${idx + 1}`,
       params
     );
 
-    res.json({ contenido: rows, acceso_completo: tieneAccesoCompleto });
+    res.json({ contenido: todo, plan_slug: planSlug });
 
   } catch (error) {
     next(error);
   }
+});
+
+// GET /api/campus/planes — Devuelve los slugs de planes activos para el selector del admin
+routerK.get('/planes', verificarToken, requireRol('admin'), async (req, res, next) => {
+  try {
+    const { rows } = await kQuery(
+      'SELECT id, nombre, slug FROM planes_suscripcion WHERE activo = true ORDER BY precio_mensual ASC'
+    );
+    res.json({ planes: rows });
+  } catch (error) { next(error); }
 });
 
 module.exports = routerK;

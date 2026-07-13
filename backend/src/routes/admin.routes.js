@@ -558,7 +558,7 @@ router.get('/campus', async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT id, tipo, titulo, descripcion, autor, especialidad,
-              duracion_min, plan_requerido, contenido_url,
+              duracion_min, plan_requerido, planes_requeridos, contenido_url,
               es_evento, activo, creado_en
        FROM contenido_campus
        WHERE es_evento = false
@@ -582,7 +582,7 @@ router.post('/campus', async (req, res, next) => {
       autor,
       especialidad,
       duracion_min,
-      plan_requerido,
+      planes_requeridos,
       contenido_url,
     } = req.body;
 
@@ -590,12 +590,17 @@ router.post('/campus', async (req, res, next) => {
       return res.status(400).json({ error: 'El título es obligatorio.' });
     }
 
+    // planes_requeridos debe ser un array con al menos un plan
+    const planesArr = Array.isArray(planes_requeridos) && planes_requeridos.length > 0
+      ? planes_requeridos
+      : ['comunidad'];
+
     const {
       rows: [item],
     } = await query(
       `INSERT INTO contenido_campus
          (tipo, titulo, descripcion, autor, especialidad,
-          duracion_min, plan_requerido, contenido_url, es_evento, activo)
+          duracion_min, planes_requeridos, contenido_url, es_evento, activo)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8, false, true)
        RETURNING *`,
       [
@@ -605,7 +610,7 @@ router.post('/campus', async (req, res, next) => {
         autor || null,
         especialidad || null,
         duracion_min || null,
-        plan_requerido || 'comunidad',
+        planesArr,
         contenido_url || null,
       ]
     );
@@ -628,24 +633,29 @@ router.put('/campus/:id', async (req, res, next) => {
       autor,
       especialidad,
       duracion_min,
-      plan_requerido,
+      planes_requeridos,
       contenido_url,
       activo,
     } = req.body;
+
+    // planes_requeridos: si viene y tiene items, actualizar; si no, mantener el actual
+    const planesArr = Array.isArray(planes_requeridos) && planes_requeridos.length > 0
+      ? planes_requeridos
+      : null;
 
     const {
       rows: [item],
     } = await query(
       `UPDATE contenido_campus SET
-         tipo           = COALESCE($1, tipo),
-         titulo         = COALESCE($2, titulo),
-         descripcion    = COALESCE($3, descripcion),
-         autor          = COALESCE($4, autor),
-         especialidad   = COALESCE($5, especialidad),
-         duracion_min   = COALESCE($6, duracion_min),
-         plan_requerido = COALESCE($7, plan_requerido),
-         contenido_url  = COALESCE($8, contenido_url),
-         activo         = COALESCE($9, activo)
+         tipo              = COALESCE($1, tipo),
+         titulo            = COALESCE($2, titulo),
+         descripcion       = COALESCE($3, descripcion),
+         autor             = COALESCE($4, autor),
+         especialidad      = COALESCE($5, especialidad),
+         duracion_min      = COALESCE($6, duracion_min),
+         planes_requeridos = COALESCE($7, planes_requeridos),
+         contenido_url     = COALESCE($8, contenido_url),
+         activo            = COALESCE($9, activo)
        WHERE id = $10 AND es_evento = false
        RETURNING *`,
       [
@@ -655,7 +665,7 @@ router.put('/campus/:id', async (req, res, next) => {
         autor || null,
         especialidad || null,
         duracion_min || null,
-        plan_requerido || null,
+        planesArr,
         contenido_url || null,
         activo ?? null,
         req.params.id,

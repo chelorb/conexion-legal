@@ -22,8 +22,8 @@ const TIPOS = {
 function TarjetaContenido({ item, planActual }) {
   const config  = TIPOS[item.tipo] || TIPOS.curso;
   const Icono   = config.icono;
-  const planesOrden = { gratuito: 0, basico: 1, comunidad: 2 };
-  const bloqueado   = planesOrden[item.plan_requerido] > planesOrden[planActual || 'gratuito'];
+  // tiene_acceso viene del backend — true si el plan del abogado está en planes_requeridos
+  const bloqueado = !item.tiene_acceso;
 
   return (
     <div className={`card flex flex-col transition-all duration-200 ${bloqueado ? 'opacity-60' : 'hover:shadow-card-hover'}`}>
@@ -49,7 +49,7 @@ function TarjetaContenido({ item, planActual }) {
             <div className="text-center">
               <Lock size={28} className="text-white mx-auto mb-2" />
               <p className="font-body text-white text-xs font-medium capitalize">
-                Plan {item.plan_requerido}
+                Plan requerido
               </p>
             </div>
           </div>
@@ -132,16 +132,12 @@ export default function Campus() {
   const [sinAcceso,  setSinAcceso]  = useState(false);
   const [tipoFiltro, setTipoFiltro] = useState('');
   const [busqueda,   setBusqueda]   = useState('');
-  const [planActual, setPlanActual] = useState('basico');
-
   useEffect(() => {
     const cargar = async () => {
       try {
-        const perfilRes = await api.get('/auth/me');
-        setPlanActual(perfilRes.data.usuario.perfil_abogado?.plan_slug || 'basico');
         const params = tipoFiltro ? { tipo: tipoFiltro } : {};
         const { data } = await api.get('/campus', { params });
-        setContenido(data.contenido);
+        setContenido(data.contenido); // cada item tiene tiene_acceso desde el backend
       } catch (err) {
         if (err.response?.status === 403) setSinAcceso(true);
         else toast.error('No se pudo cargar el campus.');

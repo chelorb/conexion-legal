@@ -24,11 +24,9 @@ function ModalContenido({ contenido, onCerrar, onGuardado }) {
 
   // Cargar planes desde la API al abrir el modal
   useEffect(() => {
-    api.get('/admin/planes-gestion')
+    api.get('/campus/planes')
       .then(({ data }) => {
-        const planes = (data.planes || [])
-          .filter(p => p.activo)
-          .map(p => ({ valor: p.slug, label: p.nombre }));
+        const planes = (data.planes || []).map(p => ({ valor: p.slug, label: p.nombre }));
         setPlanesDB(planes);
       })
       .catch(() => {
@@ -41,13 +39,21 @@ function ModalContenido({ contenido, onCerrar, onGuardado }) {
   }, []);
   const [guardando, setGuardando] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
-    defaultValues: contenido || { tipo: 'curso', plan_requerido: 'comunidad' }
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
+    defaultValues: contenido
+      ? { ...contenido, planes_requeridos: contenido.planes_requeridos || ['comunidad'] }
+      : { tipo: 'curso', planes_requeridos: ['comunidad'] }
   });
 
   const onSubmit = async (datos) => {
     setGuardando(true);
     try {
+      // Validar que al menos un plan esté seleccionado
+      if (!datos.planes_requeridos || datos.planes_requeridos.length === 0) {
+        toast.error('Seleccioná al menos un plan.');
+        setGuardando(false);
+        return;
+      }
       if (esEdicion) {
         await api.put(`/admin/campus/${contenido.id}`, datos);
         toast.success('Contenido actualizado.');
@@ -98,12 +104,33 @@ function ModalContenido({ contenido, onCerrar, onGuardado }) {
             </div>
             <div>
               <label className="input-label">Plan requerido *</label>
-              <select className="input-field" {...register('plan_requerido', { required: true })}>
-                {planesDB.length > 0
-                  ? planesDB.map(p => <option key={p.valor} value={p.valor}>{p.label}</option>)
-                  : <option value="">Cargando planes...</option>
-                }
-              </select>
+              {/* Multi-select de planes — checkboxes */}
+              {planesDB.length === 0
+                ? <p className="font-body text-xs" style={{color:'#8A8780'}}>Cargando planes...</p>
+                : <div className="space-y-2">
+                    {planesDB.map(p => {
+                      const seleccionados = watch('planes_requeridos') || [];
+                      const marcado = seleccionados.includes(p.valor);
+                      return (
+                        <label key={p.valor} className="flex items-center gap-3 cursor-pointer p-2.5 rounded-xl transition-colors"
+                          style={{ background: marcado ? 'rgba(44,43,39,0.06)' : '#FAFAF9', border: '1px solid #E8E6E3' }}>
+                          <input type="checkbox" className="w-4 h-4 accent-stone-800"
+                            checked={marcado}
+                            onChange={e => {
+                              const actual = watch('planes_requeridos') || [];
+                              if (e.target.checked) {
+                                setValue('planes_requeridos', [...actual, p.valor]);
+                              } else {
+                                setValue('planes_requeridos', actual.filter(v => v !== p.valor));
+                              }
+                            }}
+                          />
+                          <span className="font-body text-sm" style={{color:'#1C1B18'}}>{p.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+              }
             </div>
           </div>
 
