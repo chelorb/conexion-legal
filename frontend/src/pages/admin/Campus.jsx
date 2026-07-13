@@ -3,7 +3,7 @@
 // ============================================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Headphones, Video, Library, Plus, Edit2, X, Check, RefreshCw, Search } from 'lucide-react';
+import { BookOpen, Headphones, Video, Library, Plus, Edit2, X, Check, RefreshCw, Search, Upload, Link2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
 import api from '../../services/api';
@@ -37,7 +37,10 @@ function ModalContenido({ contenido, onCerrar, onGuardado }) {
         ]);
       });
   }, []);
-  const [guardando, setGuardando] = useState(false);
+  const [guardando,   setGuardando]   = useState(false);
+  const [archivoSel,  setArchivoSel]  = useState(null);  // archivo seleccionado
+  const [subiendoArch, setSubiendoArch] = useState(false); // subiendo a Cloudinary
+  const [modoArchivo, setModoArchivo]  = useState('url'); // 'url' | 'archivo'
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: contenido
@@ -54,6 +57,26 @@ function ModalContenido({ contenido, onCerrar, onGuardado }) {
         setGuardando(false);
         return;
       }
+
+      // Si hay archivo seleccionado, subirlo primero a Cloudinary via el backend
+      if (modoArchivo === 'archivo' && archivoSel) {
+        setSubiendoArch(true);
+        const formData = new FormData();
+        formData.append('archivo', archivoSel);
+        try {
+          const { data: upData } = await api.post('/admin/campus/subir-archivo', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          datos.contenido_url = upData.url;
+        } catch {
+          toast.error('Error al subir el archivo. Intentá con una URL directa.');
+          setGuardando(false);
+          setSubiendoArch(false);
+          return;
+        }
+        setSubiendoArch(false);
+      }
+
       if (esEdicion) {
         await api.put(`/admin/campus/${contenido.id}`, datos);
         toast.success('Contenido actualizado.');
@@ -159,21 +182,59 @@ function ModalContenido({ contenido, onCerrar, onGuardado }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="input-label">
-                URL del contenido <span className="font-normal" style={{ color: '#8A8780' }}>(opcional)</span>
-              </label>
+          {/* Contenido: URL o archivo */}
+          <div>
+            <label className="input-label">Contenido</label>
+            <div className="flex gap-2 mb-2">
+              <button type="button"
+                onClick={() => setModoArchivo('url')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-medium transition-colors"
+                style={modoArchivo === 'url'
+                  ? { background: '#2C2B27', color: '#fff' }
+                  : { background: '#F0EFED', color: '#56534A' }}>
+                <Link2 size={12} /> URL / Link
+              </button>
+              <button type="button"
+                onClick={() => setModoArchivo('archivo')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-medium transition-colors"
+                style={modoArchivo === 'archivo'
+                  ? { background: '#2C2B27', color: '#fff' }
+                  : { background: '#F0EFED', color: '#56534A' }}>
+                <Upload size={12} /> Subir archivo
+              </button>
+            </div>
+
+            {modoArchivo === 'url' ? (
               <input type="url" placeholder="https://..." className="input-field"
                 {...register('contenido_url')} />
-            </div>
-            <div>
-              <label className="input-label">
-                Duración (min) <span className="font-normal" style={{ color: '#8A8780' }}>(opcional)</span>
-              </label>
-              <input type="number" min="1" placeholder="Ej: 60" className="input-field"
-                {...register('duracion_min', { valueAsNumber: true })} />
-            </div>
+            ) : (
+              <div>
+                <label className="flex flex-col items-center justify-center gap-2 p-6 rounded-xl border-2 border-dashed cursor-pointer transition-colors"
+                  style={{ borderColor: archivoSel ? '#2C2B27' : '#D4D2CC', background: archivoSel ? 'rgba(44,43,39,0.04)' : '#FAFAF9' }}>
+                  <Upload size={20} style={{ color: archivoSel ? '#2C2B27' : '#8A8780' }} />
+                  <span className="font-body text-sm" style={{ color: archivoSel ? '#1C1B18' : '#8A8780' }}>
+                    {archivoSel ? archivoSel.name : 'PDF, imagen, video o cualquier archivo'}
+                  </span>
+                  <span className="font-body text-xs" style={{ color: '#B0AEA8' }}>Máximo 20MB</span>
+                  <input type="file" className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png,.gif,.mp4,.mp3,.webm,.doc,.docx,.ppt,.pptx"
+                    onChange={e => setArchivoSel(e.target.files[0] || null)} />
+                </label>
+                {subiendoArch && (
+                  <p className="font-body text-xs mt-2" style={{ color: '#B86030' }}>
+                    Subiendo archivo...
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="input-label">
+              Duración (min) <span className="font-normal" style={{ color: '#8A8780' }}>(opcional)</span>
+            </label>
+            <input type="number" min="1" placeholder="Ej: 60" className="input-field"
+              {...register('duracion_min', { valueAsNumber: true })} />
           </div>
 
           <div className="flex gap-3 pt-2">

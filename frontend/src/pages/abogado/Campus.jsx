@@ -107,19 +107,74 @@ function TarjetaContenido({ item }) {
             <Lock size={13} /> Mejorar plan
           </Link>
         ) : (
-          <button
-            onClick={() => {
-              if (item.contenido_url) window.open(item.contenido_url, '_blank');
-              else if (item.link_evento) window.open(item.link_evento, '_blank');
-              else toast('Contenido próximamente.', { icon: '⏳' });
-            }}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-body font-medium text-sm text-white w-full transition-colors"
-            style={{ background: '#2C2B27' }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}
-          >
-            <Play size={13} /> {config.accion}
-          </button>
+          {/* Renderizar según tipo de contenido */}
+          {(() => {
+            const url = item.contenido_url || item.link_evento;
+            if (!url) return (
+              <div className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-body text-sm w-full"
+                style={{ background: '#F7F6F4', color: '#B0AEA8' }}>
+                ⏳ Contenido próximamente
+              </div>
+            );
+
+            // Detectar tipo por extensión o por tipo de contenido
+            const ext = url.split('.').pop()?.toLowerCase().split('?')[0];
+            const esPDF     = ext === 'pdf' || url.includes('/raw/upload/') && ext === 'pdf';
+            const esImagen  = ['jpg','jpeg','png','gif','webp'].includes(ext);
+            const esVideo   = ['mp4','webm','ogg'].includes(ext);
+            const esAudio   = ['mp3','wav','ogg','m4a'].includes(ext);
+
+            if (esPDF) return (
+              <a href={url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-body font-medium text-sm text-white w-full transition-colors"
+                style={{ background: '#B86030' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#8B4A1E'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#B86030'; }}>
+                📄 Ver PDF
+              </a>
+            );
+
+            if (esImagen) return (
+              <a href={url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-body font-medium text-sm text-white w-full transition-colors"
+                style={{ background: '#2C2B27' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}>
+                🖼 Ver imagen
+              </a>
+            );
+
+            if (esVideo) return (
+              <a href={url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-body font-medium text-sm text-white w-full transition-colors"
+                style={{ background: '#2C2B27' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}>
+                <Play size={13} /> Ver video
+              </a>
+            );
+
+            if (esAudio) return (
+              <a href={url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-body font-medium text-sm text-white w-full transition-colors"
+                style={{ background: '#2C2B27' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}>
+                🎧 Escuchar
+              </a>
+            );
+
+            // Link genérico (YouTube, Vimeo, artículos, etc.)
+            return (
+              <a href={url} target="_blank" rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-body font-medium text-sm text-white w-full transition-colors"
+                style={{ background: '#2C2B27' }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#1C1B18'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#2C2B27'; }}>
+                <Play size={13} /> {config.accion}
+              </a>
+            );
+          })()}
         )}
       </div>
     </div>

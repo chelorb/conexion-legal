@@ -552,6 +552,67 @@ router.patch('/abogados/:id/rechazar-plan', async (req, res, next) => {
 });
 
 // ─────────────────────────────────────────────────────────────
+// POST /api/admin/campus/subir-archivo
+// Sube un archivo al campus en Cloudinary y devuelve la URL
+// ─────────────────────────────────────────────────────────────
+router.post('/campus/subir-archivo', async (req, res, next) => {
+  try {
+    const multer      = require('multer');
+    const streamifier = require('streamifier');
+    const cloudinary  = require('cloudinary').v2;
+
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key:    process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+      secure:     true,
+    });
+
+    // Procesar el archivo con multer en memoria
+    const upload = multer({
+      storage: multer.memoryStorage(),
+      limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+    }).single('archivo');
+
+    upload(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo.' });
+
+      // Detectar tipo de recurso para Cloudinary
+      const mime = req.file.mimetype;
+      let resourceType = 'auto';
+      if (mime.startsWith('video/')) resourceType = 'video';
+      else if (mime.startsWith('image/')) resourceType = 'image';
+      else resourceType = 'raw'; // PDF, docs, etc.
+
+      const timestamp = Date.now();
+      const uploadPromise = new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder:        'iustixium/campus',
+            resource_type: resourceType,
+            public_id:     `campus_${timestamp}`,
+            use_filename:  true,
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+
+      const resultado = await uploadPromise;
+      res.json({
+        url:          resultado.secure_url,
+        tipo_recurso: resourceType,
+        formato:      resultado.format,
+        tamaño:       resultado.bytes,
+      });
+    });
+  } catch (error) { next(error); }
+});
+
 // GET /api/admin/campus — Listar todo el contenido del campus
 // ─────────────────────────────────────────────────────────────
 router.get('/campus', async (req, res, next) => {
