@@ -19,7 +19,7 @@ const TIPOS = {
   congreso:        { label: 'Congreso',     icono: BookOpen,   accion: 'Inscribirse' },
 };
 
-function TarjetaContenido({ item, planActual }) {
+function TarjetaContenido({ item }) {
   const config  = TIPOS[item.tipo] || TIPOS.curso;
   const Icono   = config.icono;
   // tiene_acceso viene del backend — true si el plan del abogado está en planes_requeridos
@@ -231,7 +231,7 @@ export default function Campus() {
         {!cargando && contenidoFiltrado.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {contenidoFiltrado.map(item => (
-              <TarjetaContenido key={item.id} item={item} planActual={planActual} />
+              <TarjetaContenido key={item.id} item={item} />
             ))}
           </div>
         )}
