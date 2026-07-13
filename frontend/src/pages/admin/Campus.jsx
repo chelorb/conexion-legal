@@ -16,13 +16,29 @@ const TIPOS = [
   { valor: 'articulo',        label: 'Artículo',        icono: BookOpen   },
 ];
 
-const PLANES = [
-  { valor: 'basico',    label: 'Básico'    },
-  { valor: 'comunidad', label: 'Comunidad' },
-];
+// PLANES se carga dinámicamente desde la DB en el componente ModalContenido
 
 function ModalContenido({ contenido, onCerrar, onGuardado }) {
   const esEdicion = !!contenido;
+  const [planesDB, setPlanesDB] = useState([]); // planes reales de la DB
+
+  // Cargar planes desde la API al abrir el modal
+  useEffect(() => {
+    api.get('/admin/planes-gestion')
+      .then(({ data }) => {
+        const planes = (data.planes || [])
+          .filter(p => p.activo)
+          .map(p => ({ valor: p.slug, label: p.nombre }));
+        setPlanesDB(planes);
+      })
+      .catch(() => {
+        // Fallback si falla la carga
+        setPlanesDB([
+          { valor: 'basico',    label: 'Básico'    },
+          { valor: 'comunidad', label: 'Comunidad' },
+        ]);
+      });
+  }, []);
   const [guardando, setGuardando] = useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm({
@@ -83,7 +99,10 @@ function ModalContenido({ contenido, onCerrar, onGuardado }) {
             <div>
               <label className="input-label">Plan requerido *</label>
               <select className="input-field" {...register('plan_requerido', { required: true })}>
-                {PLANES.map(p => <option key={p.valor} value={p.valor}>{p.label}</option>)}
+                {planesDB.length > 0
+                  ? planesDB.map(p => <option key={p.valor} value={p.valor}>{p.label}</option>)
+                  : <option value="">Cargando planes...</option>
+                }
               </select>
             </div>
           </div>
@@ -287,7 +306,7 @@ export default function AdminCampus() {
                           ? { background: 'rgba(184,96,48,0.1)', color: '#B86030' }
                           : { background: '#F0EFED', color: '#56534A' }
                         }>
-                        {c.plan_requerido === 'comunidad' ? '★ Comunidad' : 'Básico'}
+                        {c.plan_requerido === 'comunidad' ? '★ Comunidad' : (c.plan_requerido?.charAt(0).toUpperCase() + c.plan_requerido?.slice(1)) || 'Básico'}
                       </span>
                     </div>
                     <div className="md:col-span-2">
