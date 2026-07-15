@@ -141,10 +141,10 @@ export default function Beneficios() {
           Beneficios exclusivos
         </h2>
         <p className="font-body mb-6 leading-relaxed" style={{ color: '#8A8780' }}>
-          Los descuentos y convenios están disponibles en el plan Comunidad.
+          Los descuentos y convenios exclusivos están disponibles en planes superiores. Actualizá tu suscripción para acceder.
         </p>
         <Link to="/abogado/suscripcion" className="btn-gold w-full justify-center">
-          Ver Plan Comunidad <ArrowRight size={16} />
+          Ver planes disponibles <ArrowRight size={16} />
         </Link>
       </div>
     </div>
