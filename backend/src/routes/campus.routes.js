@@ -44,7 +44,7 @@ routerK.get('/', verificarToken, requireRol('abogado'), requirePlanFeature('acce
     // También traer TODO el contenido bloqueado para mostrar el candado
     // (el abogado ve qué existe pero no puede acceder)
     const { rows: todo } = await kQuery(
-      `SELECT id, tipo, titulo, descripcion, miniatura_url, duracion_min,
+      `SELECT id, tipo, titulo, descripcion, contenido_url, miniatura_url, duracion_min,
               autor, especialidad, planes_requeridos, es_evento, fecha_evento, creado_en,
               ($1 = ANY(planes_requeridos)) AS tiene_acceso
        FROM contenido_campus
