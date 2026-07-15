@@ -552,74 +552,13 @@ router.patch('/abogados/:id/rechazar-plan', async (req, res, next) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// POST /api/admin/campus/subir-archivo
-// Sube un archivo al campus en Cloudinary y devuelve la URL
-// ─────────────────────────────────────────────────────────────
-router.post('/campus/subir-archivo', async (req, res, next) => {
-  try {
-    const multer      = require('multer');
-    const streamifier = require('streamifier');
-    const cloudinary  = require('cloudinary').v2;
-
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key:    process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
-      secure:     true,
-    });
-
-    // Procesar el archivo con multer en memoria
-    const upload = multer({
-      storage: multer.memoryStorage(),
-      limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
-    }).single('archivo');
-
-    upload(req, res, async (err) => {
-      if (err) return res.status(400).json({ error: err.message });
-      if (!req.file) return res.status(400).json({ error: 'No se recibió ningún archivo.' });
-
-      // Detectar tipo de recurso para Cloudinary
-      const mime = req.file.mimetype;
-      let resourceType = 'auto';
-      if (mime.startsWith('video/')) resourceType = 'video';
-      else if (mime.startsWith('image/')) resourceType = 'image';
-      else resourceType = 'raw'; // PDF, docs, etc.
-
-      const timestamp = Date.now();
-      const uploadPromise = new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            folder:        'iustixium/campus',
-            resource_type: resourceType,
-            public_id:     `campus_${timestamp}`,
-            use_filename:  true,
-          },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        streamifier.createReadStream(req.file.buffer).pipe(stream);
-      });
-
-      const resultado = await uploadPromise;
-      res.json({
-        url:          resultado.secure_url,
-        tipo_recurso: resourceType,
-        formato:      resultado.format,
-        tamaño:       resultado.bytes,
-      });
-    });
-  } catch (error) { next(error); }
-});
-
 // GET /api/admin/campus — Listar todo el contenido del campus
 // ─────────────────────────────────────────────────────────────
 router.get('/campus', async (req, res, next) => {
   try {
     const { rows } = await query(
       `SELECT id, tipo, titulo, descripcion, autor, especialidad,
-              duracion_min, plan_requerido, planes_requeridos, contenido_url,
+              duracion_min, plan_requerido, contenido_url,
               es_evento, activo, creado_en
        FROM contenido_campus
        WHERE es_evento = false
@@ -643,7 +582,7 @@ router.post('/campus', async (req, res, next) => {
       autor,
       especialidad,
       duracion_min,
-      planes_requeridos,
+      plan_requerido,
       contenido_url,
     } = req.body;
 
@@ -651,17 +590,12 @@ router.post('/campus', async (req, res, next) => {
       return res.status(400).json({ error: 'El título es obligatorio.' });
     }
 
-    // planes_requeridos debe ser un array con al menos un plan
-    const planesArr = Array.isArray(planes_requeridos) && planes_requeridos.length > 0
-      ? planes_requeridos
-      : ['comunidad'];
-
     const {
       rows: [item],
     } = await query(
       `INSERT INTO contenido_campus
          (tipo, titulo, descripcion, autor, especialidad,
-          duracion_min, planes_requeridos, contenido_url, es_evento, activo)
+          duracion_min, plan_requerido, contenido_url, es_evento, activo)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8, false, true)
        RETURNING *`,
       [
@@ -671,7 +605,7 @@ router.post('/campus', async (req, res, next) => {
         autor || null,
         especialidad || null,
         duracion_min || null,
-        planesArr,
+        plan_requerido || 'comunidad',
         contenido_url || null,
       ]
     );
@@ -694,29 +628,24 @@ router.put('/campus/:id', async (req, res, next) => {
       autor,
       especialidad,
       duracion_min,
-      planes_requeridos,
+      plan_requerido,
       contenido_url,
       activo,
     } = req.body;
-
-    // planes_requeridos: si viene y tiene items, actualizar; si no, mantener el actual
-    const planesArr = Array.isArray(planes_requeridos) && planes_requeridos.length > 0
-      ? planes_requeridos
-      : null;
 
     const {
       rows: [item],
     } = await query(
       `UPDATE contenido_campus SET
-         tipo              = COALESCE($1, tipo),
-         titulo            = COALESCE($2, titulo),
-         descripcion       = COALESCE($3, descripcion),
-         autor             = COALESCE($4, autor),
-         especialidad      = COALESCE($5, especialidad),
-         duracion_min      = COALESCE($6, duracion_min),
-         planes_requeridos = COALESCE($7, planes_requeridos),
-         contenido_url     = COALESCE($8, contenido_url),
-         activo            = COALESCE($9, activo)
+         tipo           = COALESCE($1, tipo),
+         titulo         = COALESCE($2, titulo),
+         descripcion    = COALESCE($3, descripcion),
+         autor          = COALESCE($4, autor),
+         especialidad   = COALESCE($5, especialidad),
+         duracion_min   = COALESCE($6, duracion_min),
+         plan_requerido = COALESCE($7, plan_requerido),
+         contenido_url  = COALESCE($8, contenido_url),
+         activo         = COALESCE($9, activo)
        WHERE id = $10 AND es_evento = false
        RETURNING *`,
       [
@@ -726,7 +655,7 @@ router.put('/campus/:id', async (req, res, next) => {
         autor || null,
         especialidad || null,
         duracion_min || null,
-        planesArr,
+        plan_requerido || null,
         contenido_url || null,
         activo ?? null,
         req.params.id,
@@ -1621,6 +1550,97 @@ router.get('/auditoria', async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/admin/beneficios — Listar todos los beneficios
+// ─────────────────────────────────────────────────────────────
+router.get('/beneficios', async (req, res, next) => {
+  try {
+    const { rows } = await query(
+      `SELECT id, nombre, descripcion, categoria, descuento_pct,
+              codigo_descuento, logo_url, link_externo, plan_minimo, activo, creado_en
+       FROM beneficios
+       ORDER BY activo DESC, creado_en DESC`
+    );
+    res.json({ beneficios: rows });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// POST /api/admin/beneficios — Crear un beneficio
+// ─────────────────────────────────────────────────────────────
+router.post('/beneficios', async (req, res, next) => {
+  try {
+    const { nombre, descripcion, categoria, descuento_pct,
+            codigo_descuento, logo_url, link_externo, plan_minimo } = req.body;
+
+    if (!nombre?.trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' });
+
+    const { rows: [beneficio] } = await query(
+      `INSERT INTO beneficios
+         (nombre, descripcion, categoria, descuento_pct,
+          codigo_descuento, logo_url, link_externo, plan_minimo, activo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8, true)
+       RETURNING *`,
+      [
+        nombre.trim(),
+        descripcion || null,
+        categoria || null,
+        descuento_pct ? parseInt(descuento_pct) : null,
+        codigo_descuento || null,
+        logo_url || null,
+        link_externo || null,
+        plan_minimo || 'basico',
+      ]
+    );
+    res.status(201).json({ beneficio });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// PUT /api/admin/beneficios/:id — Actualizar un beneficio
+// ─────────────────────────────────────────────────────────────
+router.put('/beneficios/:id', async (req, res, next) => {
+  try {
+    const { nombre, descripcion, categoria, descuento_pct,
+            codigo_descuento, logo_url, link_externo, plan_minimo, activo } = req.body;
+
+    const { rows: [beneficio] } = await query(
+      `UPDATE beneficios SET
+         nombre           = COALESCE($1, nombre),
+         descripcion      = COALESCE($2, descripcion),
+         categoria        = COALESCE($3, categoria),
+         descuento_pct    = COALESCE($4, descuento_pct),
+         codigo_descuento = COALESCE($5, codigo_descuento),
+         logo_url         = COALESCE($6, logo_url),
+         link_externo     = COALESCE($7, link_externo),
+         plan_minimo      = COALESCE($8, plan_minimo),
+         activo           = COALESCE($9, activo)
+       WHERE id = $10
+       RETURNING *`,
+      [
+        nombre || null, descripcion || null, categoria || null,
+        descuento_pct != null ? parseInt(descuento_pct) : null,
+        codigo_descuento || null, logo_url || null,
+        link_externo || null, plan_minimo || null,
+        activo ?? null, req.params.id,
+      ]
+    );
+    if (!beneficio) return res.status(404).json({ error: 'Beneficio no encontrado.' });
+    res.json({ beneficio });
+  } catch (error) { next(error); }
+});
+
+// ─────────────────────────────────────────────────────────────
+// DELETE /api/admin/beneficios/:id — Eliminar un beneficio
+// ─────────────────────────────────────────────────────────────
+router.delete('/beneficios/:id', async (req, res, next) => {
+  try {
+    const { rowCount } = await query('DELETE FROM beneficios WHERE id = $1', [req.params.id]);
+    if (rowCount === 0) return res.status(404).json({ error: 'Beneficio no encontrado.' });
+    res.json({ mensaje: 'Beneficio eliminado.' });
+  } catch (error) { next(error); }
 });
 
 module.exports = router;

@@ -58,6 +58,7 @@ import AdminCampus      from './pages/admin/Campus';
 import AdminLinks       from './pages/admin/Links';
 import AdminForo        from './pages/admin/Foro';
 import AdminAuditoria   from './pages/admin/Auditoria';
+import AdminBeneficios  from './pages/admin/Beneficios';
 import NotFound         from './pages/NotFound';      // ← NUEVO
 
 // ─────────────────────────────────────────────────────────────
@@ -286,7 +287,8 @@ function AppRoutes() {
           <Route path="/admin/planes"       element={<RutaProtegida rolesPermitidos={['admin']}><AdminPlanes /></RutaProtegida>} />
           <Route path="/admin/comunicado"   element={<RutaProtegida rolesPermitidos={['admin']}><AdminComunicado /></RutaProtegida>} />
           <Route path="/admin/campus"    element={<RutaProtegida rolesPermitidos={['admin']}><AdminCampus /></RutaProtegida>} />
-          <Route path="/admin/links"     element={<RutaProtegida rolesPermitidos={['admin']}><AdminLinks /></RutaProtegida>} />
+          <Route path="/admin/links"        element={<RutaProtegida rolesPermitidos={['admin']}><AdminLinks /></RutaProtegida>} />
+          <Route path="/admin/beneficios"  element={<RutaProtegida rolesPermitidos={['admin']}><AdminBeneficios /></RutaProtegida>} />
           <Route path="/admin/foro"      element={<RutaProtegida rolesPermitidos={['admin']}><AdminForo /></RutaProtegida>} />
           <Route path="/admin/auditoria" element={<RutaProtegida rolesPermitidos={['admin']}><AdminAuditoria /></RutaProtegida>} />
 

@@ -48,7 +48,8 @@ export default function Navbar() {
     { href: '/admin/campus',     label: 'Campus'     },
     { href: '/admin/foro',       label: 'Foro'       },   // ← NUEVO
     { href: '/admin/eventos',    label: 'Eventos'    },
-    { href: '/admin/links',      label: 'Links'      },
+    { href: '/admin/links',        label: 'Links'      },
+    { href: '/admin/beneficios',   label: 'Beneficios' },
     { href: '/admin/comunicado', label: '📢 Comunicado' },
     { href: '/admin/auditoria',  label: '🔐 Auditoría'  },
   ];
