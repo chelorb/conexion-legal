@@ -32,7 +32,7 @@ async function seed() {
     const adminHash = await bcrypt.hash('Admin1234', 12);
     const { rows: [admin] } = await client.query(
       `INSERT INTO usuarios (nombre, apellido, email, password_hash, rol_id, email_verificado)
-       VALUES ('Admin', 'Sistema', 'admin@conexionlegal.com', $1, $2, true)
+       VALUES ('Admin', 'Sistema', 'admin@ejemplo.com', $1, $2, true)
        ON CONFLICT (email) DO NOTHING RETURNING id, email`,
       [adminHash, rolMap.admin]
     );
@@ -192,7 +192,7 @@ async function seed() {
 
     console.log('\n🎉 Datos de prueba listos');
     console.log('\n📋 Cuentas:');
-    console.log('   👑 Admin:     admin@conexionlegal.com / Admin1234');
+    console.log('   👑 Admin:     admin@ejemplo.com / [contraseña configurada en Neon]');
     console.log('   ⚖️  Comunidad: maria@test.com / Password1');
     console.log('   ⚖️  Básico:    carlos@test.com / Password1');
     console.log('   👤 Cliente:   ana@test.com / Password1');
