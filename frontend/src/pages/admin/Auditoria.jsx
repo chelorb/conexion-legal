@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Shield, Filter, ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ArrowLeft, Shield, Filter, ChevronLeft, ChevronRight, Search, Download, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -41,6 +41,150 @@ export default function AdminAuditoria() {
   });
 
   const setFiltro = (k, v) => setFiltros(p => ({ ...p, [k]: v, pagina: 1 }));
+  const [exportando, setExportando] = useState(false);
+
+  // ── Exportar a Excel ────────────────────────────────────────
+  const exportarExcel = async () => {
+    setExportando(true);
+    try {
+      // Traer TODOS los registros sin paginación para exportar
+      const params = new URLSearchParams();
+      if (filtros.accion) params.set('accion', filtros.accion);
+      if (filtros.desde)  params.set('desde',  filtros.desde);
+      if (filtros.hasta)  params.set('hasta',  filtros.hasta);
+      params.set('pagina', 1);
+      params.set('limite', 9999); // traer todo
+
+      const { data } = await api.get(`/admin/auditoria?${params}`);
+      const todos = data.registros || [];
+
+      // Importar xlsx dinámicamente
+      const XLSX = await import('https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs');
+
+      const filas = todos.map(r => ({
+        'Fecha':       format(new Date(r.creado_en), "dd/MM/yyyy HH:mm", { locale: es }),
+        'Acción':      etiquetaAccion(r.accion).label,
+        'Descripción': r.descripcion || '',
+        'Entidad':     r.entidad_label || '',
+        'Admin':       r.admin_nombre ? `${r.admin_nombre} ${r.admin_apellido || ''}`.trim() : r.admin_email || '',
+        'IP':          r.ip || '',
+        'ID Registro': r.id,
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(filas);
+      // Ancho de columnas
+      ws['!cols'] = [
+        { wch: 18 }, { wch: 22 }, { wch: 50 },
+        { wch: 35 }, { wch: 25 }, { wch: 16 }, { wch: 38 }
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Auditoría');
+
+      const fecha = format(new Date(), 'yyyyMMdd_HHmm');
+      XLSX.writeFile(wb, `IUSTIXIUM_Auditoria_${fecha}.xlsx`);
+      toast.success('Exportado a Excel correctamente.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al exportar a Excel.');
+    } finally { setExportando(false); }
+  };
+
+  // ── Exportar a PDF (impresión del navegador) ─────────────────
+  const exportarPDF = async () => {
+    setExportando(true);
+    try {
+      // Traer todos los registros
+      const params = new URLSearchParams();
+      if (filtros.accion) params.set('accion', filtros.accion);
+      if (filtros.desde)  params.set('desde',  filtros.desde);
+      if (filtros.hasta)  params.set('hasta',  filtros.hasta);
+      params.set('pagina', 1);
+      params.set('limite', 9999);
+
+      const { data } = await api.get(`/admin/auditoria?${params}`);
+      const todos = data.registros || [];
+
+      // Crear ventana de impresión con el contenido formateado
+      const filas = todos.map(r => `
+        <tr>
+          <td>${format(new Date(r.creado_en), "dd/MM/yyyy HH:mm", { locale: es })}</td>
+          <td><span class="badge">${etiquetaAccion(r.accion).label}</span></td>
+          <td>${r.descripcion || '—'}</td>
+          <td>${r.entidad_label || '—'}</td>
+          <td>${r.admin_nombre ? `${r.admin_nombre} ${r.admin_apellido || ''}`.trim() : r.admin_email || '—'}</td>
+          <td>${r.ip || '—'}</td>
+        </tr>
+      `).join('');
+
+      const fechaGen = format(new Date(), "dd/MM/yyyy HH:mm", { locale: es });
+      const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>IUSTIXIUM — Auditoría</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #333; padding: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #2C2B27; }
+    .header h1 { font-size: 18px; color: #2C2B27; }
+    .header p { font-size: 10px; color: #8A8780; }
+    .meta { margin-bottom: 12px; font-size: 10px; color: #666; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #2C2B27; color: #fff; padding: 8px 6px; text-align: left; font-size: 10px; }
+    td { padding: 6px; border-bottom: 1px solid #E8E6E3; vertical-align: top; font-size: 10px; }
+    tr:nth-child(even) td { background: #FAFAF8; }
+    .badge { background: #F0EFED; padding: 2px 6px; border-radius: 10px; font-size: 9px; white-space: nowrap; }
+    .footer { margin-top: 20px; text-align: center; font-size: 9px; color: #B0AEA8; }
+    @media print { body { padding: 10px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>⚖ IUSTIXIUM</h1>
+      <p>Plataforma Legal Digital</p>
+    </div>
+    <div style="text-align:right">
+      <strong>Registro de Auditoría</strong>
+      <p>Generado: ${fechaGen}</p>
+      <p>Total registros: ${todos.length}</p>
+    </div>
+  </div>
+  ${filtros.accion || filtros.desde || filtros.hasta ? `
+  <div class="meta">
+    Filtros aplicados:
+    ${filtros.accion ? `Acción: ${etiquetaAccion(filtros.accion).label}` : ''}
+    ${filtros.desde ? `| Desde: ${filtros.desde}` : ''}
+    ${filtros.hasta ? `| Hasta: ${filtros.hasta}` : ''}
+  </div>` : ''}
+  <table>
+    <thead>
+      <tr>
+        <th>Fecha</th>
+        <th>Acción</th>
+        <th>Descripción</th>
+        <th>Entidad</th>
+        <th>Usuario</th>
+        <th>IP</th>
+      </tr>
+    </thead>
+    <tbody>${filas}</tbody>
+  </table>
+  <div class="footer">IUSTIXIUM — Documento generado automáticamente el ${fechaGen}</div>
+</body>
+</html>`;
+
+      const win = window.open('', '_blank');
+      win.document.write(html);
+      win.document.close();
+      win.onload = () => { win.print(); };
+      toast.success('PDF listo para imprimir/guardar.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Error al generar el PDF.');
+    } finally { setExportando(false); }
+  };
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -142,16 +286,43 @@ export default function AdminAuditoria() {
           )}
         </div>
 
-        {/* Contador */}
-        <div className="flex items-center justify-between mb-4">
+        {/* Contador + Exportación */}
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <p className="font-body text-sm" style={{ color: '#8A8780' }}>
             {cargando ? 'Cargando...' : `${paginacion.total} registro${paginacion.total !== 1 ? 's' : ''} encontrado${paginacion.total !== 1 ? 's' : ''}`}
           </p>
-          {paginacion.paginas > 1 && (
-            <p className="font-body text-xs" style={{ color: '#B0AEA8' }}>
-              Página {paginacion.pagina} de {paginacion.paginas}
-            </p>
-          )}
+          <div className="flex items-center gap-2">
+            {paginacion.paginas > 1 && (
+              <p className="font-body text-xs mr-2" style={{ color: '#B0AEA8' }}>
+                Página {paginacion.pagina} de {paginacion.paginas}
+              </p>
+            )}
+            {/* Botones de exportación */}
+            {!cargando && paginacion.total > 0 && (
+              <>
+                <button
+                  onClick={exportarExcel}
+                  disabled={exportando}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-medium transition-colors disabled:opacity-40"
+                  style={{ background: 'rgba(22,163,74,0.08)', color: '#15803d', border: '1px solid rgba(22,163,74,0.2)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(22,163,74,0.15)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(22,163,74,0.08)'; }}
+                  title="Exportar a Excel">
+                  <Download size={13} /> {exportando ? 'Exportando...' : 'Excel'}
+                </button>
+                <button
+                  onClick={exportarPDF}
+                  disabled={exportando}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-body text-xs font-medium transition-colors disabled:opacity-40"
+                  style={{ background: 'rgba(184,96,48,0.08)', color: '#B86030', border: '1px solid rgba(184,96,48,0.2)' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.15)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(184,96,48,0.08)'; }}
+                  title="Exportar a PDF">
+                  <FileText size={13} /> {exportando ? 'Generando...' : 'PDF'}
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Lista de registros */}

@@ -1496,8 +1496,9 @@ router.patch('/usuarios/:id/verificar-email', async (req, res, next) => {
 // ─────────────────────────────────────────────────────────────
 router.get('/auditoria', async (req, res, next) => {
   try {
-    const { accion, desde, hasta, pagina = 1 } = req.query;
-    const limite = 50;
+    const { accion, desde, hasta, pagina = 1, limite: limiteParam } = req.query;
+    // Si viene ?limite=9999 (exportación), usar ese valor; sino máximo 50 por página
+    const limite = limiteParam ? Math.min(parseInt(limiteParam), 9999) : 50;
     const offset = (parseInt(pagina) - 1) * limite;
 
     const condiciones = [];
