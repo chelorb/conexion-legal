@@ -10,7 +10,7 @@ import {
   Shield, Check, X, Search, MapPin,
   RefreshCw, Clock, AlertCircle, ExternalLink,
   FileText, FolderOpen, ChevronRight,
-  ThumbsUp, ThumbsDown, CheckCircle, XCircle
+  ThumbsUp, ThumbsDown, CheckCircle, XCircle, Trash2, History
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -31,12 +31,25 @@ function BadgePlan({ slug }) {
 function TabDocumentos({ abogado }) {
   const [docs,       setDocs]       = useState([]);
   const [cargando,   setCargando]   = useState(true);
-  const [procesando, setProcesando] = useState(null);
+  const [procesando,       setProcesando]       = useState(null);
+  const [historialVisible, setHistorialVisible] = useState(false);
+
+  const eliminar = async (docId, nombre) => {
+    if (!window.confirm(`¿Eliminar el documento "${nombre}"?`)) return;
+    setProcesando(docId);
+    try {
+      await api.delete(`/documentos/${docId}`);
+      toast.success('Documento eliminado.');
+      cargar();
+    } catch (err) { toast.error(err.response?.data?.error || 'Error al eliminar.'); }
+    finally { setProcesando(null); }
+  };
 
   const ESTADOS = {
     pendiente: { icono: <Clock size={11} />,        label: 'En revisión', color: '#b45309', bg: 'rgba(245,158,11,0.1)' },
     aprobado:  { icono: <CheckCircle size={11} />,  label: 'Aprobado',    color: '#15803d', bg: 'rgba(22,163,74,0.1)'  },
-    rechazado: { icono: <XCircle size={11} />,      label: 'Rechazado',   color: '#dc2626', bg: 'rgba(220,38,38,0.1)'  },
+    rechazado:   { icono: <XCircle size={11} />,   label: 'Rechazado',   color: '#dc2626', bg: 'rgba(220,38,38,0.1)'  },
+    reemplazado: { icono: <History size={11} />,    label: 'Reemplazado', color: '#8A8780', bg: 'rgba(138,135,128,0.1)'},
   };
 
   const cargar = async () => {
@@ -75,6 +88,9 @@ function TabDocumentos({ abogado }) {
     </div>
   );
 
+  const docsVigentes     = docs.filter(d => d.estado !== 'reemplazado');
+  const docsReemplazados  = docs.filter(d => d.estado === 'reemplazado');
+
   if (docs.length === 0) return (
     <div className="py-10 text-center">
       <FolderOpen size={32} className="mx-auto mb-2" style={{ color: '#D4D2CC' }} />
@@ -102,7 +118,7 @@ function TabDocumentos({ abogado }) {
         </p>
       )}
 
-      {docs.map(doc => {
+      {docsVigentes.map(doc => {
         const cfg = ESTADOS[doc.estado] || ESTADOS.pendiente;
         const enProceso = procesando === doc.id;
         return (
@@ -151,6 +167,53 @@ function TabDocumentos({ abogado }) {
           </div>
         );
       })}
+
+      {/* Historial de documentos reemplazados */}
+      {docsReemplazados.length > 0 && (
+        <div className="mt-3">
+          <button onClick={() => setHistorialVisible(!historialVisible)}
+            className="flex items-center gap-2 font-body text-xs"
+            style={{ color: '#8A8780' }}>
+            <History size={13} />
+            {historialVisible ? 'Ocultar' : 'Ver'} historial ({docsReemplazados.length} anterior{docsReemplazados.length !== 1 ? 'es' : ''})
+          </button>
+          {historialVisible && (
+            <div className="mt-2 space-y-2 pl-3 border-l-2" style={{ borderColor: '#E8E6E3' }}>
+              {docsReemplazados.map(doc => (
+                <div key={doc.id} className="rounded-xl p-3"
+                  style={{ background: '#F7F6F4', border: '1px solid #E8E6E3', opacity: 0.75 }}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <History size={13} style={{ color: '#B0AEA8' }} />
+                      <div className="min-w-0">
+                        <p className="font-body text-xs truncate" style={{ color: '#8A8780' }}>{doc.nombre}</p>
+                        <p className="font-body text-xs" style={{ color: '#B0AEA8' }}>
+                          Reemplazado: {doc.reemplazado_en ? new Date(doc.reemplazado_en).toLocaleDateString('es-AR') : '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <a href={doc.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg font-body text-xs"
+                        style={{ background: '#F0EFED', color: '#56534A' }}>
+                        <ExternalLink size={11} /> Ver
+                      </a>
+                      <button onClick={() => eliminar(doc.id, doc.nombre)}
+                        disabled={procesando === doc.id}
+                        className="px-2 py-1 rounded-lg font-body text-xs transition-colors"
+                        style={{ background: 'rgba(220,38,38,0.06)', color: '#dc2626' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.15)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(220,38,38,0.06)'; }}>
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

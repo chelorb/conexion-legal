@@ -41,6 +41,7 @@ router.get('/mis-documentos', verificarToken, requireRol('abogado'), async (req,
       `SELECT id, tipo, nombre, url, estado, motivo_rechazo, creado_en, revisado_en
        FROM documentos_abogado
        WHERE abogado_id = $1
+         AND estado != 'reemplazado'
        ORDER BY creado_en DESC`,
       [req.usuario.id]
     );
@@ -68,7 +69,18 @@ router.post('/subir', verificarToken, requireRol('abogado'), upload.single('arch
       resource_type: req.file.mimetype === 'application/pdf' ? 'raw' : 'image',
     });
 
-    // Guardar en DB
+    // Marcar documento anterior del mismo tipo como reemplazado (si existe)
+    // Esto mantiene el historial completo sin borrar nada
+    await query(
+      `UPDATE documentos_abogado
+       SET estado = 'reemplazado', reemplazado_en = NOW()
+       WHERE abogado_id = $1
+         AND tipo = $2
+         AND estado != 'reemplazado'`,
+      [abogadoId, tipo]
+    );
+
+    // Guardar el nuevo documento en DB
     const { rows: [doc] } = await query(
       `INSERT INTO documentos_abogado
          (abogado_id, tipo, nombre, cloudinary_id, url, estado)
@@ -122,6 +134,7 @@ router.get('/abogado/:id', verificarToken, requireRol('admin'), async (req, res,
       `SELECT id, tipo, nombre, url, estado, motivo_rechazo, creado_en, revisado_en
        FROM documentos_abogado
        WHERE abogado_id = $1
+         AND estado != 'reemplazado'
        ORDER BY creado_en DESC`,
       [req.params.id]
     );
